@@ -132,7 +132,7 @@ def generate(NETWORK_ENDPOINTS,
     cmd_data['init'] = app.Init(queues=queue_specs, modules=mod_specs)
 
 
-    cmd_data['conf'] = acmd([("qton_fragments", qton.Conf(msg_type="dunedaq::dataformats::Fragment",
+    cmd_data['conf'] = acmd([("qton_fragments", qton.Conf(msg_type="std::unique_ptr<dunedaq::dataformats::Fragment>",
                                            msg_module_name="FragmentNQ",
                                            sender_config=nos.Conf(ipm_plugin_type="ZmqSender",
                                                                   address=NETWORK_ENDPOINTS["frags"],

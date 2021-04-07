@@ -129,7 +129,7 @@ def generate(NETWORK_ENDPOINTS,
                                                                     address=NETWORK_ENDPOINTS["trigdec"]))),
 
 
-                ("ntoq_fragments", ntoq.Conf(msg_type="dunedaq::dataformats::Fragment",
+                ("ntoq_fragments", ntoq.Conf(msg_type="std::unique_ptr<dunedaq::dataformats::Fragment>",
                                            msg_module_name="FragmentNQ",
                                            receiver_config=nor.Conf(ipm_plugin_type="ZmqReceiver",
                                                                     address=NETWORK_ENDPOINTS["frags"]))),
