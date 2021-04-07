@@ -108,7 +108,7 @@ def generate(
             app.QueueSpec(inst="trigger_decision_from_netq", kind='FollySPSCQueue', capacity=100),
             app.QueueSpec(inst="trigger_decision_copy_for_bookkeeping", kind='FollySPSCQueue', capacity=100),
             app.QueueSpec(inst="trigger_record_q", kind='FollySPSCQueue', capacity=100),
-            app.QueueSpec(inst="data_fragments_q", kind='FollyMPMCQueue', capacity=1000),
+            app.QueueSpec(inst="data_fragments_q", kind='FollyMPMCQueue', capacity=100*NUMBER_OF_DATA_PRODUCERS),
         ] + [
             app.QueueSpec(inst=f"data_requests_{idx}", kind='FollySPSCQueue', capacity=100)
                 for idx in range(NUMBER_OF_DATA_PRODUCERS)
