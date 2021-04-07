@@ -26,8 +26,8 @@ moo.otypes.load_types('appfwk/app.jsonnet')
 moo.otypes.load_types('trigemu/triggerdecisionemulator.jsonnet')
 moo.otypes.load_types('nwqueueadapters/queuetonetwork.jsonnet')
 moo.otypes.load_types('nwqueueadapters/networktoqueue.jsonnet')
-moo.otypes.load_types('serialization/networkobjectreceiver.jsonnet')
-moo.otypes.load_types('serialization/networkobjectsender.jsonnet')
+moo.otypes.load_types('nwqueueadapters/networkobjectreceiver.jsonnet')
+moo.otypes.load_types('nwqueueadapters/networkobjectsender.jsonnet')
 
 # Import new types
 import dunedaq.cmdlib.cmd as basecmd # AddressedCmd, 
@@ -37,8 +37,8 @@ import dunedaq.appfwk.app as app # AddressedCmd,
 import dunedaq.trigemu.triggerdecisionemulator as tde
 import dunedaq.nwqueueadapters.networktoqueue as ntoq
 import dunedaq.nwqueueadapters.queuetonetwork as qton
-import dunedaq.serialization.networkobjectreceiver as nor
-import dunedaq.serialization.networkobjectsender as nos
+import dunedaq.nwqueueadapters.networkobjectreceiver as nor
+import dunedaq.nwqueueadapters.networkobjectsender as nos
 
 from appfwk.utils import mcmd, mrccmd, mspec
 
