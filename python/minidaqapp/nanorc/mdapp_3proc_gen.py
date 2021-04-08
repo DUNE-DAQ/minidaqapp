@@ -59,7 +59,7 @@ def cli(number_of_data_producers, emulator_mode, data_rate_slowdown_factor, run_
 
     port=12349
     for idx in range(number_of_data_producers):
-        network_endpoints[f"datareq_{idx}"] = f"tcp://{host_ru}:{port}"
+        network_endpoints[f"datareq_{idx}"] = "tcp://{host_ru}:"+f"{port}"
         port = port + 1
 
 
