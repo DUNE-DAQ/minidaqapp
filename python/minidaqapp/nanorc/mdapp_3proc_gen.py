@@ -54,12 +54,12 @@ def cli(number_of_data_producers, emulator_mode, data_rate_slowdown_factor, run_
         "trigdec" : "tcp://{host_trg}:12345",
         "triginh" : "tcp://{host_df}:12346",
         "timesync": "tcp://{host_ru}:12347",
-        "frags": "tcp://{host_df}:12348"
+        "frags": "tcp://{host_ru}:12348"
     }
 
     port=12349
     for idx in range(number_of_data_producers):
-        network_endpoints[f"datareq_{idx}"] = "tcp://{host_ru}:"+f"{port}"
+        network_endpoints[f"datareq_{idx}"] = "tcp://{host_df}:"+f"{port}"
         port = port + 1
 
 
