@@ -97,7 +97,8 @@ def generate_df(
             app.QueueSpec(inst="trigger_decision_from_netq", kind='FollySPSCQueue', capacity=100),
             app.QueueSpec(inst="trigger_decision_copy_for_bookkeeping", kind='FollySPSCQueue', capacity=100),
             app.QueueSpec(inst="trigger_record_q", kind='FollySPSCQueue', capacity=100),
-            app.QueueSpec(inst="data_fragments_q", kind='FollyMPMCQueue', capacity=1000),
+            app.QueueSpec(inst="data_fragments_to_netq", kind='FollyMPMCQueue', capacity=1000),
+            app.QueueSpec(inst="data_fragments_from_netq", kind='FollyMPMCQueue', capacity=1000),
         ] + [
             app.QueueSpec(inst=f"data_requests_{idx}", kind='FollySPSCQueue', capacity=100)
                 for idx in range(NUMBER_OF_DATA_PRODUCERS)
@@ -113,6 +114,14 @@ def generate_df(
 
 
     mod_specs = [
+        mspec("ntoq_fragments", "NetworkToQueue", [
+                        app.QueueInfo(name="output", inst="data_fragments_from_netq", dir="output")
+                    ]),
+
+        mspec("qton_fragments", "QueueToNetwork", [
+                        app.QueueInfo(name="input", inst="data_fragments_to_netq", dir="input")
+                    ]),
+
         mspec("ntoq_trigdec", "NetworkToQueue", [
                         app.QueueInfo(name="output", inst="trigger_decision_from_netq", dir="output")
                     ]),
@@ -136,7 +145,7 @@ def generate_df(
         mspec("ffr", "FragmentReceiver", [
                         app.QueueInfo(name="trigger_decision_input_queue", inst="trigger_decision_copy_for_bookkeeping", dir="input"),
                         app.QueueInfo(name="trigger_record_output_queue", inst="trigger_record_q", dir="output"),
-                        app.QueueInfo(name="data_fragment_input_queue", inst="data_fragments_q", dir="input"),
+                        app.QueueInfo(name="data_fragment_input_queue", inst="data_fragments_from_netq", dir="input"),
                     ]),
 
         mspec("datawriter", "DataWriter", [
@@ -150,7 +159,7 @@ def generate_df(
                             app.QueueInfo(name="raw_input", inst=f"wib_link_{idx}", dir="input"),
                             app.QueueInfo(name="timesync", inst="time_sync_q", dir="output"),
                             app.QueueInfo(name="requests", inst=f"data_requests_{idx}", dir="input"),
-                            app.QueueInfo(name="fragments", inst="data_fragments_q", dir="output"),
+                            app.QueueInfo(name="fragments", inst="data_fragments_to_netq", dir="output"),
                             ]) for idx in range(NUMBER_OF_DATA_PRODUCERS)
         ]
 
@@ -183,6 +192,22 @@ def generate_df(
     )
 
     confcmd = mrccmd("conf", "INITIAL", "CONFIGURED",[
+                ("ntoq_fragments", ntoq.Conf(msg_type="std::unique_ptr<dunedaq::dataformats::Fragment>",
+                                           msg_module_name="FragmentNQ",
+                                           receiver_config=nor.Conf(ipm_plugin_type="ZmqReceiver",
+                                                                    address="tcp://127.0.0.1:12333")
+                                           )
+                 ),
+
+                ("qton_fragments", qton.Conf(msg_type="std::unique_ptr<dunedaq::dataformats::Fragment>",
+                                           msg_module_name="FragmentNQ",
+                                           sender_config=nos.Conf(ipm_plugin_type="ZmqSender",
+                                                                  address="tcp://127.0.0.1:12333",
+                                                                  stype="msgpack")
+                                           )
+                 ),
+
+        
                 ("ntoq_trigdec", ntoq.Conf(msg_type="dunedaq::dfmessages::TriggerDecision",
                                            msg_module_name="TriggerDecisionNQ",
                                            receiver_config=nor.Conf(ipm_plugin_type="ZmqReceiver",
