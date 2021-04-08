@@ -79,7 +79,7 @@ def generate(NETWORK_ENDPOINTS,
 
     cmd_data = {}
 
-    required_eps = {'trigdec', 'triginh', 'timesync'}
+    required_eps = {'trigdec', 'triginh'}
     if not required_eps.issubset(NETWORK_ENDPOINTS):
         raise RuntimeError(f"ERROR: not all the required endpoints ({', '.join(required_eps)}) found in list of endpoints {' '.join(NETWORK_ENDPOINTS.keys())}")
 
@@ -129,22 +129,11 @@ def generate(NETWORK_ENDPOINTS,
                                                                     address=NETWORK_ENDPOINTS["trigdec"]))),
 
 
-                ("ntoq_fragments", ntoq.Conf(msg_type="std::unique_ptr<dunedaq::dataformats::Fragment>",
-                                           msg_module_name="FragmentNQ",
-                                           receiver_config=nor.Conf(ipm_plugin_type="ZmqReceiver",
-                                                                    address=NETWORK_ENDPOINTS["frags"]))),
-
                 ("qton_token", qton.Conf(msg_type="dunedaq::dfmessages::TriggerDecisionToken",
                                            msg_module_name="TriggerDecisionTokenNQ",
                                            sender_config=nos.Conf(ipm_plugin_type="ZmqSender",
                                                                   address=NETWORK_ENDPOINTS["triginh"],
                                                                   stype="msgpack"))),
-
-                ("qton_timesync", qton.Conf(msg_type="dunedaq::dfmessages::TimeSync",
-                                            msg_module_name="TimeSyncNQ",
-                                            sender_config=nos.Conf(ipm_plugin_type="ZmqSender",
-                                                                   address=NETWORK_ENDPOINTS["timesync"],
-                                                                   stype="msgpack"))),
         
                 ("rqg", rqg.ConfParams(map=rqg.mapgeoidqueue([
                                 rqg.geoidinst(apa=0, link=idx, queueinstance=f"data_requests_{idx}") for idx in range(NUMBER_OF_DATA_PRODUCERS)
@@ -164,12 +153,20 @@ def generate(NETWORK_ENDPOINTS,
                                 file_layout_parameters = hdf5ds.HDF5DataStoreFileLayoutParams(trigger_record_name_prefix= "TriggerRecord",
                                     digits_for_trigger_number = 5,
                                     digits_for_apa_number = 3,
-                                    digits_for_link_number = 2,)))),] + [
+                                    digits_for_link_number = 2,)))),
+            ] + [
                 (f"qton_datareq_{idx}", qton.Conf(msg_type="dunedaq::dfmessages::DataRequest",
                                            msg_module_name="DataRequestNQ",
                                            sender_config=nos.Conf(ipm_plugin_type="ZmqSender",
-                                                                  address=NETWORK_ENDPOINTS[f"datareq_{idx}"],
-                                                                  stype="msgpack"))) for idx in range(NUMBER_OF_DATA_PRODUCERS)
+                                                                  address=NETWORK_ENDPOINTS[inst],
+                                                                  stype="msgpack"))) 
+                for idx, inst in enumerate(NETWORK_ENDPOINTS) if "datareq" in inst
+            ] + [
+                (f"ntoq_fragments_{idx}", ntoq.Conf(msg_type="std::unique_ptr<dunedaq::dataformats::Fragment>",
+                                           msg_module_name="FragmentNQ",
+                                           receiver_config=nor.Conf(ipm_plugin_type="ZmqReceiver",
+                                                                    address=NETWORK_ENDPOINTS[inst])))
+                for idx, inst in enumerate(NETWORK_ENDPOINTS) if "frags" in inst
             ])
 
 

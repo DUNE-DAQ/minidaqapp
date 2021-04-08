@@ -74,12 +74,13 @@ def generate(NETWORK_ENDPOINTS,
         RUN_NUMBER=333, 
         DATA_FILE="./frames.bin",
         FLX_INPUT=True,
-        CLOCK_SPEED_HZ=50000000):
+        CLOCK_SPEED_HZ=50000000,
+        HOSTIDX=0):
     """Generate the json configuration for the readout and DF process"""
 
     cmd_data = {}
 
-    required_eps = {'timesync'}
+    required_eps = {f'timesync_{HOSTIDX}'}
     if not required_eps.issubset(NETWORK_ENDPOINTS):
         raise RuntimeError(f"ERROR: not all the required endpoints ({', '.join(required_eps)}) found in list of endpoints {' '.join(NETWORK_ENDPOINTS.keys())}")
 
@@ -135,14 +136,14 @@ def generate(NETWORK_ENDPOINTS,
     cmd_data['conf'] = acmd([("qton_fragments", qton.Conf(msg_type="std::unique_ptr<dunedaq::dataformats::Fragment>",
                                            msg_module_name="FragmentNQ",
                                            sender_config=nos.Conf(ipm_plugin_type="ZmqSender",
-                                                                  address=NETWORK_ENDPOINTS["frags"],
+                                                                  address=NETWORK_ENDPOINTS[f"frags_{HOSTIDX}"],
                                                                   stype="msgpack"))),
 
 
                 ("qton_timesync", qton.Conf(msg_type="dunedaq::dfmessages::TimeSync",
                                             msg_module_name="TimeSyncNQ",
                                             sender_config=nos.Conf(ipm_plugin_type="ZmqSender",
-                                                                   address=NETWORK_ENDPOINTS["timesync"],
+                                                                   address=NETWORK_ENDPOINTS[f"timesync_{HOSTIDX}"],
                                                                    stype="msgpack"))),
         
                 ("fake_source",fakecr.Conf(link_ids=list(range(NUMBER_OF_DATA_PRODUCERS)),
@@ -170,7 +171,7 @@ def generate(NETWORK_ENDPOINTS,
                 (f"ntoq_datareq_{idx}", ntoq.Conf(msg_type="dunedaq::dfmessages::DataRequest",
                                            msg_module_name="DataRequestNQ",
                                            receiver_config=nor.Conf(ipm_plugin_type="ZmqReceiver",
-                                                                    address=NETWORK_ENDPOINTS[f"datareq_{idx}"]))) for idx in range(NUMBER_OF_DATA_PRODUCERS)
+                                                                    address=NETWORK_ENDPOINTS[f"datareq_{HOSTIDX}_{idx}"]))) for idx in range(NUMBER_OF_DATA_PRODUCERS)
             ] + [
                 (f"datahandler_{idx}", dlh.Conf(raw_type = "wib",
                         emulator_mode = EMULATOR_MODE,

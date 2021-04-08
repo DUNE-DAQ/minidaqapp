@@ -84,7 +84,7 @@ def generate(
     """
     cmd_data = {}
 
-    required_eps = {'trigdec', 'triginh', 'timesync'}
+    required_eps = {'trigdec', 'triginh'}
     if not required_eps.issubset(NETWORK_ENDPOINTS):
         raise RuntimeError(f"ERROR: not all the required endpoints ({', '.join(required_eps)}) found in list of endpoints {' '.join(NETWORK_ENDPOINTS.keys())}")
 
@@ -99,7 +99,7 @@ def generate(
 
     # Define modules and queues
     queue_bare_specs = [
-            app.QueueSpec(inst="time_sync_from_netq", kind='FollySPSCQueue', capacity=100),
+            app.QueueSpec(inst="time_sync_from_netq", kind='FollyMPMCQueue', capacity=100),
             app.QueueSpec(inst="token_from_netq", kind='FollySPSCQueue', capacity=20),
             app.QueueSpec(inst="trigger_decision_to_netq", kind='FollySPSCQueue', capacity=20),
         ]
@@ -117,15 +117,15 @@ def generate(
                         app.QueueInfo(name="output", inst="token_from_netq", dir="output")
                     ]),
 
-        mspec("ntoq_timesync", "NetworkToQueue", [
-                        app.QueueInfo(name="output", inst="time_sync_from_netq", dir="output")
-                    ]),
-
         mspec("tde", "TriggerDecisionEmulator", [
                         app.QueueInfo(name="time_sync_source", inst="time_sync_from_netq", dir="input"),
                         app.QueueInfo(name="token_source", inst="token_from_netq", dir="input"),
                         app.QueueInfo(name="trigger_decision_sink", inst="trigger_decision_to_netq", dir="output"),
                     ]),
+        ] + [
+        mspec(f"ntoq_timesync_{idx}", "NetworkToQueue", [
+                        app.QueueInfo(name="output", inst="time_sync_from_netq", dir="output")
+                    ]) for idx, inst in enumerate(NETWORK_ENDPOINTS) if "timesync" in inst
         ]
 
     cmd_data['init'] = app.Init(queues=queue_specs, modules=mod_specs)
@@ -146,12 +146,6 @@ def generate(
                                             )
                  ),
 
-                ("ntoq_timesync", ntoq.Conf(msg_type="dunedaq::dfmessages::TimeSync",
-                                           msg_module_name="TimeSyncNQ",
-                                           receiver_config=nor.Conf(ipm_plugin_type="ZmqReceiver",
-                                                                    address=NETWORK_ENDPOINTS["timesync"])
-                                           )
-                ),
 
                 ("tde", tde.ConfParams(
                         links=[idx for idx in range(NUMBER_OF_DATA_PRODUCERS)],
@@ -170,19 +164,27 @@ def generate(
                         clock_frequency_hz=CLOCK_SPEED_HZ/DATA_RATE_SLOWDOWN_FACTOR,
                         initial_token_count=TOKEN_COUNT                    
                         )),
-            ])
+            ] + [
+
+                (f"ntoq_timesync_{idx}", ntoq.Conf(msg_type="dunedaq::dfmessages::TimeSync",
+                                           msg_module_name="TimeSyncNQ",
+                                           receiver_config=nor.Conf(ipm_plugin_type="ZmqReceiver",
+                                                                    address=NETWORK_ENDPOINTS[inst])
+                                           )
+                ) for idx, inst in enumerate(NETWORK_ENDPOINTS) if "timesync" in inst
+])
 
     startpars = rccmd.StartParams(run=RUN_NUMBER, disable_data_storage=False)
     cmd_data['start'] = acmd([
             ("qton_trigdec", startpars),
             ("ntoq_token", startpars),
-            ("ntoq_timesync", startpars),
+            ("ntoq_timesync_.*", startpars),
             ("tde", startpars),
         ])
 
     cmd_data['stop'] = acmd([
             ("qton_trigdec", None),
-            ("ntoq_timesync", None),
+            ("ntoq_timesync_.*", None),
             ("ntoq_token", None),
             ("tde", None),
         ])
