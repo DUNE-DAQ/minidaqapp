@@ -53,8 +53,8 @@ def cli(number_of_data_producers, emulator_mode, data_rate_slowdown_factor, run_
     network_endpoints={
         "trigdec" : "tcp://{host_trg}:12345",
         "triginh" : "tcp://{host_df}:12346",
-        "timesync": "tcp://{host_ru}:12347",
-        "frags": "tcp://{host_ru}:12348"
+        "timesync_0": "tcp://{host_ru}:12347",
+        "frags_0": "tcp://{host_ru}:12348"
     }
 
     port=12349
@@ -83,7 +83,8 @@ def cli(number_of_data_producers, emulator_mode, data_rate_slowdown_factor, run_
         RUN_NUMBER = run_number, 
         DATA_FILE = data_file,
         FLX_INPUT = use_felix,
-        CLOCK_SPEED_HZ = CLOCK_SPEED_HZ
+        CLOCK_SPEED_HZ = CLOCK_SPEED_HZ,
+        HOSTIDX = 0
     )
     console.log("readout cmd data:", cmd_data_readout)
 
