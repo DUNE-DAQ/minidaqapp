@@ -132,10 +132,8 @@ def cli(number_of_data_producers, emulator_mode, data_rate_slowdown_factor, run_
     cmd_set = ["init", "conf", "start", "stop", "pause", "resume", "scrap"]
     for app,data in [(app_trgemu, cmd_data_trg), (app_df, cmd_data_dataflow)] + list(zip(app_ru, cmd_data_readout)):
         console.log(f"Generating {app} command data json files")
-    # for app,data in ((app_trgemu, None), (app_dfru, None)):
         for c in cmd_set:
             with open(f'{join(data_dir, app)}_{c}.json', 'w') as f:
-                # f.write(f'{app} {c}')
                 json.dump(data[c].pod(), f, indent=4, sort_keys=True)
 
 
@@ -160,10 +158,42 @@ def cli(number_of_data_producers, emulator_mode, data_rate_slowdown_factor, run_
 
     console.log(f"Generating boot json file")
     with open(join(json_dir,'boot.json'), 'w') as f:
+        daq_app_specs = {
+            "daq_application_ups" : {
+                "comment": "Application profile based on a full dbt runtime environment",
+                "env": {
+                "DBT_AREA_ROOT": "getenv" 
+                },
+                "cmd": [
+                    "CMD_FAC=rest://localhost:${APP_PORT}",
+                    "INFO_SVC=file://info_${APP_ID}_${APP_PORT}.json",
+                    "cd ${DBT_AREA_ROOT}",
+                    "source dbt-setup-env.sh",
+                    "dbt-setup-runtime-environment",
+                    "cd ${APP_WD}",
+                    "daq_application --name ${APP_ID} -c ${CMD_FAC} -i ${INFO_SVC}"
+                ]
+            },
+            "daq_application" : {
+                "comment": "Application profile using  PATH variables (lower start time)",
+                "env":{
+                    "CET_PLUGIN_PATH": "getenv",
+                    "DUNEDAQ_SHARE_PATH": "getenv",
+                    "LD_LIBRARY_PATH": "getenv",
+                    "PATH": "getenv"
+                },
+                "cmd": [
+                    "CMD_FAC=rest://localhost:${APP_PORT}",
+                    "INFO_SVC=file://info_${APP_NAME}_${APP_PORT}.json",
+                    "cd ${APP_WD}",
+                    "daq_application --name ${APP_NAME} -c ${CMD_FAC} -i ${INFO_SVC}"
+                ]
+            }
+        }
+
         cfg = {
             "env" : {
-                "DBT_ROOT": "env",
-                "DBT_AREA_ROOT": "env"
+                "DUNEDAQ_ERS_VERBOSITY_LEVEL": 1
             },
             "hosts": {
                 "host_df": host_df,
@@ -180,7 +210,11 @@ def cli(number_of_data_producers, emulator_mode, data_rate_slowdown_factor, run_
                     "host": "host_df",
                     "port": 3334
                 }
-            }
+            },
+            "response_listener": {
+                "port": 56789
+            },
+            "exec": daq_app_specs
         }
         appport=3335
         for hostidx in range(len(host_ru)):

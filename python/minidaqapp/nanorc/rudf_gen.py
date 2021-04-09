@@ -18,8 +18,8 @@ moo.otypes.load_types('dfmodules/hdf5datastore.jsonnet')
 #moo.otypes.load_types('dfmodules/fakedataprod.jsonnet')
 moo.otypes.load_types('nwqueueadapters/queuetonetwork.jsonnet')
 moo.otypes.load_types('nwqueueadapters/networktoqueue.jsonnet')
-moo.otypes.load_types('serialization/networkobjectreceiver.jsonnet')
-moo.otypes.load_types('serialization/networkobjectsender.jsonnet')
+moo.otypes.load_types('nwqueueadapters/networkobjectreceiver.jsonnet')
+moo.otypes.load_types('nwqueueadapters/networkobjectsender.jsonnet')
 moo.otypes.load_types('flxlibs/felixcardreader.jsonnet')
 moo.otypes.load_types('readout/fakecardreader.jsonnet')
 moo.otypes.load_types('readout/datalinkhandler.jsonnet')
@@ -37,8 +37,8 @@ import dunedaq.dfmodules.hdf5datastore as hdf5ds
 #import dunedaq.dfmodules.fakedataprod as fdp
 import dunedaq.nwqueueadapters.networktoqueue as ntoq
 import dunedaq.nwqueueadapters.queuetonetwork as qton
-import dunedaq.serialization.networkobjectreceiver as nor
-import dunedaq.serialization.networkobjectsender as nos
+import dunedaq.nwqueueadapters.networkobjectreceiver as nor
+import dunedaq.nwqueueadapters.networkobjectsender as nos
 import dunedaq.readout.fakecardreader as fakecr
 import dunedaq.flxlibs.felixcardreader as flxcr
 import dunedaq.readout.datalinkhandler as dlh
