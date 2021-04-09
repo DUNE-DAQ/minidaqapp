@@ -17,7 +17,7 @@ console = Console()
 import click
 
 @click.command(context_settings=CONTEXT_SETTINGS)
-@click.option('-n', '--number-of-data-producers', default=2)
+@click.option('-n', '--number-of-data-producers', default=2, help="Number of links to use, either per ru (<10) or total. If total is given, will be adjusted to the closest multiple of the number of rus")
 @click.option('-e', '--emulator-mode', is_flag=True)
 @click.option('-s', '--data-rate-slowdown-factor', default=1)
 @click.option('-r', '--run-number', default=333)
@@ -28,7 +28,7 @@ import click
 @click.option('--disable-data-storage', is_flag=True)
 @click.option('-f', '--use-felix', is_flag=True)
 @click.option('--host-df', default='localhost')
-@click.option('--host-ru', multiple=True, default=['localhost'])
+@click.option('--host-ru', multiple=True, default=['localhost'], help="This option is repeatable, with each repetition adding an additional ru process.")
 @click.option('--host-trg', default='localhost')
 @click.argument('json_dir', type=click.Path())
 def cli(number_of_data_producers, emulator_mode, data_rate_slowdown_factor, run_number, trigger_rate_hz, token_count, data_file, output_path, disable_data_storage, use_felix, host_df, host_ru, host_trg, json_dir):
