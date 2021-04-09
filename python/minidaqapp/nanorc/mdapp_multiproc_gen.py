@@ -1,5 +1,6 @@
 import json
 import os
+import math
 import rich.traceback
 from rich.console import Console
 from os.path import exists, join
@@ -42,6 +43,16 @@ def cli(number_of_data_producers, emulator_mode, data_rate_slowdown_factor, run_
     from . import trg_gen
     console.log(f"Generating configs for hosts trg={host_trg} dataflow={host_df} readout={host_ru}")
 
+    total_number_of_data_producers = 0
+    if number_of_data_producers > 10:
+        total_old = number_of_data_producers
+        number_of_data_producers = math.floor(number_of_data_producers / len(host_ru))
+        total_number_of_data_producers = number_of_data_producers * len(host_ru)
+        console.log(f"More than 10 data producers were requested ({total_old}): Will setup {number_of_data_producers} per host, for a total of {total_number_of_data_producers}")
+    else:
+        total_number_of_data_producers = number_of_data_producers * len(host_ru)
+        console.log(f"Fewer than 10 data producers were requested: Will setup {number_of_data_producers} per host, for a total of {total_number_of_data_producers}")
+        
 
     if token_count > 0:
         df_token_count = 0
@@ -56,21 +67,22 @@ def cli(number_of_data_producers, emulator_mode, data_rate_slowdown_factor, run_
     }
 
     port=12347
+    for idx in range(total_number_of_data_producers):
+        network_endpoints[f"datareq_{idx}"] = "tcp://{host_df}:"+f"{port}"
+        port = port + 1
+
     for hostidx in range(len(host_ru)):
         # Should end up something like 'network_endpoints[timesync_0]: "tcp://{host_ru0}:12347"'
         network_endpoints[f"timesync_{hostidx}"] = "tcp://{host_ru" + f"{hostidx}" + "}:" + f"{port}"
         port = port + 1
         network_endpoints[f"frags_{hostidx}"] = "tcp://{host_ru"+ f"{hostidx}" + "}:" + f"{port}"
         port = port + 1
-        for idx in range(number_of_data_producers):
-            network_endpoints[f"datareq_{hostidx}_{idx}"] = "tcp://{host_df}:"+f"{port}"
-            port = port + 1
         hostidx = hostidx + 1
 
 
     cmd_data_trg = trg_gen.generate(
         network_endpoints,
-        NUMBER_OF_DATA_PRODUCERS = number_of_data_producers,
+        NUMBER_OF_DATA_PRODUCERS = total_number_of_data_producers,
         DATA_RATE_SLOWDOWN_FACTOR = data_rate_slowdown_factor,
         RUN_NUMBER = run_number, 
         TRIGGER_RATE_HZ = trigger_rate_hz,
@@ -82,7 +94,7 @@ def cli(number_of_data_producers, emulator_mode, data_rate_slowdown_factor, run_
 
     cmd_data_dataflow = dataflow_gen.generate(
         network_endpoints,
-        NUMBER_OF_DATA_PRODUCERS = number_of_data_producers,
+        NUMBER_OF_DATA_PRODUCERS = total_number_of_data_producers,
         RUN_NUMBER = run_number, 
         OUTPUT_PATH = output_path,
         DISABLE_OUTPUT = disable_data_storage,

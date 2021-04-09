@@ -89,45 +89,51 @@ def generate(NETWORK_ENDPOINTS,
     LATENCY_BUFFER_SIZE = 3 * CLOCK_SPEED_HZ / (25 * 12 * DATA_RATE_SLOWDOWN_FACTOR)
     RATE_KHZ = CLOCK_SPEED_HZ / (25 * 12 * DATA_RATE_SLOWDOWN_FACTOR * 1000)
 
-    # Define modules and queues
-    queue_bare_specs = [app.QueueSpec(inst="time_sync_q", kind='FollyMPMCQueue', capacity=100),
-            app.QueueSpec(inst="data_fragments_q", kind='FollyMPMCQueue', capacity=1000),] + [
-            app.QueueSpec(inst=f"data_requests_{idx}", kind='FollySPSCQueue', capacity=100)
-                for idx in range(NUMBER_OF_DATA_PRODUCERS)
-        ] + [
 
+    MIN_LINK = HOSTIDX*NUMBER_OF_DATA_PRODUCERS
+    MAX_LINK = MIN_LINK + NUMBER_OF_DATA_PRODUCERS
+    # Define modules and queues
+    queue_bare_specs = [
+            app.QueueSpec(inst="time_sync_q", kind='FollyMPMCQueue', capacity=100),
+            app.QueueSpec(inst="data_fragments_q", kind='FollyMPMCQueue', capacity=1000),
+        ] + [
+            app.QueueSpec(inst=f"data_requests_{idx}", kind='FollySPSCQueue', capacity=100)
+                for idx in range(MIN_LINK,MAX_LINK)
+        ] + [
             app.QueueSpec(inst=f"wib_link_{idx}", kind='FollySPSCQueue', capacity=100000)
-                for idx in range(NUMBER_OF_DATA_PRODUCERS)
+                for idx in range(MIN_LINK,MAX_LINK)
         ]
     
 
     # Only needed to reproduce the same order as when using jsonnet
     queue_specs = app.QueueSpecs(sorted(queue_bare_specs, key=lambda x: x.inst))
 
-    mod_specs = [mspec("qton_timesync", "QueueToNetwork", [app.QueueInfo(name="input", inst="time_sync_q", dir="input")]),
-        mspec("qton_fragments", "QueueToNetwork", [app.QueueInfo(name="input", inst="data_fragments_q", dir="input")]),] + [
-                mspec(f"ntoq_datareq_{idx}", "NetworkToQueue", [app.QueueInfo(name="output", inst=f"data_requests_{idx}", dir="output")]) for idx in range(NUMBER_OF_DATA_PRODUCERS)
-        ] + [
-                mspec(f"datahandler_{idx}", "DataLinkHandler", [app.QueueInfo(name="raw_input", inst=f"wib_link_{idx}", dir="input"),
+    mod_specs = [
+        mspec("qton_timesync", "QueueToNetwork", [app.QueueInfo(name="input", inst="time_sync_q", dir="input")]),
+        mspec("qton_fragments", "QueueToNetwork", [app.QueueInfo(name="input", inst="data_fragments_q", dir="input")]),
+    ] + [
+        mspec(f"ntoq_datareq_{idx}", "NetworkToQueue", [app.QueueInfo(name="output", inst=f"data_requests_{idx}", dir="output")]) for idx in range(MIN_LINK,MAX_LINK)
+    ] + [
+        mspec(f"datahandler_{idx}", "DataLinkHandler", [app.QueueInfo(name="raw_input", inst=f"wib_link_{idx}", dir="input"),
                             app.QueueInfo(name="timesync", inst="time_sync_q", dir="output"),
                             app.QueueInfo(name="requests", inst=f"data_requests_{idx}", dir="input"),
-                            app.QueueInfo(name="fragments", inst="data_fragments_q", dir="output"),]) for idx in range(NUMBER_OF_DATA_PRODUCERS)
-        ]
+                            app.QueueInfo(name="fragments", inst="data_fragments_q", dir="output"),]) for idx in range(MIN_LINK,MAX_LINK)
+    ]
 
     if FLX_INPUT:
         mod_specs.append(mspec("flxcard_0", "FelixCardReader", [
                         app.QueueInfo(name=f"output_{idx}", inst=f"wib_link_{idx}", dir="output")
-                            for idx in range(0,min(5, NUMBER_OF_DATA_PRODUCERS))
+                            for idx in range(MIN_LINK,min(MIN_LINK + 5, MAX_LINK))
                         ]))
         if NUMBER_OF_DATA_PRODUCERS > 5 :
             mod_specs.append(mspec("flxcard_1", "FelixCardReader", [
                             app.QueueInfo(name=f"output_{idx}", inst=f"wib_link_{idx}", dir="output")
-                                for idx in range(5, NUMBER_OF_DATA_PRODUCERS)
+                                for idx in range(MIN_LINK + 5, MAX_LINK)
                             ]))
     else:
         mod_specs.append(mspec("fake_source", "FakeCardReader", [
                         app.QueueInfo(name=f"output_{idx}", inst=f"wib_link_{idx}", dir="output")
-                            for idx in range(NUMBER_OF_DATA_PRODUCERS)
+                            for idx in range(MIN_LINK,MAX_LINK)
                         ]))
 
     cmd_data['init'] = app.Init(queues=queue_specs, modules=mod_specs)
@@ -146,7 +152,7 @@ def generate(NETWORK_ENDPOINTS,
                                                                    address=NETWORK_ENDPOINTS[f"timesync_{HOSTIDX}"],
                                                                    stype="msgpack"))),
         
-                ("fake_source",fakecr.Conf(link_ids=list(range(NUMBER_OF_DATA_PRODUCERS)),
+                ("fake_source",fakecr.Conf(link_ids=list(range(MIN_LINK,MAX_LINK)),
                             # input_limit=10485100, # default
                             rate_khz = RATE_KHZ,
                             raw_type = "wib",
@@ -167,11 +173,12 @@ def generate(NETWORK_ENDPOINTS,
                             dma_block_size_kb= 4,
                             dma_memory_size_gb= 4,
                             numa_id=0,
-                            num_links=max(0, NUMBER_OF_DATA_PRODUCERS - 5))),] + [
+                            num_links=max(0, NUMBER_OF_DATA_PRODUCERS - 5))),
+            ] + [
                 (f"ntoq_datareq_{idx}", ntoq.Conf(msg_type="dunedaq::dfmessages::DataRequest",
                                            msg_module_name="DataRequestNQ",
                                            receiver_config=nor.Conf(ipm_plugin_type="ZmqReceiver",
-                                                                    address=NETWORK_ENDPOINTS[f"datareq_{HOSTIDX}_{idx}"]))) for idx in range(NUMBER_OF_DATA_PRODUCERS)
+                                                                    address=NETWORK_ENDPOINTS[f"datareq_{idx}"]))) for idx in range(MIN_LINK,MAX_LINK)
             ] + [
                 (f"datahandler_{idx}", dlh.Conf(raw_type = "wib",
                         emulator_mode = EMULATOR_MODE,
@@ -181,7 +188,7 @@ def generate(NETWORK_ENDPOINTS,
                         pop_limit_pct = 0.8,
                         pop_size_pct = 0.1,
                         apa_number = 0,
-                        link_number = idx)) for idx in range(NUMBER_OF_DATA_PRODUCERS)
+                        link_number = idx)) for idx in range(MIN_LINK,MAX_LINK)
             ])
 
 

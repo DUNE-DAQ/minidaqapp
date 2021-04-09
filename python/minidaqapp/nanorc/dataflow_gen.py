@@ -100,30 +100,36 @@ def generate(NETWORK_ENDPOINTS,
     queue_specs = app.QueueSpecs(sorted(queue_bare_specs, key=lambda x: x.inst))
 
 
-    mod_specs = [mspec("ntoq_trigdec", "NetworkToQueue", [app.QueueInfo(name="output", inst="trigger_decision_from_netq", dir="output")]),
-
-        mspec("ntoq_fragments", "NetworkToQueue", [app.QueueInfo(name="output", inst="data_fragments_q", dir="output")]),
+    mod_specs = [
+        mspec("ntoq_trigdec", "NetworkToQueue", [app.QueueInfo(name="output", inst="trigger_decision_from_netq", dir="output")]),
 
         mspec("qton_token", "QueueToNetwork", [app.QueueInfo(name="input", inst="token_q", dir="input")]),
 
-        mspec("rqg", "RequestGenerator", [app.QueueInfo(name="trigger_decision_input_queue", inst="trigger_decision_from_netq", dir="input"),
-                        app.QueueInfo(name="trigger_decision_for_event_building", inst="trigger_decision_copy_for_bookkeeping", dir="output"),] + [
-                        app.QueueInfo(name=f"data_request_{idx}_output_queue", inst=f"data_requests_{idx}", dir="output")
-                            for idx in range(NUMBER_OF_DATA_PRODUCERS)
-                    ]),
-        mspec("ffr", "FragmentReceiver", [app.QueueInfo(name="trigger_decision_input_queue", inst="trigger_decision_copy_for_bookkeeping", dir="input"),
-                        app.QueueInfo(name="trigger_record_output_queue", inst="trigger_record_q", dir="output"),
-                        app.QueueInfo(name="data_fragment_input_queue", inst="data_fragments_q", dir="input"),]),
+        mspec("rqg", "RequestGenerator", [  app.QueueInfo(name="trigger_decision_input_queue", inst="trigger_decision_from_netq", dir="input"),
+                                            app.QueueInfo(name="trigger_decision_for_event_building", inst="trigger_decision_copy_for_bookkeeping", dir="output"),
+                                         ] + [
+                                            app.QueueInfo(name=f"data_request_{idx}_output_queue", inst=f"data_requests_{idx}", dir="output")
+                                                for idx in range(NUMBER_OF_DATA_PRODUCERS)
+                                         ]),
 
-        mspec("datawriter", "DataWriter", [app.QueueInfo(name="trigger_record_input_queue", inst="trigger_record_q", dir="input"),
-                        app.QueueInfo(name="token_output_queue", inst="token_q", dir="output"),]),] + [
-                mspec(f"qton_datareq_{idx}", "QueueToNetwork", [app.QueueInfo(name="input", inst=f"data_requests_{idx}", dir="input")]) for idx in range(NUMBER_OF_DATA_PRODUCERS)
-        ]
+        mspec("ffr", "FragmentReceiver", [  app.QueueInfo(name="trigger_decision_input_queue", inst="trigger_decision_copy_for_bookkeeping", dir="input"),
+                                            app.QueueInfo(name="trigger_record_output_queue", inst="trigger_record_q", dir="output"),
+                                            app.QueueInfo(name="data_fragment_input_queue", inst="data_fragments_q", dir="input"),]),
+
+        mspec("datawriter", "DataWriter", [ app.QueueInfo(name="trigger_record_input_queue", inst="trigger_record_q", dir="input"),
+                                            app.QueueInfo(name="token_output_queue", inst="token_q", dir="output"),]),
+
+    ] + [
+        mspec(f"ntoq_fragments_{idx}", "NetworkToQueue", [app.QueueInfo(name="output", inst="data_fragments_q", dir="output")]) for idx, inst in enumerate(NETWORK_ENDPOINTS) if "frags" in inst
+    ] + [
+        mspec(f"qton_datareq_{idx}", "QueueToNetwork", [app.QueueInfo(name="input", inst=f"data_requests_{idx}", dir="input")])  for idx in range(NUMBER_OF_DATA_PRODUCERS)
+    ]
 
     cmd_data['init'] = app.Init(queues=queue_specs, modules=mod_specs)
 
 
-    cmd_data['conf'] = acmd([("ntoq_trigdec", ntoq.Conf(msg_type="dunedaq::dfmessages::TriggerDecision",
+    cmd_data['conf'] = acmd([
+                ("ntoq_trigdec", ntoq.Conf(msg_type="dunedaq::dfmessages::TriggerDecision",
                                            msg_module_name="TriggerDecisionNQ",
                                            receiver_config=nor.Conf(ipm_plugin_type="ZmqReceiver",
                                                                     address=NETWORK_ENDPOINTS["trigdec"]))),
@@ -136,7 +142,7 @@ def generate(NETWORK_ENDPOINTS,
                                                                   stype="msgpack"))),
         
                 ("rqg", rqg.ConfParams(map=rqg.mapgeoidqueue([
-                                rqg.geoidinst(apa=0, link=idx, queueinstance=f"data_requests_{idx}") for idx in range(NUMBER_OF_DATA_PRODUCERS)
+                                rqg.geoidinst(apa=0, link=idx, queueinstance=f"data_requests_{idx}")  for idx in range(NUMBER_OF_DATA_PRODUCERS)
                             ]))),
                 ("ffr", ffr.ConfParams(general_queue_timeout=QUEUE_POP_WAIT_MS)),
                 ("datawriter", dw.ConfParams(initial_token_count=TOKEN_COUNT,
@@ -158,9 +164,9 @@ def generate(NETWORK_ENDPOINTS,
                 (f"qton_datareq_{idx}", qton.Conf(msg_type="dunedaq::dfmessages::DataRequest",
                                            msg_module_name="DataRequestNQ",
                                            sender_config=nos.Conf(ipm_plugin_type="ZmqSender",
-                                                                  address=NETWORK_ENDPOINTS[inst],
+                                                                  address=NETWORK_ENDPOINTS[f"datareq_{idx}"],
                                                                   stype="msgpack"))) 
-                for idx, inst in enumerate(NETWORK_ENDPOINTS) if "datareq" in inst
+                 for idx in range(NUMBER_OF_DATA_PRODUCERS)
             ] + [
                 (f"ntoq_fragments_{idx}", ntoq.Conf(msg_type="std::unique_ptr<dunedaq::dataformats::Fragment>",
                                            msg_module_name="FragmentNQ",
@@ -178,7 +184,7 @@ def generate(NETWORK_ENDPOINTS,
     cmd_data['start'] = acmd([("qton_token", startpars),
             ("datawriter", startpars),
             ("ffr", startpars),
-            ("ntoq_fragments", startpars),
+            ("ntoq_fragments_.*", startpars),
             ("qton_datareq_.*", startpars),
             ("rqg", startpars),
             ("ntoq_trigdec", startpars),])
@@ -186,7 +192,7 @@ def generate(NETWORK_ENDPOINTS,
     cmd_data['stop'] = acmd([("ntoq_trigdec", None),
             ("rqg", None),
             ("qton_datareq_.*", None),
-            ("ntoq_fragments", None),
+            ("ntoq_fragments_.*", None),
             ("ffr", None),
             ("datawriter", None),
             ("qton_token", None),])
