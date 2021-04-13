@@ -52,7 +52,7 @@ def cli(number_of_data_producers, emulator_mode, data_rate_slowdown_factor, run_
         console.log(f"More than 10 data producers were requested ({total_old}): Will setup {number_of_data_producers} per host, for a total of {total_number_of_data_producers}")
     else:
         total_number_of_data_producers = number_of_data_producers * len(host_ru)
-        console.log(f"Fewer than 10 data producers were requested: Will setup {number_of_data_producers} per host, for a total of {total_number_of_data_producers}")
+        console.log(f"10 or fewer data producers were requested: Will setup {number_of_data_producers} per host, for a total of {total_number_of_data_producers}")
         
 
     if token_count > 0:
