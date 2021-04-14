@@ -1,4 +1,4 @@
-name: lint-python-code
+name: build-develop
 
 # Controls when the action will run. Workflow runs when manually triggered using the UI
 # or API.
@@ -17,7 +17,7 @@ on:
 
 # A workflow run is made up of one or more jobs that can run sequentially or in parallel
 jobs:
-  Build_against_dev_and_lint_python:
+  Build_against_dev_release:
     # The type of runner that the job will run on
     runs-on: ubuntu-latest
     container:
@@ -84,9 +84,6 @@ jobs:
           export DBT_SETUP_BUILD_ENVIRONMENT_SCRIPT_SOURCED=1
           dbt-build.sh --install
           $GITHUB_WORKSPACE/daq-release/scripts/upsify-daq-pkgs.py -w $GITHUB_WORKSPACE/dev -o /tarballs
-          python -m pip install --upgrade pip
-          pip install flake8 pytest
-          flake8 sourcecode/minidaqapp --count --select=E9,F63,F7,F82 --show-source --statistics
           
     - name: upload UPS tarball and log file
       uses: actions/upload-artifact@v2
