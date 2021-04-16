@@ -101,7 +101,7 @@ def generate(NETWORK_ENDPOINTS,
                 for idx in range(MIN_LINK,MAX_LINK)
         ] + [
             app.QueueSpec(inst=f"wib_link_{idx}", kind='FollySPSCQueue', capacity=100000)
-                for idx in range(MIN_LINK,MAX_LINK)
+                for idx in range(NUMBER_OF_DATA_PRODUCERS)
         ]
     
 
@@ -114,26 +114,26 @@ def generate(NETWORK_ENDPOINTS,
     ] + [
         mspec(f"ntoq_datareq_{idx}", "NetworkToQueue", [app.QueueInfo(name="output", inst=f"data_requests_{idx}", dir="output")]) for idx in range(MIN_LINK,MAX_LINK)
     ] + [
-        mspec(f"datahandler_{idx}", "DataLinkHandler", [app.QueueInfo(name="raw_input", inst=f"wib_link_{idx}", dir="input"),
+        mspec(f"datahandler_{idx + MIN_LINK}", "DataLinkHandler", [app.QueueInfo(name="raw_input", inst=f"wib_link_{idx}", dir="input"),
                             app.QueueInfo(name="timesync", inst="time_sync_q", dir="output"),
-                            app.QueueInfo(name="requests", inst=f"data_requests_{idx}", dir="input"),
-                            app.QueueInfo(name="fragments", inst="data_fragments_q", dir="output"),]) for idx in range(MIN_LINK,MAX_LINK)
+                            app.QueueInfo(name="requests", inst=f"data_requests_{idx + MIN_LINK}", dir="input"),
+                            app.QueueInfo(name="fragments", inst="data_fragments_q", dir="output"),]) for idx in range(NUMBER_OF_DATA_PRODUCERS)
     ]
 
     if FLX_INPUT:
         mod_specs.append(mspec("flxcard_0", "FelixCardReader", [
                         app.QueueInfo(name=f"output_{idx}", inst=f"wib_link_{idx}", dir="output")
-                            for idx in range(MIN_LINK,min(MIN_LINK + 5, MAX_LINK))
+                            for idx in range(min(5, NUMBER_OF_DATA_PRODUCERS))
                         ]))
         if NUMBER_OF_DATA_PRODUCERS > 5 :
             mod_specs.append(mspec("flxcard_1", "FelixCardReader", [
                             app.QueueInfo(name=f"output_{idx}", inst=f"wib_link_{idx}", dir="output")
-                                for idx in range(MIN_LINK + 5, MAX_LINK)
+                                for idx in range(5, NUMBER_OF_DATA_PRODUCERS)
                             ]))
     else:
         mod_specs.append(mspec("fake_source", "FakeCardReader", [
                         app.QueueInfo(name=f"output_{idx}", inst=f"wib_link_{idx}", dir="output")
-                            for idx in range(MIN_LINK,MAX_LINK)
+                            for idx in range(NUMBER_OF_DATA_PRODUCERS)
                         ]))
 
     cmd_data['init'] = app.Init(queues=queue_specs, modules=mod_specs)
