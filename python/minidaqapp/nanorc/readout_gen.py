@@ -75,7 +75,7 @@ def generate(NETWORK_ENDPOINTS,
         DATA_FILE="./frames.bin",
         FLX_INPUT=True,
         CLOCK_SPEED_HZ=50000000,
-        HOSTIDX=0):
+        HOSTIDX=0, CARDID=0):
     """Generate the json configuration for the readout and DF process"""
 
     cmd_data = {}
@@ -158,7 +158,7 @@ def generate(NETWORK_ENDPOINTS,
                             raw_type = "wib",
                             data_filename = DATA_FILE,
                             queue_timeout_ms = QUEUE_POP_WAIT_MS)),
-                ("flxcard_0",flxcr.Conf(card_id=0,
+                ("flxcard_0",flxcr.Conf(card_id=CARDID,
                             logical_unit=0,
                             dma_id=0,
                             chunk_trailer_size= 32,
@@ -166,7 +166,7 @@ def generate(NETWORK_ENDPOINTS,
                             dma_memory_size_gb= 4,
                             numa_id=0,
                             num_links=min(5,NUMBER_OF_DATA_PRODUCERS))),
-                ("flxcard_1",flxcr.Conf(card_id=0,
+                ("flxcard_1",flxcr.Conf(card_id=CARDID,
                             logical_unit=1,
                             dma_id=0,
                             chunk_trailer_size= 32,

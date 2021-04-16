@@ -85,7 +85,8 @@ def cli(number_of_data_producers, emulator_mode, data_rate_slowdown_factor, run_
         DATA_FILE = data_file,
         FLX_INPUT = use_felix,
         CLOCK_SPEED_HZ = CLOCK_SPEED_HZ,
-        HOSTIDX = 0
+        HOSTIDX = 0,
+        CARDID = 0
     )
     console.log("readout cmd data:", cmd_data_readout)
 

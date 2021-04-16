@@ -72,12 +72,20 @@ def cli(number_of_data_producers, emulator_mode, data_rate_slowdown_factor, run_
         network_endpoints[f"datareq_{idx}"] = "tcp://{host_df}:"+f"{port}"
         port = port + 1
 
+    cardid = {}
+    host_id_dict = {}
     for hostidx in range(len(host_ru)):
         # Should end up something like 'network_endpoints[timesync_0]: "tcp://{host_ru0}:12347"'
         network_endpoints[f"timesync_{hostidx}"] = "tcp://{host_ru" + f"{hostidx}" + "}:" + f"{port}"
         port = port + 1
         network_endpoints[f"frags_{hostidx}"] = "tcp://{host_ru"+ f"{hostidx}" + "}:" + f"{port}"
         port = port + 1
+        if host_ru[hostidx] in host_id_dict:
+            host_id_dict[host_ru[hostidx]] = host_id_dict[host_ru[hostidx]] + 1
+            cardid[hostidx] = host_id_dict[host_ru[hostidx]]
+        else:
+            cardid[hostidx] = 0
+            host_id_dict[host_ru[hostidx]] = 0
         hostidx = hostidx + 1
 
 
@@ -112,7 +120,8 @@ def cli(number_of_data_producers, emulator_mode, data_rate_slowdown_factor, run_
             DATA_FILE = data_file,
             FLX_INPUT = use_felix,
             CLOCK_SPEED_HZ = CLOCK_SPEED_HZ,
-            HOSTIDX = hostidx
+            HOSTIDX = hostidx,
+            CARDID = cardid[hostidx]
             ) for hostidx in range(len(host_ru))]
     console.log("readout cmd data:", cmd_data_readout)
 
