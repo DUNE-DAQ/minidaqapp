@@ -23,7 +23,8 @@ moo.otypes.load_types('rcif/cmd.jsonnet')
 moo.otypes.load_types('appfwk/cmd.jsonnet')
 moo.otypes.load_types('appfwk/app.jsonnet')
 
-moo.otypes.load_types('trigemu/triggerdecisionemulator.jsonnet')
+moo.otypes.load_types('trigger/randomtriggercandidatemaker.jsonnet')
+moo.otypes.load_types('trigger/moduleleveltrigger.jsonnet')
 moo.otypes.load_types('nwqueueadapters/queuetonetwork.jsonnet')
 moo.otypes.load_types('nwqueueadapters/networktoqueue.jsonnet')
 moo.otypes.load_types('nwqueueadapters/networkobjectreceiver.jsonnet')
@@ -34,7 +35,9 @@ import dunedaq.cmdlib.cmd as basecmd # AddressedCmd,
 import dunedaq.rcif.cmd as rccmd # AddressedCmd, 
 import dunedaq.appfwk.cmd as cmd # AddressedCmd, 
 import dunedaq.appfwk.app as app # AddressedCmd,
-import dunedaq.trigemu.triggerdecisionemulator as tde
+import dunedaq.trigger.randomtriggercandidatemaker as rtcm
+import dunedaq.trigger.moduleleveltrigger as mlt
+
 import dunedaq.nwqueueadapters.networktoqueue as ntoq
 import dunedaq.nwqueueadapters.queuetonetwork as qton
 import dunedaq.nwqueueadapters.networkobjectreceiver as nor
@@ -102,6 +105,7 @@ def generate(
             app.QueueSpec(inst="time_sync_from_netq", kind='FollyMPMCQueue', capacity=100),
             app.QueueSpec(inst="token_from_netq", kind='FollySPSCQueue', capacity=20),
             app.QueueSpec(inst="trigger_decision_to_netq", kind='FollySPSCQueue', capacity=20),
+            app.QueueSpec(inst="trigger_candidate_q", kind='FollyMPMCQueue', capacity=20),
         ]
 
     # Only needed to reproduce the same order as when using jsonnet
@@ -117,11 +121,17 @@ def generate(
                         app.QueueInfo(name="output", inst="token_from_netq", dir="output")
                     ]),
 
-        mspec("tde", "TriggerDecisionEmulator", [
-                        app.QueueInfo(name="time_sync_source", inst="time_sync_from_netq", dir="input"),
-                        app.QueueInfo(name="token_source", inst="token_from_netq", dir="input"),
-                        app.QueueInfo(name="trigger_decision_sink", inst="trigger_decision_to_netq", dir="output"),
-                    ]),
+        mspec("rtcm_uniform", "RandomTriggerCandidateMaker", [
+            app.QueueInfo(name="time_sync_source", inst="time_sync_from_netq", dir="input"),
+            app.QueueInfo(name="trigger_candidate_sink", inst="trigger_candidate_q", dir="output"),
+        ]),
+
+        mspec("mlt", "ModuleLevelTrigger", [
+            app.QueueInfo(name="token_source", inst="token_from_netq", dir="input"),
+            app.QueueInfo(name="trigger_decision_sink", inst="trigger_decision_to_netq", dir="output"),
+            app.QueueInfo(name="trigger_candidate_source", inst="trigger_candidate_q", dir="output"),
+        ]),
+
         ] + [
         mspec(f"ntoq_timesync_{idx}", "NetworkToQueue", [
                         app.QueueInfo(name="output", inst="time_sync_from_netq", dir="output")
@@ -146,24 +156,18 @@ def generate(
                                             )
                  ),
 
-
-                ("tde", tde.ConfParams(
-                        links=[idx for idx in range(NUMBER_OF_DATA_PRODUCERS)],
-                        min_links_in_request=NUMBER_OF_DATA_PRODUCERS,
-                        max_links_in_request=NUMBER_OF_DATA_PRODUCERS,
-                        min_readout_window_ticks=MIN_READOUT_WINDOW_TICKS,
-                        max_readout_window_ticks=MAX_READOUT_WINDOW_TICKS,
-                        trigger_window_offset=TRIGGER_WINDOW_OFFSET,
-                        # The delay is set to put the trigger well within the latency buff
-                        trigger_delay_ticks=TRIGGER_DELAY_TICKS,
-                        # We divide the trigger interval by
-                        # DATA_RATE_SLOWDOWN_FACTOR so the triggers are still
-                        # emitted per (wall-clock) second, rather than being
-                        # spaced out further
-                        trigger_interval_ticks=TRG_INTERVAL_TICKS,
-                        clock_frequency_hz=CLOCK_SPEED_HZ/DATA_RATE_SLOWDOWN_FACTOR,
-                        initial_token_count=TOKEN_COUNT                    
-                        )),
+                 ("mlt", mlt.ConfParams(
+                     links=[idx for idx in range(NUMBER_OF_DATA_PRODUCERS)],
+                     initial_token_count=TOKEN_COUNT                    
+                 )),
+        
+                ("rtcm_uniform", rtcm.ConfParams(
+                    trigger_interval_ticks=TRG_INTERVAL_TICKS,
+                    clock_frequency_hz=CLOCK_SPEED_HZ/DATA_RATE_SLOWDOWN_FACTOR,
+                    timestamp_method="kTimeSync",
+                    time_distribution="kUniform"
+                )),
+        
             ] + [
 
                 (f"ntoq_timesync_{idx}", ntoq.Conf(msg_type="dunedaq::dfmessages::TimeSync",
@@ -179,14 +183,16 @@ def generate(
             ("qton_trigdec", startpars),
             ("ntoq_token", startpars),
             ("ntoq_timesync_.*", startpars),
-            ("tde", startpars),
+            ("rtcm_uniform", startpars),
+            ("mlt", startpars),
         ])
 
     cmd_data['stop'] = acmd([
             ("qton_trigdec", None),
             ("ntoq_timesync_.*", None),
             ("ntoq_token", None),
-            ("tde", None),
+            ("rtcm_uniform", None),
+            ("mlt", None),
         ])
 
     cmd_data['pause'] = acmd([
@@ -194,7 +200,7 @@ def generate(
         ])
 
     cmd_data['resume'] = acmd([
-            ("tde", tde.ResumeParams(
+            ("mlt", rccmd.ResumeParams(
                             trigger_interval_ticks=TRG_INTERVAL_TICKS
                         ))
         ])
