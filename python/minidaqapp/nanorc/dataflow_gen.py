@@ -102,13 +102,13 @@ def generate(NETWORK_ENDPOINTS,
 
         mspec("qton_token", "QueueToNetwork", [app.QueueInfo(name="input", inst="token_q", dir="input")]),
 
-        mspec("trb", "RequestGenerator", [  app.QueueInfo(name="trigger_decision_input_queue", inst="trigger_decision_from_netq", dir="input"),
-                                            app.QueueInfo(name="trigger_record_output_queue", inst="trigger_record_q", dir="output"),
-                                            app.QueueInfo(name="data_fragment_input_queue", inst="data_fragments_q", dir="input")
-                                         ] + [
-                                            app.QueueInfo(name=f"data_request_{idx}_output_queue", inst=f"data_requests_{idx}", dir="output")
-                                                for idx in range(NUMBER_OF_DATA_PRODUCERS)
-                                         ]),
+        mspec("trb", "TriggerRecordBuilder", [  app.QueueInfo(name="trigger_decision_input_queue", inst="trigger_decision_from_netq", dir="input"),
+                                                app.QueueInfo(name="trigger_record_output_queue", inst="trigger_record_q", dir="output"),
+                                                app.QueueInfo(name="data_fragment_input_queue", inst="data_fragments_q", dir="input")
+                                             ] + [
+                                                app.QueueInfo(name=f"data_request_{idx}_output_queue", inst=f"data_requests_{idx}", dir="output")
+                                                    for idx in range(NUMBER_OF_DATA_PRODUCERS)
+                                             ]),
 
         mspec("datawriter", "DataWriter", [ app.QueueInfo(name="trigger_record_input_queue", inst="trigger_record_q", dir="input"),
                                             app.QueueInfo(name="token_output_queue", inst="token_q", dir="output"),]),
