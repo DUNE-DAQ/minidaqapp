@@ -215,9 +215,9 @@ def generate(
 
     stopcmd = mrccmd("stop", "RUNNING", "CONFIGURED", [
             ("tde", None),
-            ("trb", None),
             ("fake_source", None),
             ("datahandler_.*", None),
+            ("trb", None),
             ("datawriter", None),
         ])
 
