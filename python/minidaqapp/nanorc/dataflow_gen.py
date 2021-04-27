@@ -11,8 +11,7 @@ moo.otypes.load_types('appfwk/cmd.jsonnet')
 moo.otypes.load_types('appfwk/app.jsonnet')
 
 #moo.otypes.load_types('trigemu/faketimesyncsource.jsonnet')
-moo.otypes.load_types('dfmodules/requestgenerator.jsonnet')
-moo.otypes.load_types('dfmodules/fragmentreceiver.jsonnet')
+moo.otypes.load_types('dfmodules/triggerrecordbuilder.jsonnet')
 moo.otypes.load_types('dfmodules/datawriter.jsonnet')
 moo.otypes.load_types('dfmodules/hdf5datastore.jsonnet')
 #moo.otypes.load_types('dfmodules/fakedataprod.jsonnet')
@@ -30,8 +29,7 @@ import dunedaq.cmdlib.cmd as basecmd # AddressedCmd,
 import dunedaq.rcif.cmd as rccmd # AddressedCmd,
 import dunedaq.appfwk.cmd as cmd # AddressedCmd,
 import dunedaq.appfwk.app as app # AddressedCmd,
-import dunedaq.dfmodules.requestgenerator as rqg
-import dunedaq.dfmodules.fragmentreceiver as ffr
+import dunedaq.dfmodules.triggerrecordbuilder as trb
 import dunedaq.dfmodules.datawriter as dw
 import dunedaq.dfmodules.hdf5datastore as hdf5ds
 #import dunedaq.dfmodules.fakedataprod as fdp
@@ -89,7 +87,6 @@ def generate(NETWORK_ENDPOINTS,
     queue_bare_specs = [app.QueueSpec(inst="token_q", kind='FollySPSCQueue', capacity=100),
             app.QueueSpec(inst="trigger_decision_q", kind='FollySPSCQueue', capacity=100),
             app.QueueSpec(inst="trigger_decision_from_netq", kind='FollySPSCQueue', capacity=100),
-            app.QueueSpec(inst="trigger_decision_copy_for_bookkeeping", kind='FollySPSCQueue', capacity=100),
             app.QueueSpec(inst="trigger_record_q", kind='FollySPSCQueue', capacity=100),
             app.QueueSpec(inst="data_fragments_q", kind='FollyMPMCQueue', capacity=1000),] + [
             app.QueueSpec(inst=f"data_requests_{idx}", kind='FollySPSCQueue', capacity=100)
@@ -105,16 +102,13 @@ def generate(NETWORK_ENDPOINTS,
 
         mspec("qton_token", "QueueToNetwork", [app.QueueInfo(name="input", inst="token_q", dir="input")]),
 
-        mspec("rqg", "RequestGenerator", [  app.QueueInfo(name="trigger_decision_input_queue", inst="trigger_decision_from_netq", dir="input"),
-                                            app.QueueInfo(name="trigger_decision_for_event_building", inst="trigger_decision_copy_for_bookkeeping", dir="output"),
+        mspec("trb", "RequestGenerator", [  app.QueueInfo(name="trigger_decision_input_queue", inst="trigger_decision_from_netq", dir="input"),
+                                            app.QueueInfo(name="trigger_record_output_queue", inst="trigger_record_q", dir="output"),
+                                            app.QueueInfo(name="data_fragment_input_queue", inst="data_fragments_q", dir="input")
                                          ] + [
                                             app.QueueInfo(name=f"data_request_{idx}_output_queue", inst=f"data_requests_{idx}", dir="output")
                                                 for idx in range(NUMBER_OF_DATA_PRODUCERS)
                                          ]),
-
-        mspec("ffr", "FragmentReceiver", [  app.QueueInfo(name="trigger_decision_input_queue", inst="trigger_decision_copy_for_bookkeeping", dir="input"),
-                                            app.QueueInfo(name="trigger_record_output_queue", inst="trigger_record_q", dir="output"),
-                                            app.QueueInfo(name="data_fragment_input_queue", inst="data_fragments_q", dir="input"),]),
 
         mspec("datawriter", "DataWriter", [ app.QueueInfo(name="trigger_record_input_queue", inst="trigger_record_q", dir="input"),
                                             app.QueueInfo(name="token_output_queue", inst="token_q", dir="output"),]),
@@ -141,10 +135,10 @@ def generate(NETWORK_ENDPOINTS,
                                                                   address=NETWORK_ENDPOINTS["triginh"],
                                                                   stype="msgpack"))),
         
-                ("rqg", rqg.ConfParams(map=rqg.mapgeoidqueue([
-                                rqg.geoidinst(apa=0, link=idx, queueinstance=f"data_requests_{idx}")  for idx in range(NUMBER_OF_DATA_PRODUCERS)
-                            ]))),
-                ("ffr", ffr.ConfParams(general_queue_timeout=QUEUE_POP_WAIT_MS)),
+                ("trb", trb.ConfParams( general_queue_timeout=QUEUE_POP_WAIT_MS,
+                                        map=trb.mapgeoidqueue([
+                                                trb.geoidinst(apa=0, link=idx, queueinstance=f"data_requests_{idx}")  for idx in range(NUMBER_OF_DATA_PRODUCERS) ]
+                                                              ))),
                 ("datawriter", dw.ConfParams(initial_token_count=TOKEN_COUNT,
                             data_store_parameters=hdf5ds.ConfParams(name="data_store",
                                 # type = "HDF5DataStore", # default
@@ -183,17 +177,15 @@ def generate(NETWORK_ENDPOINTS,
     startpars = rccmd.StartParams(run=RUN_NUMBER, disable_data_storage=DISABLE_OUTPUT)
     cmd_data['start'] = acmd([("qton_token", startpars),
             ("datawriter", startpars),
-            ("ffr", startpars),
             ("ntoq_fragments_.*", startpars),
             ("qton_datareq_.*", startpars),
-            ("rqg", startpars),
+            ("trb", startpars),
             ("ntoq_trigdec", startpars),])
 
     cmd_data['stop'] = acmd([("ntoq_trigdec", None),
-            ("rqg", None),
+            ("trb", None),
             ("qton_datareq_.*", None),
             ("ntoq_fragments_.*", None),
-            ("ffr", None),
             ("datawriter", None),
             ("qton_token", None),])
 
