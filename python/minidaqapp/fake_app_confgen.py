@@ -149,8 +149,8 @@ def generate(
                         )),
                 ("trb", trb.ConfParams(
                         general_queue_timeout=QUEUE_POP_WAIT_MS,
-                        map=rqg.mapgeoidqueue([
-                                rqg.geoidinst(apa=0, link=idx, queueinstance=f"data_requests_{idx}") for idx in range(NUMBER_OF_DATA_PRODUCERS)
+                        map=trb.mapgeoidqueue([
+                                trb.geoidinst(apa=0, link=idx, queueinstance=f"data_requests_{idx}") for idx in range(NUMBER_OF_DATA_PRODUCERS)
                             ])  
                         )),
                 ("datawriter", dw.ConfParams(
