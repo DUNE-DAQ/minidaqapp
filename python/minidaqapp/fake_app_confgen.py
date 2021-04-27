@@ -203,9 +203,9 @@ def generate(
     startpars = rccmd.StartParams(run=RUN_NUMBER, trigger_interval_ticks=trigger_interval_ticks, disable_data_storage=DISABLE_OUTPUT)
     startcmd = mrccmd("start", "CONFIGURED", "RUNNING", [
             ("datawriter", startpars),
-            ("trb", startpars),
             ("datahandler_.*", startpars),
             ("fake_source", startpars),
+            ("trb", startpars),
             ("tde", startpars),
         ])
 
@@ -215,9 +215,9 @@ def generate(
 
     stopcmd = mrccmd("stop", "RUNNING", "CONFIGURED", [
             ("tde", None),
+            ("trb", None),
             ("fake_source", None),
             ("datahandler_.*", None),
-            ("trb", None),
             ("datawriter", None),
         ])
 
