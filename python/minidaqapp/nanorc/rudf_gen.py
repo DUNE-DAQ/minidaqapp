@@ -287,11 +287,11 @@ def generate(
 
     cmd_data['stop'] = acmd([
             ("ntoq_trigdec", None),
-            ("trb", None),
             ("flxcard.*", None),
             ("fake_source", None),
             ("datahandler_.*", None),
             ("qton_timesync", None),
+            ("trb", None),
             ("datawriter", None),
             ("qton_token", None),
         ])
