@@ -81,7 +81,6 @@ def generate(
         RUN_NUMBER = 333, 
         DATA_FILE="./frames.bin",
         OUTPUT_PATH=".",
-        DISABLE_OUTPUT=False,
         FLX_INPUT=True,
         TOKEN_COUNT=0,
         CLOCK_SPEED_HZ = 50000000
@@ -282,7 +281,7 @@ def generate(
             ])
 
 
-    startpars = rccmd.StartParams(run=RUN_NUMBER, disable_data_storage=DISABLE_OUTPUT)
+    startpars = rccmd.StartParams(run=RUN_NUMBER)
     cmd_data['start'] = acmd([
             ("qton_token", startpars),
             ("datawriter", startpars),

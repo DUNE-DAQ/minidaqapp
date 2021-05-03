@@ -102,12 +102,11 @@ import click
 @click.option('-c', '--token-count', default=10)
 @click.option('-d', '--data-file', type=click.Path(), default='./frames.bin')
 @click.option('-o', '--output-path', type=click.Path(), default='.')
-@click.option('--disable-data-storage', is_flag=True)
 @click.option('-f', '--use-felix', is_flag=True)
 @click.option('--host-rudf', default='localhost')
 @click.option('--host-trgemu', default='localhost')
 @click.argument('json_dir', type=click.Path())
-def cli(number_of_data_producers, emulator_mode, data_rate_slowdown_factor, run_number, trigger_rate_hz, token_count, data_file, output_path, disable_data_storage, use_felix, host_rudf, host_trgemu, json_dir):
+def cli(number_of_data_producers, emulator_mode, data_rate_slowdown_factor, run_number, trigger_rate_hz, token_count, data_file, output_path, use_felix, host_rudf, host_trgemu, json_dir):
     """
       JSON_DIR: Json file output folder
     """
@@ -152,7 +151,6 @@ def cli(number_of_data_producers, emulator_mode, data_rate_slowdown_factor, run_
         RUN_NUMBER = run_number, 
         DATA_FILE = data_file,
         OUTPUT_PATH = output_path,
-        DISABLE_OUTPUT = disable_data_storage,
         FLX_INPUT = use_felix,
         TOKEN_COUNT = df_token_count,
         CLOCK_SPEED_HZ = CLOCK_SPEED_HZ
