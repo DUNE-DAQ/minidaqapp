@@ -12,7 +12,7 @@ CONTEXT_SETTINGS = dict(help_option_names=['-h', '--help'])
 
 console = Console()
 
-def generate_boot( tremu_spec: dict, rudf_spec: dict) -> dict:
+def generate_boot( tremu_spec: dict, rudf_spec: dict, disable_trace: bool) -> dict:
     """
     Generates boot informations
 
@@ -61,6 +61,9 @@ def generate_boot( tremu_spec: dict, rudf_spec: dict) -> dict:
         }
     }
 
+    if not disable_trace:
+        daq_app_specs["daq_application"]["env"]["TRACE_FILE"] = "getenv"
+    
     boot = {
         "env": {
             "DUNEDAQ_ERS_VERBOSITY_LEVEL": 1
@@ -103,11 +106,12 @@ import click
 @click.option('-d', '--data-file', type=click.Path(), default='./frames.bin')
 @click.option('-o', '--output-path', type=click.Path(), default='.')
 @click.option('--disable-data-storage', is_flag=True)
+@click.option('--disable-trace', is_flag=True, help="Do not export the TRACE_FILE environment variable to processes started by nanorc")
 @click.option('-f', '--use-felix', is_flag=True)
 @click.option('--host-rudf', default='localhost')
 @click.option('--host-trgemu', default='localhost')
 @click.argument('json_dir', type=click.Path())
-def cli(number_of_data_producers, emulator_mode, data_rate_slowdown_factor, run_number, trigger_rate_hz, token_count, data_file, output_path, disable_data_storage, use_felix, host_rudf, host_trgemu, json_dir):
+def cli(number_of_data_producers, emulator_mode, data_rate_slowdown_factor, run_number, trigger_rate_hz, token_count, data_file, output_path, disable_data_storage, disable_trace, use_felix, host_rudf, host_trgemu, json_dir):
     """
       JSON_DIR: Json file output folder
     """
@@ -210,6 +214,7 @@ def cli(number_of_data_producers, emulator_mode, data_rate_slowdown_factor, run_
                 "host": host_rudf,
                 "port": 3334
             },
+            disable_trace = disable_trace,
         )
         json.dump(cfg, f, indent=4, sort_keys=True)
     console.log(f"MDAapp config generated in {json_dir}")

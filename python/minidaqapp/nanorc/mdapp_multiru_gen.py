@@ -26,13 +26,13 @@ import click
 @click.option('-d', '--data-file', type=click.Path(), default='./frames.bin')
 @click.option('-o', '--output-path', type=click.Path(), default='.')
 @click.option('--disable-data-storage', is_flag=True)
-@click.option('--enable-trace', is_flag=True)
+@click.option('--disable-trace', is_flag=True, help="Do not export the TRACE_FILE environment variable to processes started by nanorc")
 @click.option('-f', '--use-felix', is_flag=True)
 @click.option('--host-df', default='localhost')
 @click.option('--host-ru', multiple=True, default=['localhost'], help="This option is repeatable, with each repetition adding an additional ru process.")
 @click.option('--host-trg', default='localhost')
 @click.argument('json_dir', type=click.Path())
-def cli(number_of_data_producers, emulator_mode, data_rate_slowdown_factor, run_number, trigger_rate_hz, token_count, data_file, output_path, disable_data_storage, enable_trace, use_felix, host_df, host_ru, host_trg, json_dir):
+def cli(number_of_data_producers, emulator_mode, data_rate_slowdown_factor, run_number, trigger_rate_hz, token_count, data_file, output_path, disable_data_storage, disable_trace, use_felix, host_df, host_ru, host_trg, json_dir):
     """
       JSON_DIR: Json file output folder
     """
@@ -201,7 +201,7 @@ def cli(number_of_data_producers, emulator_mode, data_rate_slowdown_factor, run_
             }
         }
 
-        if enable_trace:
+        if not disable_trace:
             daq_app_specs["daq_application"]["env"]["TRACE_FILE"] = "getenv"
 
         cfg = {
