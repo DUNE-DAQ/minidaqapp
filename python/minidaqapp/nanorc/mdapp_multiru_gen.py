@@ -146,7 +146,7 @@ def cli(number_of_data_producers, emulator_mode, data_rate_slowdown_factor, run_
 
 
     console.log(f"Generating top-level command json files")
-    start_order = app_ru + [app_df, app_trgemu]
+    start_order = [app_df] + app_ru + [app_trgemu]
     for c in cmd_set:
         with open(join(json_dir,f'{c}.json'), 'w') as f:
             cfg = {
