@@ -29,9 +29,15 @@ import click
 @click.option('-f', '--use-felix', is_flag=True)
 @click.option('--host-df', default='localhost')
 @click.option('--host-ru', multiple=True, default=['localhost'], help="This option is repeatable, with each repetition adding an additional ru process.")
-@click.option('--host-trg', default='localhost')
+@click.option('--host-trigger', default='localhost')
+@click.option('--host-hsi', default='localhost')
+@click.option('--hsi-event-period', default=1e9)
+@click.option('--hsi-device-id', default=0)
+@click.option('--mean-hsi-signal-multiplicity', default=1)
+@click.option('--hsi-signal-emulation-mode', default=0)
+@click.option('--enabled-hsi-signals', default=0b00000001)
 @click.argument('json_dir', type=click.Path())
-def cli(number_of_data_producers, emulator_mode, data_rate_slowdown_factor, run_number, trigger_rate_hz, token_count, data_file, output_path, enable_trace, use_felix, host_df, host_ru, host_trg, json_dir):
+def cli(number_of_data_producers, emulator_mode, data_rate_slowdown_factor, run_number, trigger_rate_hz, token_count, data_file, output_path, enable_trace, use_felix, hsi_event_period, hsi_device_id, mean_hsi_signal_multiplicity, hsi_signal_emulation_mode, enabled_hsi_signals, host_df, host_ru, host_trigger, host_hsi, json_dir):
     """
       JSON_DIR: Json file output folder
     """
@@ -39,9 +45,11 @@ def cli(number_of_data_producers, emulator_mode, data_rate_slowdown_factor, run_
     from . import dataflow_gen
     console.log("Loading readout config generator")
     from . import readout_gen
-    console.log("Loading trg config generator")
-    from . import trg_gen
-    console.log(f"Generating configs for hosts trg={host_trg} dataflow={host_df} readout={host_ru}")
+    console.log("Loading trigger config generator")
+    from . import trigger_gen
+    console.log("Loading hsi config generator")
+    from . import hsi_gen
+    console.log(f"Generating configs for hosts trigger={host_trigger} dataflow={host_df} readout={host_ru} hsi={host_hsi}")
 
     total_number_of_data_producers = 0
     if number_of_data_producers > 10:
@@ -62,7 +70,8 @@ def cli(number_of_data_producers, emulator_mode, data_rate_slowdown_factor, run_
         trigemu_token_count = 0
 
     network_endpoints={
-        "trigdec" : "tcp://{host_trg}:12345",
+        "hsievent" : "tcp://{host_df}:12344",
+        "trigdec" : "tcp://{host_trigger}:12345",
         "triginh" : "tcp://{host_df}:12346",
     }
 
@@ -87,18 +96,26 @@ def cli(number_of_data_producers, emulator_mode, data_rate_slowdown_factor, run_
             host_id_dict[host_ru[hostidx]] = 0
         hostidx = hostidx + 1
 
-
-    cmd_data_trg = trg_gen.generate(
+    cmd_data_hsi = hsi_gen.generate(
         network_endpoints,
-        NUMBER_OF_DATA_PRODUCERS = total_number_of_data_producers,
-        DATA_RATE_SLOWDOWN_FACTOR = data_rate_slowdown_factor,
-        RUN_NUMBER = run_number, 
-        TRIGGER_RATE_HZ = trigger_rate_hz,
-        TOKEN_COUNT = trigemu_token_count,
-        CLOCK_SPEED_HZ = CLOCK_SPEED_HZ
+        RUN_NUMBER = run_number,
+        CLOCK_SPEED_HZ = CLOCK_SPEED_HZ,
+        HSI_EVENT_PERIOD_NS = hsi_event_period,
+        HSI_DEVICE_ID = hsi_device_id,
+        MEAN_SIGNAL_MULTIPLICITY = mean_hsi_signal_multiplicity,
+        SIGNAL_EMULATION_MODE = hsi_signal_emulation_mode,
+        ENABLED_SIGNALS =  enabled_hsi_signals,
     )
 
-    console.log("trg cmd data:", cmd_data_trg)
+    console.log("hsi cmd data:", cmd_data_hsi)
+
+    cmd_data_trigger = trigger_gen.generate(
+        network_endpoints,
+        NUMBER_OF_DATA_PRODUCERS = total_number_of_data_producers,
+        TOKEN_COUNT = trigemu_token_count,
+    )
+
+    console.log("trigger cmd data:", cmd_data_trigger)
 
     cmd_data_dataflow = dataflow_gen.generate(
         network_endpoints,
@@ -129,16 +146,18 @@ def cli(number_of_data_producers, emulator_mode, data_rate_slowdown_factor, run_
     data_dir = join(json_dir, 'data')
     os.makedirs(data_dir)
 
-    app_trgemu="trgemu"
+    app_hsi="hsi"
+    app_trigger="trigger"
     app_df="dataflow"
     app_ru=[f"ruflx{idx}" if use_felix else f"ruemu{idx}" for idx in range(len(host_ru))]
 
-    jf_trigemu = join(data_dir, app_trgemu)
+    jf_hsi = join(data_dir, app_hsi)
+    jf_trigemu = join(data_dir, app_trigger)
     jf_df = join(data_dir, app_df)
     jf_ru = [join(data_dir, app_ru[idx]) for idx in range(len(host_ru))]
 
     cmd_set = ["init", "conf", "start", "stop", "pause", "resume", "scrap"]
-    for app,data in [(app_trgemu, cmd_data_trg), (app_df, cmd_data_dataflow)] + list(zip(app_ru, cmd_data_readout)):
+    for app,data in [(app_hsi, cmd_data_hsi), (app_trigger, cmd_data_trigger), (app_df, cmd_data_dataflow)] + list(zip(app_ru, cmd_data_readout)):
         console.log(f"Generating {app} command data json files")
         for c in cmd_set:
             with open(f'{join(data_dir, app)}_{c}.json', 'w') as f:
@@ -146,11 +165,11 @@ def cli(number_of_data_producers, emulator_mode, data_rate_slowdown_factor, run_
 
 
     console.log(f"Generating top-level command json files")
-    start_order = [app_df] + app_ru + [app_trgemu]
+    start_order = [app_df] + app_ru + [app_trigger] + [app_hsi]
     for c in cmd_set:
         with open(join(json_dir,f'{c}.json'), 'w') as f:
             cfg = {
-                "apps": { app: f'data/{app}_{c}' for app in [app_trgemu, app_df] + app_ru }
+                "apps": { app: f'data/{app}_{c}' for app in [app_trigger, app_df, app_hsi] + app_ru }
             }
             if c == 'start':
                 cfg['order'] = start_order
@@ -187,6 +206,8 @@ def cli(number_of_data_producers, emulator_mode, data_rate_slowdown_factor, run_
                 "env":{
                     "CET_PLUGIN_PATH": "getenv",
                     "DUNEDAQ_SHARE_PATH": "getenv",
+                    "DUNEDAQ_ERS_DEBUG_LEVEL": "getenv",
+                    "DUNEDAQ_ERS_VERBOSITY_LEVEL": "getenv",
                     "LD_LIBRARY_PATH": "getenv",
                     "PATH": "getenv"
                 },
@@ -208,19 +229,25 @@ def cli(number_of_data_producers, emulator_mode, data_rate_slowdown_factor, run_
             },
             "hosts": {
                 "host_df": host_df,
-                "host_trg": host_trg
+                "host_trigger": host_trigger,
+                "host_hsi": host_hsi
             },
             "apps" : {
-                app_trgemu : {
+                app_hsi: {
                     "exec": "daq_application",
-                    "host": "host_trg",
+                    "host": "host_hsi",
+                    "port": 3332
+                },
+                app_trigger : {
+                    "exec": "daq_application",
+                    "host": "host_trigger",
                     "port": 3333
                 },
                 app_df: {
                     "exec": "daq_application",
                     "host": "host_df",
                     "port": 3334
-                }
+                },
             },
             "response_listener": {
                 "port": 56789
@@ -240,7 +267,6 @@ def cli(number_of_data_producers, emulator_mode, data_rate_slowdown_factor, run_
 
 
 if __name__ == '__main__':
-
     try:
         cli(show_default=True, standalone_mode=True)
     except Exception as e:
