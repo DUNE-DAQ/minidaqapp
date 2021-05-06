@@ -202,4 +202,6 @@ def generate(NETWORK_ENDPOINTS,
 
     cmd_data['scrap'] = acmd([("", None)])
 
+    cmd_data['record'] = acmd([("", None)])
+
     return cmd_data

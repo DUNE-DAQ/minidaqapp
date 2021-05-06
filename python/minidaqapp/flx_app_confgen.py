@@ -17,6 +17,7 @@ moo.otypes.load_types('dfmodules/datawriter.jsonnet')
 moo.otypes.load_types('dfmodules/hdf5datastore.jsonnet')
 moo.otypes.load_types('readout/datalinkhandler.jsonnet')
 moo.otypes.load_types('flxlibs/felixcardreader.jsonnet')
+moo.otypes.load_types('readout/datarecorder.jsonnet')
 
 # Import new types
 import dunedaq.cmdlib.cmd as basecmd # AddressedCmd, 
@@ -30,6 +31,7 @@ import dunedaq.dfmodules.datawriter as dw
 import dunedaq.dfmodules.hdf5datastore as hdf5ds
 import dunedaq.flxlibs.felixcardreader as fcr
 import dunedaq.readout.datalinkhandler as dlh
+import dunedaq.readout.datarecorder as dr
 
 from appfwk.utils import mcmd, mrccmd, mspec
 
@@ -66,6 +68,9 @@ def generate(
         ] + [
 
             app.QueueSpec(inst=f"wib_link_{idx}", kind='FollySPSCQueue', capacity=100000)
+                for idx in range(NUMBER_OF_DATA_PRODUCERS)
+        ] + [
+            app.QueueSpec(inst=f"snb_link_{idx}", kind='FollySPSCQueue', capacity=100000)
                 for idx in range(NUMBER_OF_DATA_PRODUCERS)
         ]
     
@@ -111,8 +116,14 @@ def generate(
                             app.QueueInfo(name="timesync", inst="time_sync_q", dir="output"),
                             app.QueueInfo(name="requests", inst=f"data_requests_{idx}", dir="input"),
                             app.QueueInfo(name="fragments", inst="data_fragments_q", dir="output"),
+                            app.QueueInfo(name="snb", inst=f"snb_link_{idx}", dir="output"),
                             ]) for idx in range(NUMBER_OF_DATA_PRODUCERS)
-        ]
+        ] + [
+                mspec(f"data_recorder_{idx}", "DataRecorder", [
+
+                            app.QueueInfo(name="snb", inst=f"snb_link_{idx}", dir="input")
+                            ]) for idx in range(NUMBER_OF_DATA_PRODUCERS)
+    ]
 
     if NUMBER_OF_DATA_PRODUCERS>5 :
         mod_specs.append(mspec("flxcard_1", "FelixCardReader", [
@@ -214,7 +225,13 @@ def generate(
                         apa_number = 0,
                         link_number = idx
                         )) for idx in range(NUMBER_OF_DATA_PRODUCERS)
-            ])
+            ] + [
+                (f"data_recorder_{idx}", dr.Conf(
+                        output_file = f"output_{idx}.out",
+                        compression_algorithm = "None",
+                        stream_buffer_size = 8388608
+                        )) for idx in range(NUMBER_OF_DATA_PRODUCERS)
+    ])
     
     jstr = json.dumps(confcmd.pod(), indent=4, sort_keys=True)
     print(jstr)
@@ -224,6 +241,7 @@ def generate(
             ("datawriter", startpars),
             ("ffr", startpars),
             ("datahandler_.*", startpars),
+            ("data_recorder_.*", startpars),
             ("flxcard.*", startpars),
             ("rqg", startpars),
             ("tde", startpars),
@@ -237,6 +255,7 @@ def generate(
             ("rqg", None),
             ("flxcard.*", None),
             ("datahandler_.*", None),
+            ("datarecorder_.*", None),
             ("ffr", None),
             ("datawriter", None),
         ])
@@ -267,8 +286,17 @@ def generate(
     jstr = json.dumps(scrapcmd.pod(), indent=4, sort_keys=True)
     print("="*80+"\nScrap\n\n", jstr)
 
+    recordcmd = mrccmd("record", "RUNNING", "RUNNING", [
+        ("datahandler_.*", dlh.RecordingParams(
+            duration=10
+        ))
+    ])
+
+    jstr = json.dumps(recordcmd.pod(), indent=4, sort_keys=True)
+    print("="*80+"\nRecord\n\n", jstr)
+
     # Create a list of commands
-    cmd_seq = [initcmd, confcmd, startcmd, stopcmd, pausecmd, resumecmd, scrapcmd]
+    cmd_seq = [initcmd, confcmd, startcmd, stopcmd, pausecmd, resumecmd, scrapcmd, recordcmd]
 
     # Print them as json (to be improved/moved out)
     jstr = json.dumps([c.pod() for c in cmd_seq], indent=4, sort_keys=True)

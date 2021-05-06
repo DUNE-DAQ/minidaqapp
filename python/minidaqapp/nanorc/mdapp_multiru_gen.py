@@ -137,7 +137,7 @@ def cli(number_of_data_producers, emulator_mode, data_rate_slowdown_factor, run_
     jf_df = join(data_dir, app_df)
     jf_ru = [join(data_dir, app_ru[idx]) for idx in range(len(host_ru))]
 
-    cmd_set = ["init", "conf", "start", "stop", "pause", "resume", "scrap"]
+    cmd_set = ["init", "conf", "start", "stop", "pause", "resume", "scrap", "record"]
     for app,data in [(app_trgemu, cmd_data_trg), (app_df, cmd_data_dataflow)] + list(zip(app_ru, cmd_data_readout)):
         console.log(f"Generating {app} command data json files")
         for c in cmd_set:

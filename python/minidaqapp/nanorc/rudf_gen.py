@@ -23,6 +23,7 @@ moo.otypes.load_types('nwqueueadapters/networkobjectsender.jsonnet')
 moo.otypes.load_types('flxlibs/felixcardreader.jsonnet')
 moo.otypes.load_types('readout/fakecardreader.jsonnet')
 moo.otypes.load_types('readout/datalinkhandler.jsonnet')
+moo.otypes.load_types('readout/datarecorder.jsonnet')
 
 
 # Import new types
@@ -42,6 +43,7 @@ import dunedaq.nwqueueadapters.networkobjectsender as nos
 import dunedaq.readout.fakecardreader as fakecr
 import dunedaq.flxlibs.felixcardreader as flxcr
 import dunedaq.readout.datalinkhandler as dlh
+import dunedaq.readout.datarecorder as dr
 
 from appfwk.utils import mcmd, mrccmd, mspec
 
@@ -115,6 +117,9 @@ def generate(
 
             app.QueueSpec(inst=f"wib_link_{idx}", kind='FollySPSCQueue', capacity=100000)
                 for idx in range(NUMBER_OF_DATA_PRODUCERS)
+        ] + [
+            app.QueueSpec(inst=f"snb_link_{idx}", kind='FollySPSCQueue', capacity=100000)
+                for idx in range(NUMBER_OF_DATA_PRODUCERS)
         ]
     
 
@@ -161,8 +166,14 @@ def generate(
                             app.QueueInfo(name="timesync", inst="time_sync_q", dir="output"),
                             app.QueueInfo(name="requests", inst=f"data_requests_{idx}", dir="input"),
                             app.QueueInfo(name="fragments", inst="data_fragments_q", dir="output"),
+                            app.QueueInfo(name="snb", inst=f"snb_link_{idx}", dir="output"),
                             ]) for idx in range(NUMBER_OF_DATA_PRODUCERS)
-        ]
+        ] + [
+                mspec(f"data_recorder_{idx}", "DataRecorder", [
+
+                            app.QueueInfo(name="snb", inst=f"snb_link_{idx}", dir="input")
+                            ]) for idx in range(NUMBER_OF_DATA_PRODUCERS)
+    ]
 
     if FLX_INPUT:
         mod_specs.append(mspec("flxcard_0", "FelixCardReader", [
@@ -278,6 +289,12 @@ def generate(
                         apa_number = 0,
                         link_number = idx
                         )) for idx in range(NUMBER_OF_DATA_PRODUCERS)
+            ] + [
+                (f"data_recorder_{idx}", dr.Conf(
+                        output_file = f"output_{idx}.out",
+                        compression_algorithm = "None",
+                        stream_buffer_size = 8388608
+                        )) for idx in range(NUMBER_OF_DATA_PRODUCERS)
             ])
 
 
@@ -288,6 +305,7 @@ def generate(
             ("ffr", startpars),
             ("qton_timesync", startpars),
             ("datahandler_.*", startpars),
+            ("data_recorder_.*", startpars),
             ("fake_source", startpars),
             ("flxcard.*", startpars),
             ("rqg", startpars),
@@ -300,6 +318,7 @@ def generate(
             ("flxcard.*", None),
             ("fake_source", None),
             ("datahandler_.*", None),
+            ("data_recorder_.*", None),
             ("qton_timesync", None),
             ("ffr", None),
             ("datawriter", None),
@@ -315,6 +334,10 @@ def generate(
         ])
 
     cmd_data['scrap'] = acmd([
+            ("", None)
+        ])
+
+    cmd_data['record'] = acmd([
             ("", None)
         ])
 
