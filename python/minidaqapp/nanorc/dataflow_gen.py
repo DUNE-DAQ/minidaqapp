@@ -71,7 +71,6 @@ def generate(NETWORK_ENDPOINTS,
         NUMBER_OF_DATA_PRODUCERS=2,
         RUN_NUMBER=333, 
         OUTPUT_PATH=".",
-        DISABLE_OUTPUT=False,
         TOKEN_COUNT=0,):
     """Generate the json configuration for the readout and DF process"""
 
@@ -174,7 +173,7 @@ def generate(NETWORK_ENDPOINTS,
 
 
 
-    startpars = rccmd.StartParams(run=RUN_NUMBER, disable_data_storage=DISABLE_OUTPUT)
+    startpars = rccmd.StartParams(run=RUN_NUMBER)
     cmd_data['start'] = acmd([("qton_token", startpars),
             ("datawriter", startpars),
             ("ntoq_fragments_.*", startpars),

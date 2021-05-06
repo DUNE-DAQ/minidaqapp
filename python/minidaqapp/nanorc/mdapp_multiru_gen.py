@@ -25,14 +25,13 @@ import click
 @click.option('-c', '--token-count', default=10)
 @click.option('-d', '--data-file', type=click.Path(), default='./frames.bin')
 @click.option('-o', '--output-path', type=click.Path(), default='.')
-@click.option('--disable-data-storage', is_flag=True)
 @click.option('--enable-trace', is_flag=True)
 @click.option('-f', '--use-felix', is_flag=True)
 @click.option('--host-df', default='localhost')
 @click.option('--host-ru', multiple=True, default=['localhost'], help="This option is repeatable, with each repetition adding an additional ru process.")
 @click.option('--host-trg', default='localhost')
 @click.argument('json_dir', type=click.Path())
-def cli(number_of_data_producers, emulator_mode, data_rate_slowdown_factor, run_number, trigger_rate_hz, token_count, data_file, output_path, disable_data_storage, enable_trace, use_felix, host_df, host_ru, host_trg, json_dir):
+def cli(number_of_data_producers, emulator_mode, data_rate_slowdown_factor, run_number, trigger_rate_hz, token_count, data_file, output_path, enable_trace, use_felix, host_df, host_ru, host_trg, json_dir):
     """
       JSON_DIR: Json file output folder
     """
@@ -106,7 +105,6 @@ def cli(number_of_data_producers, emulator_mode, data_rate_slowdown_factor, run_
         NUMBER_OF_DATA_PRODUCERS = total_number_of_data_producers,
         RUN_NUMBER = run_number, 
         OUTPUT_PATH = output_path,
-        DISABLE_OUTPUT = disable_data_storage,
         TOKEN_COUNT = df_token_count
     )
     console.log("dataflow cmd data:", cmd_data_dataflow)
@@ -148,7 +146,7 @@ def cli(number_of_data_producers, emulator_mode, data_rate_slowdown_factor, run_
 
 
     console.log(f"Generating top-level command json files")
-    start_order = [app_df] + app_ru + [app_trgemu] 
+    start_order = [app_df] + app_ru + [app_trgemu]
     for c in cmd_set:
         with open(join(json_dir,f'{c}.json'), 'w') as f:
             cfg = {
