@@ -206,8 +206,6 @@ def cli(number_of_data_producers, emulator_mode, data_rate_slowdown_factor, run_
                 "env":{
                     "CET_PLUGIN_PATH": "getenv",
                     "DUNEDAQ_SHARE_PATH": "getenv",
-                    "DUNEDAQ_ERS_DEBUG_LEVEL": "getenv",
-                    "DUNEDAQ_ERS_VERBOSITY_LEVEL": "getenv",
                     "LD_LIBRARY_PATH": "getenv",
                     "PATH": "getenv"
                 },
