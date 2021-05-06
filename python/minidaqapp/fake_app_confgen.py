@@ -11,8 +11,7 @@ moo.otypes.load_types('appfwk/cmd.jsonnet')
 moo.otypes.load_types('appfwk/app.jsonnet')
 
 moo.otypes.load_types('trigemu/triggerdecisionemulator.jsonnet')
-moo.otypes.load_types('dfmodules/requestgenerator.jsonnet')
-moo.otypes.load_types('dfmodules/fragmentreceiver.jsonnet')
+moo.otypes.load_types('dfmodules/triggerrecordbuilder.jsonnet')
 moo.otypes.load_types('dfmodules/datawriter.jsonnet')
 moo.otypes.load_types('dfmodules/hdf5datastore.jsonnet')
 moo.otypes.load_types('readout/fakecardreader.jsonnet')
@@ -24,8 +23,7 @@ import dunedaq.rcif.cmd as rccmd # AddressedCmd,
 import dunedaq.appfwk.cmd as cmd # AddressedCmd, 
 import dunedaq.appfwk.app as app # AddressedCmd, 
 import dunedaq.trigemu.triggerdecisionemulator as tde
-import dunedaq.dfmodules.requestgenerator as rqg
-import dunedaq.dfmodules.fragmentreceiver as ffr
+import dunedaq.dfmodules.triggerrecordbuilder as trb
 import dunedaq.dfmodules.datawriter as dw
 import dunedaq.dfmodules.hdf5datastore as hdf5ds
 import dunedaq.readout.fakecardreader as fcr
@@ -59,7 +57,6 @@ def generate(
             app.QueueSpec(inst="time_sync_q", kind='FollyMPMCQueue', capacity=100),
             app.QueueSpec(inst="token_q", kind='FollySPSCQueue', capacity=20),
             app.QueueSpec(inst="trigger_decision_q", kind='FollySPSCQueue', capacity=20),
-            app.QueueSpec(inst="trigger_decision_copy_for_bookkeeping", kind='FollySPSCQueue', capacity=20),
             app.QueueSpec(inst="trigger_record_q", kind='FollySPSCQueue', capacity=20),
             app.QueueSpec(inst="data_fragments_q", kind='FollyMPMCQueue', capacity=20*NUMBER_OF_DATA_PRODUCERS),
         ] + [
@@ -83,18 +80,13 @@ def generate(
                         app.QueueInfo(name="trigger_decision_sink", inst="trigger_decision_q", dir="output"),
                     ]),
 
-        mspec("rqg", "RequestGenerator", [
+        mspec("trb", "TriggerRecordBuilder", [
                         app.QueueInfo(name="trigger_decision_input_queue", inst="trigger_decision_q", dir="input"),
-                        app.QueueInfo(name="trigger_decision_for_event_building", inst="trigger_decision_copy_for_bookkeeping", dir="output"),
+                        app.QueueInfo(name="trigger_record_output_queue", inst="trigger_record_q", dir="output"),
+                        app.QueueInfo(name="data_fragment_input_queue", inst="data_fragments_q", dir="input")
                     ] + [
                         app.QueueInfo(name=f"data_request_{idx}_output_queue", inst=f"data_requests_{idx}", dir="output")
                             for idx in range(NUMBER_OF_DATA_PRODUCERS)
-                    ]),
-
-        mspec("ffr", "FragmentReceiver", [
-                        app.QueueInfo(name="trigger_decision_input_queue", inst="trigger_decision_copy_for_bookkeeping", dir="input"),
-                        app.QueueInfo(name="trigger_record_output_queue", inst="trigger_record_q", dir="output"),
-                        app.QueueInfo(name="data_fragment_input_queue", inst="data_fragments_q", dir="input"),
                     ]),
 
         mspec("datawriter", "DataWriter", [
@@ -155,13 +147,11 @@ def generate(
                         clock_frequency_hz=CLOCK_SPEED_HZ/DATA_RATE_SLOWDOWN_FACTOR,
                         initial_token_count=trigemu_token_count
                         )),
-                ("rqg", rqg.ConfParams(
-                        map=rqg.mapgeoidqueue([
-                                rqg.geoidinst(apa=0, link=idx, queueinstance=f"data_requests_{idx}") for idx in range(NUMBER_OF_DATA_PRODUCERS)
+                ("trb", trb.ConfParams(
+                        general_queue_timeout=QUEUE_POP_WAIT_MS,
+                        map=trb.mapgeoidqueue([
+                                trb.geoidinst(apa=0, link=idx, queueinstance=f"data_requests_{idx}") for idx in range(NUMBER_OF_DATA_PRODUCERS)
                             ])  
-                        )),
-                ("ffr", ffr.ConfParams(
-                            general_queue_timeout=QUEUE_POP_WAIT_MS
                         )),
                 ("datawriter", dw.ConfParams(
                             initial_token_count=df_token_count,
@@ -213,10 +203,9 @@ def generate(
     startpars = rccmd.StartParams(run=RUN_NUMBER, trigger_interval_ticks=trigger_interval_ticks, disable_data_storage=DISABLE_OUTPUT)
     startcmd = mrccmd("start", "CONFIGURED", "RUNNING", [
             ("datawriter", startpars),
-            ("ffr", startpars),
             ("datahandler_.*", startpars),
             ("fake_source", startpars),
-            ("rqg", startpars),
+            ("trb", startpars),
             ("tde", startpars),
         ])
 
@@ -226,10 +215,9 @@ def generate(
 
     stopcmd = mrccmd("stop", "RUNNING", "CONFIGURED", [
             ("tde", None),
-            ("rqg", None),
             ("fake_source", None),
             ("datahandler_.*", None),
-            ("ffr", None),
+            ("trb", None),
             ("datawriter", None),
         ])
 
