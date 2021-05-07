@@ -132,11 +132,11 @@ def generate(NETWORK_ENDPOINTS,
                 app.QueueInfo(name="timesync", inst="time_sync_q", dir="output"),
                 app.QueueInfo(name="requests", inst=f"data_requests_{idx}", dir="input"),
                 app.QueueInfo(name="fragments", inst="data_fragments_q", dir="output"),
-                app.QueueInfo(name="snb", inst=f"raw_recording_link_{idx}", dir="output")
+                app.QueueInfo(name="raw_recording", inst=f"raw_recording_link_{idx}", dir="output")
             ]) for idx in range(NUMBER_OF_DATA_PRODUCERS)
         ] + [
             mspec(f"data_recorder_{idx}", "DataRecorder", [
-                app.QueueInfo(name="snb", inst=f"raw_recording_link_{idx}", dir="input")
+                app.QueueInfo(name="raw_recording", inst=f"raw_recording_link_{idx}", dir="input")
             ]) for idx in range(NUMBER_OF_DATA_PRODUCERS)
         ]
     else:
