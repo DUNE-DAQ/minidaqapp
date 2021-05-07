@@ -77,7 +77,9 @@ def generate(NETWORK_ENDPOINTS,
         DATA_FILE="./frames.bin",
         FLX_INPUT=True,
         CLOCK_SPEED_HZ=50000000,
-        HOSTIDX=0, CARDID=0):
+        HOSTIDX=0, CARDID=0,
+        RAW_RECORDING_ENABLED=False,
+        RAW_RECORDING_OUTPUT_DIR="."):
     """Generate the json configuration for the readout and DF process"""
 
     cmd_data = {}
@@ -104,10 +106,13 @@ def generate(NETWORK_ENDPOINTS,
         ] + [
             app.QueueSpec(inst=f"wib_link_{idx}", kind='FollySPSCQueue', capacity=100000)
                 for idx in range(NUMBER_OF_DATA_PRODUCERS)
-        ] + [
-            app.QueueSpec(inst=f"snb_link_{idx}", kind='FollySPSCQueue', capacity=100000)
-                for idx in range(NUMBER_OF_DATA_PRODUCERS)
-    ]
+        ]
+
+    if RAW_RECORDING_ENABLED:
+        queue_bare_specs = queue_bare_specs + [
+            app.QueueSpec(inst=f"raw_recording_link_{idx}", kind='FollySPSCQueue', capacity=100000)
+            for idx in range(NUMBER_OF_DATA_PRODUCERS)
+        ]
     
 
     # Only needed to reproduce the same order as when using jsonnet
@@ -118,16 +123,31 @@ def generate(NETWORK_ENDPOINTS,
         mspec("qton_fragments", "QueueToNetwork", [app.QueueInfo(name="input", inst="data_fragments_q", dir="input")]),
     ] + [
         mspec(f"ntoq_datareq_{idx}", "NetworkToQueue", [app.QueueInfo(name="output", inst=f"data_requests_{idx}", dir="output")]) for idx in range(MIN_LINK,MAX_LINK)
-    ] + [
-        mspec(f"datahandler_{idx + MIN_LINK}", "DataLinkHandler", [app.QueueInfo(name="raw_input", inst=f"wib_link_{idx}", dir="input"),
-                            app.QueueInfo(name="timesync", inst="time_sync_q", dir="output"),
-                            app.QueueInfo(name="requests", inst=f"data_requests_{idx + MIN_LINK}", dir="input"),
-                            app.QueueInfo(name="fragments", inst="data_fragments_q", dir="output"),
-                            app.QueueInfo(name="snb", inst=f"snb_link_{idx}", dir="output")]) for idx in range(NUMBER_OF_DATA_PRODUCERS)
-    ] + [
-        mspec(f"data_recorder_{idx}", "DataRecorder", [
-                            app.QueueInfo(name="snb", inst=f"snb_link_{idx}", dir="input")]) for idx in range(NUMBER_OF_DATA_PRODUCERS)
     ]
+
+    if RAW_RECORDING_ENABLED:
+        mod_specs = mod_specs + [
+            mspec(f"datahandler_{idx}", "DataLinkHandler", [
+                app.QueueInfo(name="raw_input", inst=f"wib_link_{idx}", dir="input"),
+                app.QueueInfo(name="timesync", inst="time_sync_q", dir="output"),
+                app.QueueInfo(name="requests", inst=f"data_requests_{idx}", dir="input"),
+                app.QueueInfo(name="fragments", inst="data_fragments_q", dir="output"),
+                app.QueueInfo(name="snb", inst=f"raw_recording_link_{idx}", dir="output")
+            ]) for idx in range(NUMBER_OF_DATA_PRODUCERS)
+        ] + [
+            mspec(f"data_recorder_{idx}", "DataRecorder", [
+                app.QueueInfo(name="snb", inst=f"raw_recording_link_{idx}", dir="input")
+            ]) for idx in range(NUMBER_OF_DATA_PRODUCERS)
+        ]
+    else:
+        mod_specs = mod_specs + [
+            mspec(f"datahandler_{idx}", "DataLinkHandler", [
+                app.QueueInfo(name="raw_input", inst=f"wib_link_{idx}", dir="input"),
+                app.QueueInfo(name="timesync", inst="time_sync_q", dir="output"),
+                app.QueueInfo(name="requests", inst=f"data_requests_{idx}", dir="input"),
+                app.QueueInfo(name="fragments", inst="data_fragments_q", dir="output")
+            ]) for idx in range(NUMBER_OF_DATA_PRODUCERS)
+        ]
 
     if FLX_INPUT:
         mod_specs.append(mspec("flxcard_0", "FelixCardReader", [

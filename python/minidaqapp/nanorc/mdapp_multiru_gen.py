@@ -30,8 +30,10 @@ import click
 @click.option('--host-df', default='localhost')
 @click.option('--host-ru', multiple=True, default=['localhost'], help="This option is repeatable, with each repetition adding an additional ru process.")
 @click.option('--host-trg', default='localhost')
+@click.option('--enable-raw-recording', is_flag=True)
+@click.option('--raw-recording-output-dir', type=click.Path(), default='.')
 @click.argument('json_dir', type=click.Path())
-def cli(number_of_data_producers, emulator_mode, data_rate_slowdown_factor, run_number, trigger_rate_hz, token_count, data_file, output_path, enable_trace, use_felix, host_df, host_ru, host_trg, json_dir):
+def cli(number_of_data_producers, emulator_mode, data_rate_slowdown_factor, run_number, trigger_rate_hz, token_count, data_file, output_path, enable_trace, use_felix, host_df, host_ru, host_trg, enable_raw_recording, raw_recording_output_dir, json_dir):
     """
       JSON_DIR: Json file output folder
     """
@@ -119,7 +121,9 @@ def cli(number_of_data_producers, emulator_mode, data_rate_slowdown_factor, run_
             FLX_INPUT = use_felix,
             CLOCK_SPEED_HZ = CLOCK_SPEED_HZ,
             HOSTIDX = hostidx,
-            CARDID = cardid[hostidx]
+            CARDID = cardid[hostidx],
+            RAW_RECORDING_ENABLED = enable_raw_recording,
+            RAW_RECORDING_OUTPUT_DIR = raw_recording_output_dir
             ) for hostidx in range(len(host_ru))]
     console.log("readout cmd data:", cmd_data_readout)
 

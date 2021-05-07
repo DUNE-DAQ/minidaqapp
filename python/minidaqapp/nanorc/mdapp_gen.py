@@ -105,8 +105,10 @@ import click
 @click.option('-f', '--use-felix', is_flag=True)
 @click.option('--host-rudf', default='localhost')
 @click.option('--host-trgemu', default='localhost')
+@click.option('--enable-raw-recording', is_flag=True)
+@click.option('--raw-recording-output-dir', type=click.Path(), default='.')
 @click.argument('json_dir', type=click.Path())
-def cli(number_of_data_producers, emulator_mode, data_rate_slowdown_factor, run_number, trigger_rate_hz, token_count, data_file, output_path, use_felix, host_rudf, host_trgemu, json_dir):
+def cli(number_of_data_producers, emulator_mode, data_rate_slowdown_factor, run_number, trigger_rate_hz, token_count, data_file, output_path, use_felix, host_rudf, host_trgemu, enable_raw_recording, raw_recording_output_dir, json_dir):
     """
       JSON_DIR: Json file output folder
     """
@@ -153,7 +155,9 @@ def cli(number_of_data_producers, emulator_mode, data_rate_slowdown_factor, run_
         OUTPUT_PATH = output_path,
         FLX_INPUT = use_felix,
         TOKEN_COUNT = df_token_count,
-        CLOCK_SPEED_HZ = CLOCK_SPEED_HZ
+        CLOCK_SPEED_HZ = CLOCK_SPEED_HZ,
+        RAW_RECORDING_ENABLED = enable_raw_recording,
+        RAW_RECORDING_OUTPUT_DIR = raw_recording_output_dir
     )
     console.log("rudf cmd data:", cmd_data_rudf)
 
