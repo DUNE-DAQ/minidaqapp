@@ -245,12 +245,6 @@ def generate(
                         )) for idx in range(NUMBER_OF_DATA_PRODUCERS)
             ] + [
                 (f"data_recorder_{idx}", dr.Conf(
-                        output_file = f"output_{idx}.out",
-                        compression_algorithm = "None",
-                        stream_buffer_size = 8388608
-                        )) for idx in range(NUMBER_OF_DATA_PRODUCERS)
-            ] + [
-                (f"data_recorder_{idx}", dr.Conf(
                         output_file = join(RAW_RECORDING_OUTPUT_DIR, f"output_{idx}.out"),
                         compression_algorithm = "None",
                         stream_buffer_size = 8388608
