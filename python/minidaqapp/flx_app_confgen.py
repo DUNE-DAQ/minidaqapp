@@ -136,7 +136,7 @@ def generate(
     else:
         mod_specs = mod_specs + [
             mspec(f"datahandler_{idx}", "DataLinkHandler", [
-                app.QueueInfo(name="raw_input", inst=f"wib_fake_link_{idx}", dir="input"),
+                app.QueueInfo(name="raw_input", inst=f"wib_link_{idx}", dir="input"),
                 app.QueueInfo(name="timesync", inst="time_sync_q", dir="output"),
                 app.QueueInfo(name="requests", inst=f"data_requests_{idx}", dir="input"),
                 app.QueueInfo(name="fragments", inst="data_fragments_q", dir="output")
