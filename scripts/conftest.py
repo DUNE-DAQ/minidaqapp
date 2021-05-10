@@ -11,6 +11,7 @@ def pytest_addoption(parser):
 
 @pytest.fixture(scope="session")
 def setup_dirs(request, tmp_path_factory):
+    """Create the temporary directory to run nanorc in, and put the frame data file in it"""
     run_dir=tmp_path_factory.mktemp("rundir")
     frame_path=request.config.getoption("--frame-file")
     os.symlink(frame_path, run_dir.joinpath("frames.bin"))
@@ -18,11 +19,22 @@ def setup_dirs(request, tmp_path_factory):
         pass
     dirs=Dirs()
     dirs.run_dir=run_dir
+    # Form the name of the json directory, but don't actually create
+    # it, because the confgen script checks that it doesn't already
+    # exist
     dirs.json_dir=tmp_path_factory.getbasetemp() / "json"
     yield dirs
 
 @pytest.fixture(scope="module")
 def create_json_files(request, setup_dirs):
+    """Run the confgen to produce the configuration json files
+
+    The name of the module to use is taken from the `confgen_name`
+    variable in the global scope of the test module, and the arguments
+    for the confgen are taken from the `confgen_arguments` variable in
+    the same place
+
+    """
     print("Creating json files")
     module_name=getattr(request.module, "confgen_name")
     module_arguments=getattr(request.module, "confgen_arguments")
@@ -34,6 +46,11 @@ def create_json_files(request, setup_dirs):
 
 @pytest.fixture(scope="module")
 def run_nanorc(request, create_json_files, setup_dirs):
+    """Run nanorc with the json files created by `create_json_files`. The
+    commands specified by the `nanorc_command_list` variable in the
+    test module are executed
+
+    """
     command_list=getattr(request.module, "nanorc_command_list")
     run_dir=setup_dirs.run_dir
     json_dir=setup_dirs.json_dir
