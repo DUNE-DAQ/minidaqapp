@@ -1,3 +1,16 @@
+# test_integration.py - example integration test
+#
+# An example integration test using the pytest framework
+#
+# Prerequisites:
+#
+# > cd scripts
+# > pip install -r requirements.txt # Install pytest
+#
+# Usage:
+# 
+# pytest --frame-file /path/to/frames.bin test_integration.py
+
 import pytest
 
 import data_file_checks
@@ -39,8 +52,8 @@ def test_data_file(run_nanorc):
 
     data_file=data_file_checks.DataFile(run_nanorc.data_files[0])
     assert data_file_checks.sanity_check(data_file)
-    assert data_file_checks.check_link_presence(data_file, 1)
-    assert data_file_checks.check_fragment_sizes(data_file, 22344, 22344)
+    assert data_file_checks.check_link_presence(data_file, n_links=1)
+    assert data_file_checks.check_fragment_sizes(data_file, min_frag_size=22344, max_frag_size=22344)
 
 
 def test_log_files(run_nanorc):
