@@ -10,8 +10,8 @@ def log_has_no_errors(log_file_name):
             ok=False
     return ok
 
-def logs_are_error_free():
+def logs_are_error_free(log_file_names):
     all_ok=True
-    for log in glob("log_*.txt"):
+    for log in log_file_names:
         all_ok=all_ok and log_has_no_errors(log)
     return all_ok
