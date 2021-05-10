@@ -59,15 +59,11 @@ def run_nanorc(request, create_json_files, setup_dirs):
     class RunResult:
         pass
     
-    try:
-        result=RunResult()
-        result.completed_process=subprocess.run([nanorc] + [str(json_dir)] + command_list, cwd=run_dir)
-        result.run_dir=run_dir
-        result.json_dir=json_dir
-        result.data_files=list(run_dir.glob("swtest_*.hdf5"))
-        result.log_files=list(run_dir.glob("log_*.txt"))
-        result.opmon_files=list(run_dir.glob("info_*.json"))
-        yield result
-    except subprocess.CalledProcessError as err:
-        print(f"Running nanorc failed with exit code {err.returncode}")
-        pytest.fail()
+    result=RunResult()
+    result.completed_process=subprocess.run([nanorc] + [str(json_dir)] + command_list, cwd=run_dir)
+    result.run_dir=run_dir
+    result.json_dir=json_dir
+    result.data_files=list(run_dir.glob("swtest_*.hdf5"))
+    result.log_files=list(run_dir.glob("log_*.txt"))
+    result.opmon_files=list(run_dir.glob("info_*.json"))
+    yield result
