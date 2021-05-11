@@ -127,10 +127,10 @@ def generate(NETWORK_ENDPOINTS,
 
     if RAW_RECORDING_ENABLED:
         mod_specs = mod_specs + [
-            mspec(f"datahandler_{idx}", "DataLinkHandler", [
+            mspec(f"datahandler_{idx + MIN_LINK}", "DataLinkHandler", [
                 app.QueueInfo(name="raw_input", inst=f"wib_link_{idx}", dir="input"),
                 app.QueueInfo(name="timesync", inst="time_sync_q", dir="output"),
-                app.QueueInfo(name="requests", inst=f"data_requests_{idx}", dir="input"),
+                app.QueueInfo(name="requests", inst=f"data_requests_{idx + MIN_LINK}", dir="input"),
                 app.QueueInfo(name="fragments", inst="data_fragments_q", dir="output"),
                 app.QueueInfo(name="raw_recording", inst=f"raw_recording_link_{idx}", dir="output")
             ]) for idx in range(NUMBER_OF_DATA_PRODUCERS)
@@ -141,10 +141,10 @@ def generate(NETWORK_ENDPOINTS,
         ]
     else:
         mod_specs = mod_specs + [
-            mspec(f"datahandler_{idx}", "DataLinkHandler", [
+            mspec(f"datahandler_{idx + MIN_LINK}", "DataLinkHandler", [
                 app.QueueInfo(name="raw_input", inst=f"wib_link_{idx}", dir="input"),
                 app.QueueInfo(name="timesync", inst="time_sync_q", dir="output"),
-                app.QueueInfo(name="requests", inst=f"data_requests_{idx}", dir="input"),
+                app.QueueInfo(name="requests", inst=f"data_requests_{idx + MIN_LINK}", dir="input"),
                 app.QueueInfo(name="fragments", inst="data_fragments_q", dir="output")
             ]) for idx in range(NUMBER_OF_DATA_PRODUCERS)
         ]
