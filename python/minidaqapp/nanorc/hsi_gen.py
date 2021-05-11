@@ -23,7 +23,7 @@ moo.otypes.load_types('rcif/cmd.jsonnet')
 moo.otypes.load_types('appfwk/cmd.jsonnet')
 moo.otypes.load_types('appfwk/app.jsonnet')
 
-moo.otypes.load_types('trigemu/triggerdecisionemulator.jsonnet')
+moo.otypes.load_types('timinglibs/fakehsieventgenerator.jsonnet')
 moo.otypes.load_types('nwqueueadapters/queuetonetwork.jsonnet')
 moo.otypes.load_types('nwqueueadapters/networktoqueue.jsonnet')
 moo.otypes.load_types('nwqueueadapters/networkobjectreceiver.jsonnet')
@@ -34,7 +34,7 @@ import dunedaq.cmdlib.cmd as basecmd # AddressedCmd,
 import dunedaq.rcif.cmd as rccmd # AddressedCmd, 
 import dunedaq.appfwk.cmd as cmd # AddressedCmd, 
 import dunedaq.appfwk.app as app # AddressedCmd,
-import dunedaq.trigemu.triggerdecisionemulator as tde
+import dunedaq.timinglibs.fakehsieventgenerator as fhsig
 import dunedaq.nwqueueadapters.networktoqueue as ntoq
 import dunedaq.nwqueueadapters.queuetonetwork as qton
 import dunedaq.nwqueueadapters.networkobjectreceiver as nor
@@ -70,38 +70,27 @@ def acmd(mods: list) -> cmd.CmdObj:
 #===============================================================================
 def generate(
         NETWORK_ENDPOINTS: list,
-        NUMBER_OF_DATA_PRODUCERS: int = 2,          
-        DATA_RATE_SLOWDOWN_FACTOR: int = 1,
-        RUN_NUMBER: int = 333, 
-        TRIGGER_RATE_HZ: float = 1.0,
-        DATA_FILE: str = "./frames.bin",
-        OUTPUT_PATH: str = ".",
-        TOKEN_COUNT: int = 10,
+        RUN_NUMBER = 333,
         CLOCK_SPEED_HZ: int = 50000000,
+        HSI_EVENT_PERIOD_NS: int = 20,
+        HSI_DEVICE_ID: int = 0,
+        MEAN_SIGNAL_MULTIPLICITY: int = 0,
+        SIGNAL_EMULATION_MODE: int = 0,
+        ENABLED_SIGNALS: int = 0b00000001,
     ):
     """
     { item_description }
     """
     cmd_data = {}
 
-    required_eps = {'trigdec', 'triginh'}
+    required_eps = {'hsievent'}
     if not required_eps.issubset(NETWORK_ENDPOINTS):
         raise RuntimeError(f"ERROR: not all the required endpoints ({', '.join(required_eps)}) found in list of endpoints {' '.join(NETWORK_ENDPOINTS.keys())}")
 
-
-    # Derived parameters
-    TRG_INTERVAL_TICKS = math.floor((1/TRIGGER_RATE_HZ) * CLOCK_SPEED_HZ/DATA_RATE_SLOWDOWN_FACTOR)
-    MIN_READOUT_WINDOW_TICKS = math.floor(CLOCK_SPEED_HZ/(DATA_RATE_SLOWDOWN_FACTOR*1000))
-    MAX_READOUT_WINDOW_TICKS = math.floor(CLOCK_SPEED_HZ/(DATA_RATE_SLOWDOWN_FACTOR*1000))
-    TRIGGER_WINDOW_OFFSET=math.floor(CLOCK_SPEED_HZ/(DATA_RATE_SLOWDOWN_FACTOR*2000))
-    # The delay is set to put the trigger well within the latency buff
-    TRIGGER_DELAY_TICKS=math.floor(CLOCK_SPEED_HZ/DATA_RATE_SLOWDOWN_FACTOR)
-
     # Define modules and queues
     queue_bare_specs = [
-            app.QueueSpec(inst="time_sync_from_netq", kind='FollyMPMCQueue', capacity=100),
-            app.QueueSpec(inst="token_from_netq", kind='FollySPSCQueue', capacity=20),
-            app.QueueSpec(inst="trigger_decision_to_netq", kind='FollySPSCQueue', capacity=20),
+            app.QueueSpec(inst="time_sync_from_netq", kind='FollySPSCQueue', capacity=100),
+            app.QueueSpec(inst="hsievent_q_to_net", kind='FollySPSCQueue', capacity=100),
         ]
 
     # Only needed to reproduce the same order as when using jsonnet
@@ -109,21 +98,17 @@ def generate(
 
 
     mod_specs = [
-        mspec("qton_trigdec", "QueueToNetwork", [
-                        app.QueueInfo(name="input", inst="trigger_decision_to_netq", dir="input")
-                    ]),
 
-        mspec("ntoq_token", "NetworkToQueue", [
-                        app.QueueInfo(name="output", inst="token_from_netq", dir="output")
-                    ]),
-
-        mspec("tde", "TriggerDecisionEmulator", [
+        mspec("fhsig", "FakeHSIEventGenerator", [
                         app.QueueInfo(name="time_sync_source", inst="time_sync_from_netq", dir="input"),
-                        app.QueueInfo(name="token_source", inst="token_from_netq", dir="input"),
-                        app.QueueInfo(name="trigger_decision_sink", inst="trigger_decision_to_netq", dir="output"),
+                        app.QueueInfo(name="hsievent_sink", inst="hsievent_q_to_net", dir="output"),
+                    ]),
+        mspec("qton_hsievent", "QueueToNetwork", [
+                        app.QueueInfo(name="input", inst="hsievent_q_to_net", dir="input")
                     ]),
         ] + [
-        mspec(f"ntoq_timesync_{idx}", "NetworkToQueue", [
+
+           mspec(f"ntoq_timesync_{idx}", "NetworkToQueue", [
                         app.QueueInfo(name="output", inst="time_sync_from_netq", dir="output")
                     ]) for idx, inst in enumerate(NETWORK_ENDPOINTS) if "timesync" in inst
         ]
@@ -131,40 +116,23 @@ def generate(
     cmd_data['init'] = app.Init(queues=queue_specs, modules=mod_specs)
 
     cmd_data['conf'] = acmd([
-                ("qton_trigdec", qton.Conf(msg_type="dunedaq::dfmessages::TriggerDecision",
-                                           msg_module_name="TriggerDecisionNQ",
+
+                ("fhsig", fhsig.Conf(
+                        clock_frequency=CLOCK_SPEED_HZ,
+                        event_period=HSI_EVENT_PERIOD_NS,
+                        mean_signal_multiplicity=MEAN_SIGNAL_MULTIPLICITY,
+                        signal_emulation_mode=SIGNAL_EMULATION_MODE,
+                        enabled_signals=ENABLED_SIGNALS,
+                        )),
+
+                ("qton_hsievent", qton.Conf(msg_type="dunedaq::dfmessages::HSIEvent",
+                                           msg_module_name="HSIEventNQ",
                                            sender_config=nos.Conf(ipm_plugin_type="ZmqSender",
-                                                                  address=NETWORK_ENDPOINTS["trigdec"],
+                                                                  address=NETWORK_ENDPOINTS["hsievent"],
                                                                   stype="msgpack")
                                            )
                  ),
-
-                 ("ntoq_token", ntoq.Conf(msg_type="dunedaq::dfmessages::TriggerDecisionToken",
-                                            msg_module_name="TriggerDecisionTokenNQ",
-                                            receiver_config=nor.Conf(ipm_plugin_type="ZmqReceiver",
-                                                                     address=NETWORK_ENDPOINTS["triginh"])
-                                            )
-                 ),
-
-
-                ("tde", tde.ConfParams(
-                        links=[idx for idx in range(NUMBER_OF_DATA_PRODUCERS)],
-                        min_links_in_request=NUMBER_OF_DATA_PRODUCERS,
-                        max_links_in_request=NUMBER_OF_DATA_PRODUCERS,
-                        min_readout_window_ticks=MIN_READOUT_WINDOW_TICKS,
-                        max_readout_window_ticks=MAX_READOUT_WINDOW_TICKS,
-                        trigger_window_offset=TRIGGER_WINDOW_OFFSET,
-                        # The delay is set to put the trigger well within the latency buff
-                        trigger_delay_ticks=TRIGGER_DELAY_TICKS,
-                        # We divide the trigger interval by
-                        # DATA_RATE_SLOWDOWN_FACTOR so the triggers are still
-                        # emitted per (wall-clock) second, rather than being
-                        # spaced out further
-                        trigger_interval_ticks=TRG_INTERVAL_TICKS,
-                        clock_frequency_hz=CLOCK_SPEED_HZ/DATA_RATE_SLOWDOWN_FACTOR,
-                        initial_token_count=TOKEN_COUNT                    
-                        )),
-            ] + [
+    ] + [
 
                 (f"ntoq_timesync_{idx}", ntoq.Conf(msg_type="dunedaq::dfmessages::TimeSync",
                                            msg_module_name="TimeSyncNQ",
@@ -172,31 +140,29 @@ def generate(
                                                                     address=NETWORK_ENDPOINTS[inst])
                                            )
                 ) for idx, inst in enumerate(NETWORK_ENDPOINTS) if "timesync" in inst
-])
+    ])
+ 
 
     startpars = rccmd.StartParams(run=RUN_NUMBER, disable_data_storage=False)
     cmd_data['start'] = acmd([
-            ("qton_trigdec", startpars),
-            ("ntoq_token", startpars),
             ("ntoq_timesync_.*", startpars),
-            ("tde", startpars),
+            ("fhsig", startpars),
+            ("qton_hsievent", startpars)
         ])
 
     cmd_data['stop'] = acmd([
-            ("qton_trigdec", None),
             ("ntoq_timesync_.*", None),
-            ("ntoq_token", None),
-            ("tde", None),
+            ("fhsig", None),
+            ("qton_hsievent", None)
         ])
 
     cmd_data['pause'] = acmd([
             ("", None)
         ])
 
+    resumepars = rccmd.ResumeParams(trigger_interval_ticks=50000000)
     cmd_data['resume'] = acmd([
-            ("tde", tde.ResumeParams(
-                            trigger_interval_ticks=TRG_INTERVAL_TICKS
-                        ))
+            ("", resumepars)
         ])
 
     cmd_data['scrap'] = acmd([
