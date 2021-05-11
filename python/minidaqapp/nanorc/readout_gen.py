@@ -220,7 +220,7 @@ def generate(NETWORK_ENDPOINTS,
                         link_number = idx)) for idx in range(MIN_LINK,MAX_LINK)
             ] + [
                 (f"data_recorder_{idx}", dr.Conf(
-                        output_file = f"output_{idx}.out",
+                        output_file = f"output_{idx + MIN_LINK}.out",
                         compression_algorithm = "None",
                         stream_buffer_size = 8388608)) for idx in range(NUMBER_OF_DATA_PRODUCERS)
     ])
