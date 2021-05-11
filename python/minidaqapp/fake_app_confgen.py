@@ -3,6 +3,8 @@ from dunedaq.env import get_moo_model_path
 import moo.io
 moo.io.default_load_path = get_moo_model_path()
 
+from os.path import join
+
 # Load configuration types
 import moo.otypes
 
@@ -16,6 +18,7 @@ moo.otypes.load_types('dfmodules/datawriter.jsonnet')
 moo.otypes.load_types('dfmodules/hdf5datastore.jsonnet')
 moo.otypes.load_types('readout/fakecardreader.jsonnet')
 moo.otypes.load_types('readout/datalinkhandler.jsonnet')
+moo.otypes.load_types('readout/datarecorder.jsonnet')
 
 # Import new types
 import dunedaq.cmdlib.cmd as basecmd # AddressedCmd, 
@@ -28,6 +31,7 @@ import dunedaq.dfmodules.datawriter as dw
 import dunedaq.dfmodules.hdf5datastore as hdf5ds
 import dunedaq.readout.fakecardreader as fcr
 import dunedaq.readout.datalinkhandler as dlh
+import dunedaq.readout.datarecorder as dr
 
 from appfwk.utils import mcmd, mrccmd, mspec
 
@@ -47,7 +51,10 @@ def generate(
         DATA_FILE="./frames.bin",
         OUTPUT_PATH=".",
         DISABLE_OUTPUT=False,
-        TOKEN_COUNT=10
+        TOKEN_COUNT=10,
+        RAW_RECORDING_ENABLED = False,
+        RAW_RECORDING_OUTPUT_DIR = ".",
+        RAW_RECORDING_DURATION = 1
     ):
     
     trigger_interval_ticks = math.floor((1/TRIGGER_RATE_HZ) * CLOCK_SPEED_HZ/DATA_RATE_SLOWDOWN_FACTOR)
@@ -67,7 +74,12 @@ def generate(
             app.QueueSpec(inst=f"wib_fake_link_{idx}", kind='FollySPSCQueue', capacity=100000)
                 for idx in range(NUMBER_OF_DATA_PRODUCERS)
         ]
-    
+
+    if (RAW_RECORDING_ENABLED):
+        queue_bare_specs = queue_bare_specs + [
+            app.QueueSpec(inst=f"raw_recording_link_{idx}", kind='FollySPSCQueue', capacity=100000)
+            for idx in range(NUMBER_OF_DATA_PRODUCERS)
+        ]
 
     # Only needed to reproduce the same order as when using jsonnet
     queue_specs = app.QueueSpecs(sorted(queue_bare_specs, key=lambda x: x.inst))
@@ -100,14 +112,30 @@ def generate(
                             for idx in range(NUMBER_OF_DATA_PRODUCERS)
                         ]),
 
-        ] + [
-                mspec(f"datahandler_{idx}", "DataLinkHandler", [
+        ]
 
-                            app.QueueInfo(name="raw_input", inst=f"wib_fake_link_{idx}", dir="input"),
-                            app.QueueInfo(name="timesync", inst="time_sync_q", dir="output"),
-                            app.QueueInfo(name="requests", inst=f"data_requests_{idx}", dir="input"),
-                            app.QueueInfo(name="fragments", inst="data_fragments_q", dir="output"),
-                            ]) for idx in range(NUMBER_OF_DATA_PRODUCERS)
+    if (RAW_RECORDING_ENABLED):
+        mod_specs = mod_specs + [
+            mspec(f"datahandler_{idx}", "DataLinkHandler", [
+                app.QueueInfo(name="raw_input", inst=f"wib_fake_link_{idx}", dir="input"),
+                app.QueueInfo(name="timesync", inst="time_sync_q", dir="output"),
+                app.QueueInfo(name="requests", inst=f"data_requests_{idx}", dir="input"),
+                app.QueueInfo(name="fragments", inst="data_fragments_q", dir="output"),
+                app.QueueInfo(name="raw_recording", inst=f"raw_recording_link_{idx}", dir="output")
+            ]) for idx in range(NUMBER_OF_DATA_PRODUCERS)
+        ] + [
+            mspec(f"data_recorder_{idx}", "DataRecorder", [
+                app.QueueInfo(name="raw_recording", inst=f"raw_recording_link_{idx}", dir="input")
+            ]) for idx in range(NUMBER_OF_DATA_PRODUCERS)
+        ]
+    else:
+        mod_specs = mod_specs + [
+            mspec(f"datahandler_{idx}", "DataLinkHandler", [
+                app.QueueInfo(name="raw_input", inst=f"wib_fake_link_{idx}", dir="input"),
+                app.QueueInfo(name="timesync", inst="time_sync_q", dir="output"),
+                app.QueueInfo(name="requests", inst=f"data_requests_{idx}", dir="input"),
+                app.QueueInfo(name="fragments", inst="data_fragments_q", dir="output")
+            ]) for idx in range(NUMBER_OF_DATA_PRODUCERS)
         ]
 
     init_specs = app.Init(queues=queue_specs, modules=mod_specs)
@@ -195,7 +223,13 @@ def generate(
                         apa_number = 0,
                         link_number = idx
                         )) for idx in range(NUMBER_OF_DATA_PRODUCERS)
-            ])
+            ] + [
+                (f"data_recorder_{idx}", dr.Conf(
+                        output_file = join(RAW_RECORDING_OUTPUT_DIR, f"output_{idx}.out"),
+                        compression_algorithm = "None",
+                        stream_buffer_size = 8388608
+                        )) for idx in (range(NUMBER_OF_DATA_PRODUCERS) if RAW_RECORDING_ENABLED else [])
+    ])
     
     jstr = json.dumps(confcmd.pod(), indent=4, sort_keys=True)
     print(jstr)
@@ -204,6 +238,7 @@ def generate(
     startcmd = mrccmd("start", "CONFIGURED", "RUNNING", [
             ("datawriter", startpars),
             ("datahandler_.*", startpars),
+            ("data_recorder_.*", startpars),
             ("fake_source", startpars),
             ("trb", startpars),
             ("tde", startpars),
@@ -217,6 +252,7 @@ def generate(
             ("tde", None),
             ("fake_source", None),
             ("datahandler_.*", None),
+            ("datarecorder_.*", None),
             ("trb", None),
             ("datawriter", None),
         ])
@@ -250,6 +286,19 @@ def generate(
     # Create a list of commands
     cmd_seq = [initcmd, confcmd, startcmd, stopcmd, pausecmd, resumecmd, scrapcmd]
 
+    if (RAW_RECORDING_ENABLED):
+        # Add optional command
+        record_cmd = mrccmd("record", "RUNNING", "RUNNING", [
+            ("datahandler_.*", dlh.RecordingParams(
+                duration=RAW_RECORDING_DURATION
+            ))
+        ])
+
+        jstr = json.dumps(record_cmd.pod(), indent=4, sort_keys=True)
+        print("="*80+"\nRecord\n\n", jstr)
+
+        cmd_seq.append(record_cmd)
+
     # Print them as json (to be improved/moved out)
     jstr = json.dumps([c.pod() for c in cmd_seq], indent=4, sort_keys=True)
     return jstr
@@ -270,8 +319,11 @@ if __name__ == '__main__':
     @click.option('-o', '--output-path', type=click.Path(), default='.')
     @click.option('--disable-data-storage', is_flag=True)
     @click.option('-c', '--token-count', default=10)
+    @click.option('--enable-raw-recording', is_flag=True)
+    @click.option('--raw-recording-output-dir', type=click.Path(), default='.')
+    @click.option('--raw-recording-duration', default=1)
     @click.argument('json_file', type=click.Path(), default='minidaq-app-fake-readout.json')
-    def cli(number_of_data_producers, emulator_mode, data_rate_slowdown_factor, run_number, trigger_rate_hz, data_file, output_path, disable_data_storage, token_count, json_file):
+    def cli(number_of_data_producers, emulator_mode, data_rate_slowdown_factor, run_number, trigger_rate_hz, data_file, output_path, disable_data_storage, token_count, enable_raw_recording, raw_recording_output_dir, raw_recording_duration, json_file):
         """
           JSON_FILE: Input raw data file.
           JSON_FILE: Output json configuration file.
@@ -287,7 +339,10 @@ if __name__ == '__main__':
                     DATA_FILE = data_file,
                     OUTPUT_PATH = output_path,
                     DISABLE_OUTPUT = disable_data_storage,
-                    TOKEN_COUNT = token_count
+                    TOKEN_COUNT = token_count,
+                    RAW_RECORDING_ENABLED = enable_raw_recording,
+                    RAW_RECORDING_OUTPUT_DIR = raw_recording_output_dir,
+                    RAW_RECORDING_DURATION = raw_recording_duration
                 ))
 
         print(f"'{json_file}' generation completed.")

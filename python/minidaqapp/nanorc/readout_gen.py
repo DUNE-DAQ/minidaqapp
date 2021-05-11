@@ -23,6 +23,7 @@ moo.otypes.load_types('nwqueueadapters/networkobjectsender.jsonnet')
 moo.otypes.load_types('flxlibs/felixcardreader.jsonnet')
 moo.otypes.load_types('readout/fakecardreader.jsonnet')
 moo.otypes.load_types('readout/datalinkhandler.jsonnet')
+moo.otypes.load_types('readout/datarecorder.jsonnet')
 
 
 # Import new types
@@ -42,6 +43,7 @@ import dunedaq.nwqueueadapters.networkobjectsender as nos
 import dunedaq.readout.fakecardreader as fakecr
 import dunedaq.flxlibs.felixcardreader as flxcr
 import dunedaq.readout.datalinkhandler as dlh
+import dunedaq.readout.datarecorder as dr
 
 from appfwk.utils import mcmd, mrccmd, mspec
 
@@ -75,7 +77,9 @@ def generate(NETWORK_ENDPOINTS,
         DATA_FILE="./frames.bin",
         FLX_INPUT=True,
         CLOCK_SPEED_HZ=50000000,
-        HOSTIDX=0, CARDID=0):
+        HOSTIDX=0, CARDID=0,
+        RAW_RECORDING_ENABLED=False,
+        RAW_RECORDING_OUTPUT_DIR="."):
     """Generate the json configuration for the readout and DF process"""
 
     cmd_data = {}
@@ -103,6 +107,12 @@ def generate(NETWORK_ENDPOINTS,
             app.QueueSpec(inst=f"wib_link_{idx}", kind='FollySPSCQueue', capacity=100000)
                 for idx in range(NUMBER_OF_DATA_PRODUCERS)
         ]
+
+    if RAW_RECORDING_ENABLED:
+        queue_bare_specs = queue_bare_specs + [
+            app.QueueSpec(inst=f"raw_recording_link_{idx}", kind='FollySPSCQueue', capacity=100000)
+            for idx in range(NUMBER_OF_DATA_PRODUCERS)
+        ]
     
 
     # Only needed to reproduce the same order as when using jsonnet
@@ -113,12 +123,31 @@ def generate(NETWORK_ENDPOINTS,
         mspec("qton_fragments", "QueueToNetwork", [app.QueueInfo(name="input", inst="data_fragments_q", dir="input")]),
     ] + [
         mspec(f"ntoq_datareq_{idx}", "NetworkToQueue", [app.QueueInfo(name="output", inst=f"data_requests_{idx}", dir="output")]) for idx in range(MIN_LINK,MAX_LINK)
-    ] + [
-        mspec(f"datahandler_{idx + MIN_LINK}", "DataLinkHandler", [app.QueueInfo(name="raw_input", inst=f"wib_link_{idx}", dir="input"),
-                            app.QueueInfo(name="timesync", inst="time_sync_q", dir="output"),
-                            app.QueueInfo(name="requests", inst=f"data_requests_{idx + MIN_LINK}", dir="input"),
-                            app.QueueInfo(name="fragments", inst="data_fragments_q", dir="output"),]) for idx in range(NUMBER_OF_DATA_PRODUCERS)
     ]
+
+    if RAW_RECORDING_ENABLED:
+        mod_specs = mod_specs + [
+            mspec(f"datahandler_{idx + MIN_LINK}", "DataLinkHandler", [
+                app.QueueInfo(name="raw_input", inst=f"wib_link_{idx}", dir="input"),
+                app.QueueInfo(name="timesync", inst="time_sync_q", dir="output"),
+                app.QueueInfo(name="requests", inst=f"data_requests_{idx + MIN_LINK}", dir="input"),
+                app.QueueInfo(name="fragments", inst="data_fragments_q", dir="output"),
+                app.QueueInfo(name="raw_recording", inst=f"raw_recording_link_{idx}", dir="output")
+            ]) for idx in range(NUMBER_OF_DATA_PRODUCERS)
+        ] + [
+            mspec(f"data_recorder_{idx}", "DataRecorder", [
+                app.QueueInfo(name="raw_recording", inst=f"raw_recording_link_{idx}", dir="input")
+            ]) for idx in range(NUMBER_OF_DATA_PRODUCERS)
+        ]
+    else:
+        mod_specs = mod_specs + [
+            mspec(f"datahandler_{idx + MIN_LINK}", "DataLinkHandler", [
+                app.QueueInfo(name="raw_input", inst=f"wib_link_{idx}", dir="input"),
+                app.QueueInfo(name="timesync", inst="time_sync_q", dir="output"),
+                app.QueueInfo(name="requests", inst=f"data_requests_{idx + MIN_LINK}", dir="input"),
+                app.QueueInfo(name="fragments", inst="data_fragments_q", dir="output")
+            ]) for idx in range(NUMBER_OF_DATA_PRODUCERS)
+        ]
 
     if FLX_INPUT:
         mod_specs.append(mspec("flxcard_0", "FelixCardReader", [
@@ -189,13 +218,19 @@ def generate(NETWORK_ENDPOINTS,
                         pop_size_pct = 0.1,
                         apa_number = 0,
                         link_number = idx)) for idx in range(MIN_LINK,MAX_LINK)
-            ])
+            ] + [
+                (f"data_recorder_{idx}", dr.Conf(
+                        output_file = f"output_{idx + MIN_LINK}.out",
+                        compression_algorithm = "None",
+                        stream_buffer_size = 8388608)) for idx in range(NUMBER_OF_DATA_PRODUCERS)
+    ])
 
 
     startpars = rccmd.StartParams(run=RUN_NUMBER)
     cmd_data['start'] = acmd([("qton_fragments", startpars),
             ("qton_timesync", startpars),
             ("datahandler_.*", startpars),
+            ("data_recorder_.*", startpars),
             ("fake_source", startpars),
             ("flxcard.*", startpars),
             ("ntoq_datareq_.*", startpars),
@@ -206,6 +241,7 @@ def generate(NETWORK_ENDPOINTS,
             ("flxcard.*", None),
             ("fake_source", None),
             ("datahandler_.*", None),
+            ("data_recorder_.*", None),
             ("qton_timesync", None),
             ("qton_fragments", None),])
 
@@ -214,5 +250,7 @@ def generate(NETWORK_ENDPOINTS,
     cmd_data['resume'] = acmd([("", None)])
 
     cmd_data['scrap'] = acmd([("", None)])
+
+    cmd_data['record'] = acmd([("", None)])
 
     return cmd_data
