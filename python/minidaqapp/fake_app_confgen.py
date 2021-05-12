@@ -178,7 +178,7 @@ def generate(
                 ("trb", trb.ConfParams(
                         general_queue_timeout=QUEUE_POP_WAIT_MS,
                         map=trb.mapgeoidqueue([
-                                trb.geoidinst(apa=0, link=idx, queueinstance=f"data_requests_{idx}") for idx in range(NUMBER_OF_DATA_PRODUCERS)
+                                trb.geoidinst(region=0, element=idx, system="TPC", queueinstance=f"data_requests_{idx}") for idx in range(NUMBER_OF_DATA_PRODUCERS)
                             ])  
                         )),
                 ("datawriter", dw.ConfParams(
