@@ -102,6 +102,7 @@ def cli(number_of_data_producers, emulator_mode, data_rate_slowdown_factor, run_
         network_endpoints,
         RUN_NUMBER = run_number,
         CLOCK_SPEED_HZ = CLOCK_SPEED_HZ,
+        DATA_RATE_SLOWDOWN_FACTOR = data_rate_slowdown_factor,
         HSI_EVENT_PERIOD_NS = hsi_event_period,
         HSI_DEVICE_ID = hsi_device_id,
         MEAN_SIGNAL_MULTIPLICITY = mean_hsi_signal_multiplicity,
@@ -181,6 +182,7 @@ def cli(number_of_data_producers, emulator_mode, data_rate_slowdown_factor, run_
                 cfg['order'] = start_order[::-1]
             elif c in ('resume', 'pause'):
                 del cfg['apps'][app_df]
+                del cfg['apps'][app_hsi]
                 for ruapp in app_ru:
                     del cfg['apps'][ruapp]
 

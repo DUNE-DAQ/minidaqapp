@@ -72,6 +72,7 @@ def generate(
         NETWORK_ENDPOINTS: list,
         RUN_NUMBER = 333,
         CLOCK_SPEED_HZ: int = 50000000,
+        DATA_RATE_SLOWDOWN_FACTOR: int = 1,
         HSI_EVENT_PERIOD_NS: int = 20,
         HSI_DEVICE_ID: int = 0,
         MEAN_SIGNAL_MULTIPLICITY: int = 0,
@@ -118,7 +119,7 @@ def generate(
     cmd_data['conf'] = acmd([
 
                 ("fhsig", fhsig.Conf(
-                        clock_frequency=CLOCK_SPEED_HZ,
+                        clock_frequency=CLOCK_SPEED_HZ/DATA_RATE_SLOWDOWN_FACTOR,
                         event_period=HSI_EVENT_PERIOD_NS,
                         mean_signal_multiplicity=MEAN_SIGNAL_MULTIPLICITY,
                         signal_emulation_mode=SIGNAL_EMULATION_MODE,
@@ -160,9 +161,8 @@ def generate(
             ("", None)
         ])
 
-    resumepars = rccmd.ResumeParams(trigger_interval_ticks=50000000)
     cmd_data['resume'] = acmd([
-            ("", resumepars)
+            ("", None)
         ])
 
     cmd_data['scrap'] = acmd([
