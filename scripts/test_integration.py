@@ -15,8 +15,8 @@
 
 import pytest
 
-import data_file_checks
-import log_file_checks
+import minidaqapp.integration_tests.data_file_checks as data_file_checks
+import minidaqapp.integration_tests.log_file_checks as log_file_checks
 
 # The next three variables must be present as globals in the test
 # file. They're read by the "fixtures" in conftest.py to determine how
