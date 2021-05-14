@@ -4,15 +4,25 @@
 #
 # Prerequisites:
 #
-# > cd scripts
+# > cd minidaqapp/python/minidaqapp/integration_tests
 # > pip install -r requirements.txt # Install pytest
 #
 # Usage:
-# 
-# pytest --frame-file /path/to/frames.bin test_integration.py
+#
+# > cd minidaqapp/scripts # (This directory)
+# > pytest --frame-file /path/to/frames.bin test_integration.py
+#
+# to run just this test, or to run all of the tests in this directory:
+#
+# > cd minidaqapp/scripts # (This directory)
+# > pytest --frame-file /path/to/frames.bin .
 #
 # Add "-s" to the options to see output from confgen and nanorc as they run
-
+#
+# pytest finds the --frame-file option and the `run_nanorc` fixture
+# used in these tests via the conftest.py file in this directory. If
+# you want to make a test directory in another package, you'll have to
+# copy that file there too
 import pytest
 
 import minidaqapp.integration_tests.data_file_checks as data_file_checks
