@@ -36,8 +36,10 @@ import click
 @click.option('--mean-hsi-signal-multiplicity', default=1)
 @click.option('--hsi-signal-emulation-mode', default=0)
 @click.option('--enabled-hsi-signals', default=0b00000001)
+@click.option('--enable-raw-recording', is_flag=True)
+@click.option('--raw-recording-output-dir', type=click.Path(), default='.')
 @click.argument('json_dir', type=click.Path())
-def cli(number_of_data_producers, emulator_mode, data_rate_slowdown_factor, run_number, trigger_rate_hz, token_count, data_file, output_path, enable_trace, use_felix, hsi_event_period, hsi_device_id, mean_hsi_signal_multiplicity, hsi_signal_emulation_mode, enabled_hsi_signals, host_df, host_ru, host_trigger, host_hsi, json_dir):
+def cli(number_of_data_producers, emulator_mode, data_rate_slowdown_factor, run_number, trigger_rate_hz, token_count, data_file, output_path, enable_trace, use_felix, hsi_event_period, hsi_device_id, mean_hsi_signal_multiplicity, hsi_signal_emulation_mode, enabled_hsi_signals, host_df, host_ru, host_trigger, host_hsi, enable_raw_recording, raw_recording_output_dir, json_dir):
     """
       JSON_DIR: Json file output folder
     """
@@ -100,6 +102,7 @@ def cli(number_of_data_producers, emulator_mode, data_rate_slowdown_factor, run_
         network_endpoints,
         RUN_NUMBER = run_number,
         CLOCK_SPEED_HZ = CLOCK_SPEED_HZ,
+        DATA_RATE_SLOWDOWN_FACTOR = data_rate_slowdown_factor,
         HSI_EVENT_PERIOD_NS = hsi_event_period,
         HSI_DEVICE_ID = hsi_device_id,
         MEAN_SIGNAL_MULTIPLICITY = mean_hsi_signal_multiplicity,
@@ -136,7 +139,9 @@ def cli(number_of_data_producers, emulator_mode, data_rate_slowdown_factor, run_
             FLX_INPUT = use_felix,
             CLOCK_SPEED_HZ = CLOCK_SPEED_HZ,
             HOSTIDX = hostidx,
-            CARDID = cardid[hostidx]
+            CARDID = cardid[hostidx],
+            RAW_RECORDING_ENABLED = enable_raw_recording,
+            RAW_RECORDING_OUTPUT_DIR = raw_recording_output_dir
             ) for hostidx in range(len(host_ru))]
     console.log("readout cmd data:", cmd_data_readout)
 
@@ -156,7 +161,7 @@ def cli(number_of_data_producers, emulator_mode, data_rate_slowdown_factor, run_
     jf_df = join(data_dir, app_df)
     jf_ru = [join(data_dir, app_ru[idx]) for idx in range(len(host_ru))]
 
-    cmd_set = ["init", "conf", "start", "stop", "pause", "resume", "scrap"]
+    cmd_set = ["init", "conf", "start", "stop", "pause", "resume", "scrap", "record"]
     for app,data in [(app_hsi, cmd_data_hsi), (app_trigger, cmd_data_trigger), (app_df, cmd_data_dataflow)] + list(zip(app_ru, cmd_data_readout)):
         console.log(f"Generating {app} command data json files")
         for c in cmd_set:
@@ -177,6 +182,7 @@ def cli(number_of_data_producers, emulator_mode, data_rate_slowdown_factor, run_
                 cfg['order'] = start_order[::-1]
             elif c in ('resume', 'pause'):
                 del cfg['apps'][app_df]
+                del cfg['apps'][app_hsi]
                 for ruapp in app_ru:
                     del cfg['apps'][ruapp]
 

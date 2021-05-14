@@ -136,7 +136,7 @@ def generate(NETWORK_ENDPOINTS,
         
                 ("trb", trb.ConfParams( general_queue_timeout=QUEUE_POP_WAIT_MS,
                                         map=trb.mapgeoidqueue([
-                                                trb.geoidinst(apa=0, link=idx, queueinstance=f"data_requests_{idx}")  for idx in range(NUMBER_OF_DATA_PRODUCERS) ]
+                                                trb.geoidinst(region=0, element=idx, system="TPC", queueinstance=f"data_requests_{idx}")  for idx in range(NUMBER_OF_DATA_PRODUCERS) ]
                                                               ))),
                 ("datawriter", dw.ConfParams(initial_token_count=TOKEN_COUNT,
                             data_store_parameters=hdf5ds.ConfParams(name="data_store",
@@ -193,5 +193,7 @@ def generate(NETWORK_ENDPOINTS,
     cmd_data['resume'] = acmd([("", None)])
 
     cmd_data['scrap'] = acmd([("", None)])
+
+    cmd_data['record'] = acmd([("", None)])
 
     return cmd_data

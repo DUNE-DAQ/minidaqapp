@@ -175,4 +175,8 @@ def generate(
         ("", None)
     ])
 
+    cmd_data['record'] = acmd([
+        ("", None)
+    ])
+
     return cmd_data
