@@ -9,10 +9,10 @@ def pytest_addoption(parser):
         "--frame-file", action="store", help="Path to frame file", required=True
     )
 
-@pytest.fixture(scope="session")
+@pytest.fixture(scope="module")
 def setup_dirs(request, tmp_path_factory):
     """Create the temporary directory to run nanorc in, and put the frame data file in it"""
-    run_dir=tmp_path_factory.mktemp("rundir")
+    run_dir=tmp_path_factory.mktemp(request.module.__name__+"_run")
     frame_path=request.config.getoption("--frame-file")
     os.symlink(frame_path, run_dir.joinpath("frames.bin"))
     class Dirs:
@@ -22,7 +22,8 @@ def setup_dirs(request, tmp_path_factory):
     # Form the name of the json directory, but don't actually create
     # it, because the confgen script checks that it doesn't already
     # exist
-    dirs.json_dir=tmp_path_factory.getbasetemp() / "json"
+    p=tmp_path_factory.mktemp(request.module.__name__)
+    dirs.json_dir=p / "json"
     yield dirs
 
 @pytest.fixture(scope="module")
