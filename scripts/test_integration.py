@@ -10,6 +10,8 @@
 # Usage:
 # 
 # pytest --frame-file /path/to/frames.bin test_integration.py
+#
+# Add "-s" to the options to see output from confgen and nanorc as they run
 
 import pytest
 
