@@ -11,8 +11,6 @@ moo.otypes.load_types('appfwk/cmd.jsonnet')
 moo.otypes.load_types('appfwk/app.jsonnet')
 
 #moo.otypes.load_types('trigemu/faketimesyncsource.jsonnet')
-moo.otypes.load_types('dfmodules/requestgenerator.jsonnet')
-moo.otypes.load_types('dfmodules/fragmentreceiver.jsonnet')
 moo.otypes.load_types('dfmodules/datawriter.jsonnet')
 moo.otypes.load_types('dfmodules/hdf5datastore.jsonnet')
 #moo.otypes.load_types('dfmodules/fakedataprod.jsonnet')
@@ -31,8 +29,6 @@ import dunedaq.cmdlib.cmd as basecmd # AddressedCmd,
 import dunedaq.rcif.cmd as rccmd # AddressedCmd,
 import dunedaq.appfwk.cmd as cmd # AddressedCmd,
 import dunedaq.appfwk.app as app # AddressedCmd,
-import dunedaq.dfmodules.requestgenerator as rqg
-import dunedaq.dfmodules.fragmentreceiver as ffr
 import dunedaq.dfmodules.datawriter as dw
 import dunedaq.dfmodules.hdf5datastore as hdf5ds
 #import dunedaq.dfmodules.fakedataprod as fdp
