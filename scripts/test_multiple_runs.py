@@ -2,8 +2,9 @@
 
 import pytest
 
-import data_file_checks
-import log_file_checks
+import integrationtest.data_file_checks as data_file_checks
+import integrationtest.log_file_checks as log_file_checks
+
 
 # The name of the python module for the config generation
 confgen_name="minidaqapp.nanorc.mdapp_multiru_gen"

@@ -10,14 +10,17 @@
 # Usage:
 #
 # > cd minidaqapp/scripts # (This directory)
-# > pytest --frame-file /path/to/frames.bin test_integration.py
+# > pytest -s test_integration.py --frame-file /path/to/frames.bin
 #
 # to run just this test, or to run all of the tests in this directory:
 #
 # > cd minidaqapp/scripts # (This directory)
-# > pytest --frame-file /path/to/frames.bin .
+# > pytest -s . --frame-file /path/to/frames.bin
 #
-# Add "-s" to the options to see output from confgen and nanorc as they run
+# Remove "-s" from the options to suppress output from confgen and nanorc as they run
+#
+# If your nanorc is not checked out in $DBT_AREA_ROOT/sourcecode, you
+# can specify the location of nanorc.py with the --nanorc-path option
 #
 # pytest finds the --frame-file option and the `run_nanorc` fixture
 # used in these tests via the conftest.py file in this directory. If
@@ -25,8 +28,8 @@
 # copy that file there too
 import pytest
 
-import minidaqapp.integration_tests.data_file_checks as data_file_checks
-import minidaqapp.integration_tests.log_file_checks as log_file_checks
+import integrationtest.data_file_checks as data_file_checks
+import integrationtest.log_file_checks as log_file_checks
 
 # The next three variables must be present as globals in the test
 # file. They're read by the "fixtures" in conftest.py to determine how
