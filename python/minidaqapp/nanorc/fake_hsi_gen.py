@@ -23,7 +23,7 @@ moo.otypes.load_types('rcif/cmd.jsonnet')
 moo.otypes.load_types('appfwk/cmd.jsonnet')
 moo.otypes.load_types('appfwk/app.jsonnet')
 
-moo.otypes.load_types('timinglibs/hsireadout.jsonnet')
+moo.otypes.load_types('timinglibs/fakehsieventgenerator.jsonnet')
 moo.otypes.load_types('nwqueueadapters/queuetonetwork.jsonnet')
 moo.otypes.load_types('nwqueueadapters/networktoqueue.jsonnet')
 moo.otypes.load_types('nwqueueadapters/networkobjectreceiver.jsonnet')
@@ -34,7 +34,7 @@ import dunedaq.cmdlib.cmd as basecmd # AddressedCmd,
 import dunedaq.rcif.cmd as rccmd # AddressedCmd, 
 import dunedaq.appfwk.cmd as cmd # AddressedCmd, 
 import dunedaq.appfwk.app as app # AddressedCmd,
-import dunedaq.timinglibs.hsireadout as hsi
+import dunedaq.timinglibs.fakehsieventgenerator as fhsig
 import dunedaq.nwqueueadapters.networktoqueue as ntoq
 import dunedaq.nwqueueadapters.queuetonetwork as qton
 import dunedaq.nwqueueadapters.networkobjectreceiver as nor
@@ -71,9 +71,13 @@ def acmd(mods: list) -> cmd.CmdObj:
 def generate(
         NETWORK_ENDPOINTS: list,
         RUN_NUMBER = 333,
-        READOUT_PERIOD_US: int = 1e3,
-        HSI_DEVICE_NAME="BOREAS_FMC",
-        UHAL_LOG_LEVEL="notice",
+        CLOCK_SPEED_HZ: int = 50000000,
+        DATA_RATE_SLOWDOWN_FACTOR: int = 1,
+        HSI_EVENT_PERIOD_NS: int = 20,
+        HSI_DEVICE_ID: int = 0,
+        MEAN_SIGNAL_MULTIPLICITY: int = 0,
+        SIGNAL_EMULATION_MODE: int = 0,
+        ENABLED_SIGNALS: int = 0b00000001,
     ):
     """
     { item_description }
@@ -86,8 +90,9 @@ def generate(
 
     # Define modules and queues
     queue_bare_specs = [
+            app.QueueSpec(inst="time_sync_from_netq", kind='FollySPSCQueue', capacity=100),
             app.QueueSpec(inst="hsievent_q_to_net", kind='FollySPSCQueue', capacity=100),
-                       ]
+        ]
 
     # Only needed to reproduce the same order as when using jsonnet
     queue_specs = app.QueueSpecs(sorted(queue_bare_specs, key=lambda x: x.inst))
@@ -95,23 +100,30 @@ def generate(
 
     mod_specs = [
 
-       mspec("hsir", "HSIReadout", [
-                                    app.QueueInfo(name="hsievent_sink", inst="hsievent_q_to_net", dir="output"),
-                                ]),
+        mspec("fhsig", "FakeHSIEventGenerator", [
+                        app.QueueInfo(name="time_sync_source", inst="time_sync_from_netq", dir="input"),
+                        app.QueueInfo(name="hsievent_sink", inst="hsievent_q_to_net", dir="output"),
+                    ]),
         mspec("qton_hsievent", "QueueToNetwork", [
                         app.QueueInfo(name="input", inst="hsievent_q_to_net", dir="input")
                     ]),
+        ] + [
+
+           mspec(f"ntoq_timesync_{idx}", "NetworkToQueue", [
+                        app.QueueInfo(name="output", inst="time_sync_from_netq", dir="output")
+                    ]) for idx, inst in enumerate(NETWORK_ENDPOINTS) if "timesync" in inst
         ]
 
     cmd_data['init'] = app.Init(queues=queue_specs, modules=mod_specs)
 
     cmd_data['conf'] = acmd([
 
-                ("hsir", hsi.ConfParams(
-                        connections_file="${TIMING_SHARE}/config/etc/connections.xml",
-                        readout_period=READOUT_PERIOD_US,
-                        hsi_device_name=HSI_DEVICE_NAME,
-                        uhal_log_level=UHAL_LOG_LEVEL
+                ("fhsig", fhsig.Conf(
+                        clock_frequency=CLOCK_SPEED_HZ/DATA_RATE_SLOWDOWN_FACTOR,
+                        event_period=HSI_EVENT_PERIOD_NS,
+                        mean_signal_multiplicity=MEAN_SIGNAL_MULTIPLICITY,
+                        signal_emulation_mode=SIGNAL_EMULATION_MODE,
+                        enabled_signals=ENABLED_SIGNALS,
                         )),
 
                 ("qton_hsievent", qton.Conf(msg_type="dunedaq::dfmessages::HSIEvent",
@@ -121,17 +133,27 @@ def generate(
                                                                   stype="msgpack")
                                            )
                  ),
+    ] + [
+
+                (f"ntoq_timesync_{idx}", ntoq.Conf(msg_type="dunedaq::dfmessages::TimeSync",
+                                           msg_module_name="TimeSyncNQ",
+                                           receiver_config=nor.Conf(ipm_plugin_type="ZmqReceiver",
+                                                                    address=NETWORK_ENDPOINTS[inst])
+                                           )
+                ) for idx, inst in enumerate(NETWORK_ENDPOINTS) if "timesync" in inst
     ])
  
 
     startpars = rccmd.StartParams(run=RUN_NUMBER, disable_data_storage=False)
     cmd_data['start'] = acmd([
-            ("hsir", startpars),
+            ("ntoq_timesync_.*", startpars),
+            ("fhsig", startpars),
             ("qton_hsievent", startpars)
         ])
 
     cmd_data['stop'] = acmd([
-            ("hsir", None),
+            ("ntoq_timesync_.*", None),
+            ("fhsig", None),
             ("qton_hsievent", None)
         ])
 
