@@ -217,8 +217,8 @@ def cli(number_of_data_producers, emulator_mode, data_rate_slowdown_factor, run_
                     "CMD_FAC=rest://localhost:${APP_PORT}",
                     "INFO_SVC=file://info_${APP_NAME}_${APP_PORT}.json",
                     "cd ${DBT_AREA_ROOT}",
-                    "source dbt-setup-env.sh",
-                    "dbt-setup-runtime-environment",
+                    "source dbt-env.sh",
+                    "dbt-workarea-env",
                     "cd ${APP_WD}",
                     "daq_application --name ${APP_NAME} -c ${CMD_FAC} -i ${INFO_SVC}"
                 ]
