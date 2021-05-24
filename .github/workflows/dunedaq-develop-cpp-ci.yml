@@ -71,7 +71,7 @@ jobs:
           dbt-workarea-env || true
           setup_repo_env="SETUP_$REPO"
           [[ -z ${!setup_env_repo+x} ]] || unsetup $REPO
-          cp -pr $GITHUB_WORKSPACE/$REPO $GITHUB_WORKSPACE/dev/sourcecode
+          cp -pr $GITHUB_WORKSPACE/DUNE-DAQ/$REPO $GITHUB_WORKSPACE/dev/sourcecode
           cp -pr $GITHUB_WORKSPACE/nanorc $GITHUB_WORKSPACE/dev/sourcecode
           dbt-build.sh --install
           pip install -r $GITHUB_WORKSPACE/dev/sourcecode/nanorc/requirements.txt
