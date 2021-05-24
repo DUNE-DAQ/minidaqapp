@@ -63,30 +63,6 @@ jobs:
 
 
     
-    - name: setup build env and build the dev release
-      run: |
-          export REPO=$(echo '${{ github.repository }}' | awk -F '/' '{print $2}')
-          source $GITHUB_WORKSPACE/daq-buildtools/env.sh
-          cd $GITHUB_WORKSPACE/dev
-          dbt-workarea-env || true
-          setup_repo_env="SETUP_$REPO"
-          [[ -z ${!setup_env_repo+x} ]] || unsetup $REPO
-          cp -pr $GITHUB_WORKSPACE/DUNE-DAQ/$REPO $GITHUB_WORKSPACE/dev/sourcecode
-          dbt-build.sh --install
-          $GITHUB_WORKSPACE/daq-release/scripts/upsify-daq-pkgs.py -w $GITHUB_WORKSPACE/dev -o /tarballs
-
-    - name: upload UPS tarball and log file
-      uses: actions/upload-artifact@v2
-      with:
-        name: ups_package
-        path: /tarballs
-
-    - name: upload build log file
-      uses: actions/upload-artifact@v2
-      with:
-        name: build_log
-        path: ${{ github.workspace }}/dev/log
-
     - name: running minidaqapp with nanorc and pytest
       run: |
           export REPO=$(echo '${{ github.repository }}' | awk -F '/' '{print $2}')
@@ -103,3 +79,29 @@ jobs:
           dbt-build.sh --install
           dbt-setup-runtime-environment
           pytest --frame-file $GITHUB_WORKSPACE/dev/frames.bin $GITHUB_WORKSPACE/dev/sourcecode/minidaqapp/scripts/test_integration.py
+          $GITHUB_WORKSPACE/daq-release/scripts/upsify-daq-pkgs.py -w $GITHUB_WORKSPACE/dev -o /tarballs
+
+#    - name: setup build env and build the dev release
+#      run: |
+#          export REPO=$(echo '${{ github.repository }}' | awk -F '/' '{print $2}')
+#          source $GITHUB_WORKSPACE/daq-buildtools/env.sh
+#          cd $GITHUB_WORKSPACE/dev
+#          dbt-workarea-env || true
+#          setup_repo_env="SETUP_$REPO"
+#          [[ -z ${!setup_env_repo+x} ]] || unsetup $REPO
+#          cp -pr $GITHUB_WORKSPACE/DUNE-DAQ/$REPO $GITHUB_WORKSPACE/dev/sourcecode
+#          dbt-build.sh --install
+#          $GITHUB_WORKSPACE/daq-release/scripts/upsify-daq-pkgs.py -w $GITHUB_WORKSPACE/dev -o /tarballs
+
+    - name: upload UPS tarball and log file
+      uses: actions/upload-artifact@v2
+      with:
+        name: ups_package
+        path: /tarballs
+
+    - name: upload build log file
+      uses: actions/upload-artifact@v2
+      with:
+        name: build_log
+        path: ${{ github.workspace }}/dev/log
+
