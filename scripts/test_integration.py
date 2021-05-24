@@ -65,7 +65,7 @@ def test_data_file(run_nanorc):
     data_file=data_file_checks.DataFile(run_nanorc.data_files[0])
     assert data_file_checks.sanity_check(data_file)
     assert data_file_checks.check_link_presence(data_file, n_links=1)
-    assert data_file_checks.check_fragment_sizes(data_file, min_frag_size=22344, max_frag_size=22344)
+    assert data_file_checks.check_fragment_sizes(data_file, min_frag_size=22352, max_frag_size=22352)
 
 
 def test_log_files(run_nanorc):
