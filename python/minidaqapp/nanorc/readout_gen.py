@@ -54,7 +54,9 @@ def generate(NETWORK_ENDPOINTS,
         CLOCK_SPEED_HZ=50000000,
         HOSTIDX=0, CARDID=0,
         RAW_RECORDING_ENABLED=False,
-        RAW_RECORDING_OUTPUT_DIR="."):
+        RAW_RECORDING_OUTPUT_DIR=".",
+        FRONTEND_TYPE='wib',
+        SYSTEM_TYPE='TPC'):
     """Generate the json configuration for the readout and DF process"""
 
     cmd_data = {}
@@ -79,13 +81,13 @@ def generate(NETWORK_ENDPOINTS,
             app.QueueSpec(inst=f"data_requests_{idx}", kind='FollySPSCQueue', capacity=100)
                 for idx in range(MIN_LINK,MAX_LINK)
         ] + [
-            app.QueueSpec(inst=f"wib_link_{idx}", kind='FollySPSCQueue', capacity=100000)
+            app.QueueSpec(inst=f"{FRONTEND_TYPE}_link_{idx}", kind='FollySPSCQueue', capacity=100000)
                 for idx in range(NUMBER_OF_DATA_PRODUCERS)
         ]
 
     if RAW_RECORDING_ENABLED:
         queue_bare_specs = queue_bare_specs + [
-            app.QueueSpec(inst=f"raw_recording_link_{idx}", kind='FollySPSCQueue', capacity=100000)
+            app.QueueSpec(inst=f"{FRONTEND_TYPE}_recording_link_{idx}", kind='FollySPSCQueue', capacity=100000)
             for idx in range(NUMBER_OF_DATA_PRODUCERS)
         ]
     
@@ -103,21 +105,21 @@ def generate(NETWORK_ENDPOINTS,
     if RAW_RECORDING_ENABLED:
         mod_specs = mod_specs + [
             mspec(f"datahandler_{idx + MIN_LINK}", "DataLinkHandler", [
-                app.QueueInfo(name="raw_input", inst=f"wib_link_{idx}", dir="input"),
+                app.QueueInfo(name="raw_input", inst=f"{FRONTEND_TYPE}_link_{idx}", dir="input"),
                 app.QueueInfo(name="timesync", inst="time_sync_q", dir="output"),
                 app.QueueInfo(name="requests", inst=f"data_requests_{idx + MIN_LINK}", dir="input"),
                 app.QueueInfo(name="fragments", inst="data_fragments_q", dir="output"),
-                app.QueueInfo(name="raw_recording", inst=f"raw_recording_link_{idx}", dir="output")
+                app.QueueInfo(name="raw_recording", inst=f"{FRONTEND_TYPE}_recording_link_{idx}", dir="output")
             ]) for idx in range(NUMBER_OF_DATA_PRODUCERS)
         ] + [
             mspec(f"data_recorder_{idx}", "DataRecorder", [
-                app.QueueInfo(name="raw_recording", inst=f"raw_recording_link_{idx}", dir="input")
+                app.QueueInfo(name="raw_recording", inst=f"{FRONTEND_TYPE}_recording_link_{idx}", dir="input")
             ]) for idx in range(NUMBER_OF_DATA_PRODUCERS)
         ]
     else:
         mod_specs = mod_specs + [
             mspec(f"datahandler_{idx + MIN_LINK}", "DataLinkHandler", [
-                app.QueueInfo(name="raw_input", inst=f"wib_link_{idx}", dir="input"),
+                app.QueueInfo(name="raw_input", inst=f"{FRONTEND_TYPE}_link_{idx}", dir="input"),
                 app.QueueInfo(name="timesync", inst="time_sync_q", dir="output"),
                 app.QueueInfo(name="requests", inst=f"data_requests_{idx + MIN_LINK}", dir="input"),
                 app.QueueInfo(name="fragments", inst="data_fragments_q", dir="output")
@@ -126,17 +128,17 @@ def generate(NETWORK_ENDPOINTS,
 
     if FLX_INPUT:
         mod_specs.append(mspec("flxcard_0", "FelixCardReader", [
-                        app.QueueInfo(name=f"output_{idx}", inst=f"wib_link_{idx}", dir="output")
+                        app.QueueInfo(name=f"output_{idx}", inst=f"{FRONTEND_TYPE}_link_{idx}", dir="output")
                             for idx in range(min(5, NUMBER_OF_DATA_PRODUCERS))
                         ]))
         if NUMBER_OF_DATA_PRODUCERS > 5 :
             mod_specs.append(mspec("flxcard_1", "FelixCardReader", [
-                            app.QueueInfo(name=f"output_{idx}", inst=f"wib_link_{idx}", dir="output")
+                            app.QueueInfo(name=f"output_{idx}", inst=f"{FRONTEND_TYPE}_link_{idx}", dir="output")
                                 for idx in range(5, NUMBER_OF_DATA_PRODUCERS)
                             ]))
     else:
         mod_specs.append(mspec("fake_source", "FakeCardReader", [
-                        app.QueueInfo(name=f"output_{idx}", inst=f"wib_link_{idx}", dir="output")
+                        app.QueueInfo(name=f"output_{idx}", inst=f"{FRONTEND_TYPE}_link_{idx}", dir="output")
                             for idx in range(NUMBER_OF_DATA_PRODUCERS)
                         ]))
 
@@ -156,11 +158,14 @@ def generate(NETWORK_ENDPOINTS,
                                                                    address=NETWORK_ENDPOINTS[f"timesync_{HOSTIDX}"],
                                                                    stype="msgpack"))),
         
-                ("fake_source",fakecr.Conf(link_ids=list(range(MIN_LINK,MAX_LINK)),
+                ("fake_source",fakecr.Conf(
+                            link_confs=[fakecr.LinkConfiguration(
+                            geoid=fakecr.GeoID(system=SYSTEM_TYPE, region=0, element=idx),
+                                slowdown=DATA_RATE_SLOWDOWN_FACTOR,
+                                queue_name=f"output_{idx}",
+                                data_filename = DATA_FILE
+                                ) for idx in range(MIN_LINK,MAX_LINK)],
                             # input_limit=10485100, # default
-                            rate_khz = RATE_KHZ,
-                            raw_type = "wib",
-                            data_filename = DATA_FILE,
                             queue_timeout_ms = QUEUE_POP_WAIT_MS)),
                 ("flxcard_0",flxcr.Conf(card_id=CARDID,
                             logical_unit=0,
@@ -184,7 +189,7 @@ def generate(NETWORK_ENDPOINTS,
                                            receiver_config=nor.Conf(ipm_plugin_type="ZmqReceiver",
                                                                     address=NETWORK_ENDPOINTS[f"datareq_{idx}"]))) for idx in range(MIN_LINK,MAX_LINK)
             ] + [
-                (f"datahandler_{idx}", dlh.Conf(raw_type = "wib",
+                (f"datahandler_{idx}", dlh.Conf(
                         emulator_mode = EMULATOR_MODE,
                         # fake_trigger_flag=0, # default
                         source_queue_timeout_ms= QUEUE_POP_WAIT_MS,

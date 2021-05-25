@@ -38,8 +38,9 @@ import click
 @click.option('--enabled-hsi-signals', default=0b00000001)
 @click.option('--enable-raw-recording', is_flag=True)
 @click.option('--raw-recording-output-dir', type=click.Path(), default='.')
+@click.option('--frontend-type', default='wib')
 @click.argument('json_dir', type=click.Path())
-def cli(number_of_data_producers, emulator_mode, data_rate_slowdown_factor, run_number, trigger_rate_hz, token_count, data_file, output_path, enable_trace, use_felix, hsi_event_period, hsi_device_id, mean_hsi_signal_multiplicity, hsi_signal_emulation_mode, enabled_hsi_signals, host_df, host_ru, host_trigger, host_hsi, enable_raw_recording, raw_recording_output_dir, json_dir):
+def cli(number_of_data_producers, emulator_mode, data_rate_slowdown_factor, run_number, trigger_rate_hz, token_count, data_file, output_path, enable_trace, use_felix, hsi_event_period, hsi_device_id, mean_hsi_signal_multiplicity, hsi_signal_emulation_mode, enabled_hsi_signals, host_df, host_ru, host_trigger, host_hsi, enable_raw_recording, raw_recording_output_dir, frontend_type, json_dir):
     """
       JSON_DIR: Json file output folder
     """
@@ -76,6 +77,11 @@ def cli(number_of_data_producers, emulator_mode, data_rate_slowdown_factor, run_
         "trigdec" : "tcp://{host_trigger}:12345",
         "triginh" : "tcp://{host_df}:12346",
     }
+
+    if frontend_type == 'wib' or frontend_type == 'wib2':
+        system_type = 'TPC'
+    else:
+        system_type = 'PDS'
 
     port=12347
     for idx in range(total_number_of_data_producers):
@@ -116,6 +122,7 @@ def cli(number_of_data_producers, emulator_mode, data_rate_slowdown_factor, run_
         network_endpoints,
         NUMBER_OF_DATA_PRODUCERS = total_number_of_data_producers,
         TOKEN_COUNT = trigemu_token_count,
+        SYSTEM_TYPE = system_type
     )
 
     console.log("trigger cmd data:", cmd_data_trigger)
@@ -125,7 +132,8 @@ def cli(number_of_data_producers, emulator_mode, data_rate_slowdown_factor, run_
         NUMBER_OF_DATA_PRODUCERS = total_number_of_data_producers,
         RUN_NUMBER = run_number, 
         OUTPUT_PATH = output_path,
-        TOKEN_COUNT = df_token_count
+        TOKEN_COUNT = df_token_count,
+        SYSTEM_TYPE = system_type
     )
     console.log("dataflow cmd data:", cmd_data_dataflow)
 
@@ -141,7 +149,9 @@ def cli(number_of_data_producers, emulator_mode, data_rate_slowdown_factor, run_
             HOSTIDX = hostidx,
             CARDID = cardid[hostidx],
             RAW_RECORDING_ENABLED = enable_raw_recording,
-            RAW_RECORDING_OUTPUT_DIR = raw_recording_output_dir
+            RAW_RECORDING_OUTPUT_DIR = raw_recording_output_dir,
+            FRONTEND_TYPE = frontend_type,
+            SYSTEM_TYPE = system_type
             ) for hostidx in range(len(host_ru))]
     console.log("readout cmd data:", cmd_data_readout)
 

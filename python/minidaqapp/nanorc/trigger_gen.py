@@ -46,6 +46,7 @@ def generate(
         NETWORK_ENDPOINTS: list,
         NUMBER_OF_DATA_PRODUCERS: int = 2,
         TOKEN_COUNT: int = 10,
+        SYSTEM_TYPE = 'wib'
 ):
     """
     { item_description }
@@ -98,7 +99,7 @@ def generate(
 
     cmd_data['conf'] = acmd([
         ("mlt", mlt.ConfParams(
-            links=[idx for idx in range(NUMBER_OF_DATA_PRODUCERS)],
+            links=[mlt.GeoID(system=SYSTEM_TYPE, region=0, element=idx) for idx in range(NUMBER_OF_DATA_PRODUCERS)],
             initial_token_count=TOKEN_COUNT                    
         )),
         
