@@ -81,7 +81,7 @@ def cli(number_of_data_producers, emulator_mode, data_rate_slowdown_factor, run_
         trigemu_token_count = 0
 
     network_endpoints={
-        "hsievent" : "tcp://{host_df}:12344",
+        "hsievent" : "tcp://{host_hsi}:12344",
         "trigdec" : "tcp://{host_trigger}:12345",
         "triginh" : "tcp://{host_df}:12346",
     }
