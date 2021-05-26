@@ -38,7 +38,7 @@ import click
 @click.option('--enabled-hsi-signals', default=0b00000001)
 @click.option('--enable-raw-recording', is_flag=True)
 @click.option('--raw-recording-output-dir', type=click.Path(), default='.')
-@click.option('--frontend-type', default='wib')
+@click.option('--frontend-type', type=click.Choice(['wib', 'wib2', 'pds_queue', 'pds_list']), default='wib')
 @click.argument('json_dir', type=click.Path())
 def cli(number_of_data_producers, emulator_mode, data_rate_slowdown_factor, run_number, trigger_rate_hz, token_count, data_file, output_path, enable_trace, use_felix, hsi_event_period, hsi_device_id, mean_hsi_signal_multiplicity, hsi_signal_emulation_mode, enabled_hsi_signals, host_df, host_ru, host_trigger, host_hsi, enable_raw_recording, raw_recording_output_dir, frontend_type, json_dir):
     """
