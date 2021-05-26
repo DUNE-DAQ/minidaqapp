@@ -41,11 +41,15 @@ import click
 @click.option('--mean-hsi-signal-multiplicity', default=1)
 @click.option('--hsi-signal-emulation-mode', default=0)
 @click.option('--enabled-hsi-signals', default=0b00000001)
+# trigger options
+@click.option('--ttcm-s1', default=1, help="Timing trigger candidate maker accepted HSI signal ID 1")
+@click.option('--ttcm-s2', default=2, help="Timing trigger candidate maker accepted HSI signal ID 2")
 @click.option('--enable-raw-recording', is_flag=True)
 @click.option('--raw-recording-output-dir', type=click.Path(), default='.')
 @click.argument('json_dir', type=click.Path())
 def cli(number_of_data_producers, emulator_mode, data_rate_slowdown_factor, run_number, trigger_rate_hz, token_count, data_file, output_path, enable_trace, use_felix, host_df, host_ru, host_trigger, host_hsi, 
         hsi_device_name, hsi_readout_period, fake_hsi, hsi_event_period, hsi_device_id, mean_hsi_signal_multiplicity, hsi_signal_emulation_mode, enabled_hsi_signals,
+        ttcm_s1, ttcm_s2,
         enable_raw_recording, raw_recording_output_dir, json_dir):
     """
       JSON_DIR: Json file output folder
@@ -132,6 +136,8 @@ def cli(number_of_data_producers, emulator_mode, data_rate_slowdown_factor, run_
         network_endpoints,
         NUMBER_OF_DATA_PRODUCERS = total_number_of_data_producers,
         TOKEN_COUNT = trigemu_token_count,
+        TTCM_S1=ttcm_s1,
+        TTCM_S2=ttcm_s2
     )
 
     console.log("trigger cmd data:", cmd_data_trigger)
