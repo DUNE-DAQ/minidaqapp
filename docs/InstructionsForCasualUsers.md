@@ -5,11 +5,15 @@ The expected steps will be something like the following
 2. generate the sample system configuration
 3. use _nanorc_ to run the sample system
 
-There is a bit of a chicken-and-egg problem, though, because it will be best to document those steps once the v2.6.0 release is complete, but we want to provide some documentation before the release is done.  
+There is a bit of a chicken-and-egg problem, though, because it will be best to document those steps once the v2.6.0 release is complete, but we want to provide some documentation before the release is ready.  
 
-To help give a flavor of what is to come, though, here are the similar steps that one would use for a v2.4.0-based system:
+To help give a flavor of what is to come, here are the similar steps that one would use for a v2.4.0-based system:
 1. log into a system that has access to `/cvmfs/dunedaq.opensciencegrid.org/`
 2. `source /cvmfs/dunedaq.opensciencegrid.org/setup_dunedaq.sh`
 3. `setup_dbt dunedaq-v2.4.0`
-4. `cd <work_dir>`
-5. `dbt-workarea-env`
+4. `dbt-create.sh dunedaq-v2.4.0 <work_dir>`
+5. `cd <work_dir>`
+6. `dbt-setup-runtime-environment`
+7. download a raw data file ([CERNBox link](https://cernbox.cern.ch/index.php/s/VAqNtn7bwuQtff3/download)) and put it into `<work_dir>`
+8. `python -m minidaqapp.nanorc.mdapp_gen -d ./frames.bin -o . -s 10 mdapp_sample`
+9. `nanorc/nanorc.py mdapp_4proc boot init conf start 111 wait 2 resume wait 60 pause wait 2 stop scrap terminate`
