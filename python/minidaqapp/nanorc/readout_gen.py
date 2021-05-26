@@ -162,7 +162,7 @@ def generate(NETWORK_ENDPOINTS,
                             link_confs=[fakecr.LinkConfiguration(
                             geoid=fakecr.GeoID(system=SYSTEM_TYPE, region=0, element=idx),
                                 slowdown=DATA_RATE_SLOWDOWN_FACTOR,
-                                queue_name=f"output_{idx}",
+                                queue_name=f"output_{idx-MIN_LINK}",
                                 data_filename = DATA_FILE
                                 ) for idx in range(MIN_LINK,MAX_LINK)],
                             # input_limit=10485100, # default
