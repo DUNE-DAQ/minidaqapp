@@ -55,7 +55,8 @@ def generate(NETWORK_ENDPOINTS,
         NUMBER_OF_DATA_PRODUCERS=2,
         RUN_NUMBER=333, 
         OUTPUT_PATH=".",
-        TOKEN_COUNT=0,):
+        TOKEN_COUNT=0,
+        SYSTEM_TYPE="TPC"):
     """Generate the json configuration for the readout and DF process"""
 
     cmd_data = {}
@@ -120,7 +121,7 @@ def generate(NETWORK_ENDPOINTS,
         
                 ("trb", trb.ConfParams( general_queue_timeout=QUEUE_POP_WAIT_MS,
                                         map=trb.mapgeoidqueue([
-                                                trb.geoidinst(region=0, element=idx, system="TPC", queueinstance=f"data_requests_{idx}")  for idx in range(NUMBER_OF_DATA_PRODUCERS) ]
+                                                trb.geoidinst(region=0, element=idx, system=SYSTEM_TYPE, queueinstance=f"data_requests_{idx}")  for idx in range(NUMBER_OF_DATA_PRODUCERS) ]
                                                               ))),
                 ("datawriter", dw.ConfParams(initial_token_count=TOKEN_COUNT,
                             data_store_parameters=hdf5ds.ConfParams(name="data_store",
