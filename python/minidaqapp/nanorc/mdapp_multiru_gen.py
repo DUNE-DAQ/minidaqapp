@@ -35,7 +35,7 @@ import click
 @click.option('--hsi-device-name', default="BOREAS_TLU", help='Real HSI hardware only: device name of HSI hw')
 @click.option('--hsi-readout-period', default=1e3, help='Real HSI hardware only: Period between HSI hardware polling [us]')
 # fake hsi options
-@click.option('--fake-hsi', is_flag=True, default=True, help='Flag to control whether fake or real hardware HSI config is generated')
+@click.option('--hw-hsi/--fake-hsi', default=False, help='Flag to control whether fake or real hardware HSI config is generated')
 @click.option('--hsi-event-period', default=1e9, help='Fake HSI only: how often are fake HSIEvents sent (given valid generated signal)')
 @click.option('--hsi-device-id', default=0, help='Fake HSI only: device ID of fake HSIEvents')
 @click.option('--mean-hsi-signal-multiplicity', default=1, help='Fake HSI only: rate of individual HSI signals in emulation mode 1')
@@ -49,7 +49,7 @@ import click
 @click.option('--frontend-type', type=click.Choice(['wib', 'wib2', 'pds_queue', 'pds_list']), default='wib', help="Frontend type (wib, wib2 or pds) and latency buffer implementation in case of pds (folly queue or skip list)")
 @click.argument('json_dir', type=click.Path())
 def cli(number_of_data_producers, emulator_mode, data_rate_slowdown_factor, run_number, trigger_rate_hz, token_count, data_file, output_path, enable_trace, use_felix, host_df, host_ru, host_trigger, host_hsi, 
-        hsi_device_name, hsi_readout_period, fake_hsi, hsi_event_period, hsi_device_id, mean_hsi_signal_multiplicity, hsi_signal_emulation_mode, enabled_hsi_signals,
+        hsi_device_name, hsi_readout_period, hw_hsi, hsi_event_period, hsi_device_id, mean_hsi_signal_multiplicity, hsi_signal_emulation_mode, enabled_hsi_signals,
         ttcm_s1, ttcm_s2,
         enable_raw_recording, raw_recording_output_dir, frontend_type, json_dir):
     """
@@ -116,8 +116,15 @@ def cli(number_of_data_producers, emulator_mode, data_rate_slowdown_factor, run_
             cardid[hostidx] = 0
             host_id_dict[host_ru[hostidx]] = 0
         hostidx = hostidx + 1
-
-    if fake_hsi:
+    
+    if hw_hsi:
+        cmd_data_hsi = hsi_gen.generate(
+            network_endpoints,
+            RUN_NUMBER = run_number,
+            READOUT_PERIOD_US = hsi_readout_period,
+            HSI_DEVICE_NAME = hsi_device_name,
+        )
+    else:
         cmd_data_hsi = fake_hsi_gen.generate(
             network_endpoints,
             RUN_NUMBER = run_number,
@@ -129,13 +136,7 @@ def cli(number_of_data_producers, emulator_mode, data_rate_slowdown_factor, run_
             SIGNAL_EMULATION_MODE = hsi_signal_emulation_mode,
             ENABLED_SIGNALS =  enabled_hsi_signals,
         )
-    else:
-        cmd_data_hsi = hsi_gen.generate(
-            network_endpoints,
-            RUN_NUMBER = run_number,
-            READOUT_PERIOD_US = hsi_readout_period,
-            HSI_DEVICE_NAME = hsi_device_name,
-        )
+    
     console.log("hsi cmd data:", cmd_data_hsi)
 
     cmd_data_trigger = trigger_gen.generate(
