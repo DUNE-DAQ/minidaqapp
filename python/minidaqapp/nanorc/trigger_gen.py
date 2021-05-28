@@ -46,6 +46,9 @@ def generate(
         NETWORK_ENDPOINTS: list,
         NUMBER_OF_DATA_PRODUCERS: int = 2,
         TOKEN_COUNT: int = 10,
+        SYSTEM_TYPE = 'wib',
+        TTCM_S1: int = 1,
+        TTCM_S2: int = 2,
 ):
     """
     { item_description }
@@ -98,12 +101,19 @@ def generate(
 
     cmd_data['conf'] = acmd([
         ("mlt", mlt.ConfParams(
-            links=[idx for idx in range(NUMBER_OF_DATA_PRODUCERS)],
+            links=[mlt.GeoID(system=SYSTEM_TYPE, region=0, element=idx) for idx in range(NUMBER_OF_DATA_PRODUCERS)],
             initial_token_count=TOKEN_COUNT                    
         )),
         
         ("ttcm", ttcm.Conf(
-        )),
+                        s1=ttcm.map_t(signal_type=TTCM_S1,
+                                      time_before=100000,
+                                      time_after=200000),
+                        s2=ttcm.map_t(signal_type=TTCM_S2,
+                                      time_before=100000,
+                                      time_after=200000)
+                        )
+        ),
 
         ("ntoq_hsievent", ntoq.Conf(msg_type="dunedaq::dfmessages::HSIEvent",
                                            msg_module_name="HSIEventNQ",
