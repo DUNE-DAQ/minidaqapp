@@ -259,6 +259,7 @@ def cli(number_of_data_producers, emulator_mode, data_rate_slowdown_factor, run_
 
         if enable_trace:
             daq_app_specs["daq_application"]["env"]["TRACE_FILE"] = "getenv"
+            daq_app_specs["daq_application_ups"]["env"]["TRACE_FILE"] = "getenv"
 
         cfg = {
             "env" : {
