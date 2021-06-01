@@ -245,6 +245,7 @@ def cli(number_of_data_producers, emulator_mode, data_rate_slowdown_factor, run_
                 "env":{
                     "CET_PLUGIN_PATH": "getenv",
                     "DUNEDAQ_SHARE_PATH": "getenv",
+                    "TIMING_SHARE": "getenv",
                     "LD_LIBRARY_PATH": "getenv",
                     "PATH": "getenv"
                 },
@@ -272,7 +273,7 @@ def cli(number_of_data_producers, emulator_mode, data_rate_slowdown_factor, run_
             },
             "apps" : {
                 app_hsi: {
-                    "exec": "daq_application_ups",
+                    "exec": "daq_application",
                     "host": "host_hsi",
                     "port": 3332
                 },
