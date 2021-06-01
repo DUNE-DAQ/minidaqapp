@@ -79,7 +79,7 @@ jobs:
           dbt-workarea-env --refresh
           curl https://cernbox.cern.ch/index.php/s/VAqNtn7bwuQtff3/download -o frames.bin
           pytest --frame-file $GITHUB_WORKSPACE/dev/frames.bin $GITHUB_WORKSPACE/dev/sourcecode/minidaqapp/scripts/test_integration.py
-          sleep 500 ; $GITHUB_WORKSPACE/daq-release/scripts/upsify-daq-pkgs.py -w $GITHUB_WORKSPACE/dev -o /tarballs
+#          $GITHUB_WORKSPACE/daq-release/scripts/upsify-daq-pkgs.py -w $GITHUB_WORKSPACE/dev -o /tarballs
 
 #    - name: setup build env and build the dev release
 #      run: |
