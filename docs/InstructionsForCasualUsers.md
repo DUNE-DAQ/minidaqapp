@@ -31,3 +31,16 @@ When you later return to this work area, you can skip the 'setup' steps.  For ex
 4. `dbt-workarea-env`
 5. `dbt-build.sh` # if needed
 7. `nanorc mdapp_fake boot init conf start 102 wait 2 resume wait 60 pause wait 2 stop scrap terminate`
+
+If/when you want to make code changes in one of the repositories that are part of the MiniDAQ suite, you can clone that package into the /sourcecode subdirectory in your work area and proceed from there.  For example:
+1. `cd <work_dir>`
+2. `source /cvmfs/dunedaq.opensciencegrid.org/setup_dunedaq.sh`
+3. `setup_dbt dunedaq-v2.6.0`
+4. `dbt-workarea-env`
+5. `cd sourcecode`
+6. `git clone https://github.com/DUNE-DAQ/minidaqapp.git -b dunedaq-v2.6.0` # or `-b develop` or `-b <whatever>`
+7.  `cd ..`
+8.  `dbt-build.sh`
+
+  
+
