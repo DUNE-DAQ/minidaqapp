@@ -23,13 +23,13 @@ Here are the steps that should be used when you first create your local software
    * and
    * `python3 $DFMODULES_FQ_DIR/dfmodules/bin/hdf5dump/hdf5_dump.py -p both -f swtest_run000101_0000_*.hdf5`
 
-When you later return to this work area, you can skip the 'setup' steps.  For example:
+When you return to this work area (for example, after logging out and back in), you can skip the 'setup' steps in the instructions above.  For example:
 
 1. `cd <work_dir>`
 2. `source /cvmfs/dunedaq.opensciencegrid.org/setup_dunedaq.sh`
 3. `setup_dbt dunedaq-v2.6.0`
 4. `dbt-workarea-env`
-5. `dbt-build.sh` # if needed
+5. `dbt-build.sh` # probably not needed
 7. `nanorc mdapp_fake boot init conf start 102 wait 2 resume wait 60 pause wait 2 stop scrap terminate`
 
 If/when you want to make code changes in one of the repositories that are part of the MiniDAQ suite, you can clone that package into the /sourcecode subdirectory in your work area and proceed from there.  For example:
@@ -41,6 +41,7 @@ If/when you want to make code changes in one of the repositories that are part o
 6. `git clone https://github.com/DUNE-DAQ/minidaqapp.git -b dunedaq-v2.6.0` # or `-b develop` or `-b <whatever>`
 7.  `cd ..`
 8.  `dbt-build.sh`
+9.  etc.
 
   
 
