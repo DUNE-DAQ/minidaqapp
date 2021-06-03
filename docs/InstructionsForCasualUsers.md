@@ -13,7 +13,6 @@ Here are the steps that should be used when you first create your local software
 4. `dbt-create.sh dunedaq-v2.6.0 <work_dir>`
 5. `cd <work_dir>`
 6. `dbt-workarea-env`
-7. `pip install https://github.com/DUNE-DAQ/nanorc/archive/refs/tags/dunedaq-v2.6.0.tar.gz`
 8. `dbt-build.sh`
 9. download a raw data file ([CERNBox link](https://cernbox.cern.ch/index.php/s/VAqNtn7bwuQtff3/download)) and put it into `<work_dir>`
 10. `python -m minidaqapp.nanorc.mdapp_multiru_gen -d ./frames.bin -o . -s 10 mdapp_fake`
