@@ -41,7 +41,7 @@ import dunedaq.readout.fakecardreader as fakecr
 import dunedaq.flxlibs.felixcardreader as flxcr
 import dunedaq.readout.datalinkhandler as dlh
 
-from appfwk.utils import mcmd, mrccmd, mspec
+from appfwk.utils import acmd, mcmd, mrccmd, mspec
 
 import json
 import math
@@ -50,28 +50,13 @@ from pprint import pprint
 QUEUE_POP_WAIT_MS = 100
 # local clock speed Hz
 # CLOCK_SPEED_HZ = 50000000;
-def acmd(mods: list):
-    """ 
-    Helper function to create appfwk's Commands addressed to modules.
-        
-    :param      cmdid:  The coommand id
-    :type       cmdid:  str
-    :param      mods:   List of module name/data structures 
-    :type       mods:   list
-    
-    :returns:   A constructed Command object
-    :rtype:     dunedaq.appfwk.cmd.Command
-    """
-    return cmd.CmdObj(modules=cmd.AddressedCmds(cmd.AddressedCmd(match=m, data=o)
-            for m,o in mods))
-
-
 
 def generate(NETWORK_ENDPOINTS,
         NUMBER_OF_DATA_PRODUCERS=2,
         RUN_NUMBER=333, 
         OUTPUT_PATH=".",
-        TOKEN_COUNT=0,):
+        TOKEN_COUNT=0,
+        SYSTEM_TYPE="TPC"):
     """Generate the json configuration for the readout and DF process"""
 
     cmd_data = {}
@@ -136,7 +121,7 @@ def generate(NETWORK_ENDPOINTS,
         
                 ("trb", trb.ConfParams( general_queue_timeout=QUEUE_POP_WAIT_MS,
                                         map=trb.mapgeoidqueue([
-                                                trb.geoidinst(region=0, element=idx, system="TPC", queueinstance=f"data_requests_{idx}")  for idx in range(NUMBER_OF_DATA_PRODUCERS) ]
+                                                trb.geoidinst(region=0, element=idx, system=SYSTEM_TYPE, queueinstance=f"data_requests_{idx}")  for idx in range(NUMBER_OF_DATA_PRODUCERS) ]
                                                               ))),
                 ("datawriter", dw.ConfParams(initial_token_count=TOKEN_COUNT,
                             data_store_parameters=hdf5ds.ConfParams(name="data_store",

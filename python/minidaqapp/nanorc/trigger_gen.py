@@ -34,7 +34,7 @@ import dunedaq.nwqueueadapters.queuetonetwork as qton
 import dunedaq.nwqueueadapters.networkobjectreceiver as nor
 import dunedaq.nwqueueadapters.networkobjectsender as nos
 
-from appfwk.utils import mcmd, mrccmd, mspec
+from appfwk.utils import acmd, mcmd, mrccmd, mspec
 
 import json
 import math
@@ -42,30 +42,13 @@ from pprint import pprint
 
 
 #===============================================================================
-def acmd(mods: list) -> cmd.CmdObj:
-    """ 
-    Helper function to create appfwk's Commands addressed to modules.
-        
-    :param      cmdid:  The coommand id
-    :type       cmdid:  str
-    :param      mods:   List of module name/data structures 
-    :type       mods:   list
-    
-    :returns:   A constructed Command object
-    :rtype:     dunedaq.appfwk.cmd.Command
-    """
-    return cmd.CmdObj(
-        modules=cmd.AddressedCmds(
-            cmd.AddressedCmd(match=m, data=o)
-            for m,o in mods
-        )
-    )
-
-#===============================================================================
 def generate(
         NETWORK_ENDPOINTS: list,
         NUMBER_OF_DATA_PRODUCERS: int = 2,
         TOKEN_COUNT: int = 10,
+        SYSTEM_TYPE = 'wib',
+        TTCM_S1: int = 1,
+        TTCM_S2: int = 2,
 ):
     """
     { item_description }
@@ -118,12 +101,19 @@ def generate(
 
     cmd_data['conf'] = acmd([
         ("mlt", mlt.ConfParams(
-            links=[idx for idx in range(NUMBER_OF_DATA_PRODUCERS)],
+            links=[mlt.GeoID(system=SYSTEM_TYPE, region=0, element=idx) for idx in range(NUMBER_OF_DATA_PRODUCERS)],
             initial_token_count=TOKEN_COUNT                    
         )),
         
         ("ttcm", ttcm.Conf(
-        )),
+                        s1=ttcm.map_t(signal_type=TTCM_S1,
+                                      time_before=100000,
+                                      time_after=200000),
+                        s2=ttcm.map_t(signal_type=TTCM_S2,
+                                      time_before=100000,
+                                      time_after=200000)
+                        )
+        ),
 
         ("ntoq_hsievent", ntoq.Conf(msg_type="dunedaq::dfmessages::HSIEvent",
                                            msg_module_name="HSIEventNQ",
