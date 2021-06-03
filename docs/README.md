@@ -10,4 +10,3 @@ The focus of this documentation is on providing instructions for using the tools
 
 [Instructions for casual or first-time users](InstructionsForCasualUsers.md)
 
-(Possibly we can/should add some instructions for the next level of user, for example, someone who wants to make changes in repoY as part of their development work...)
