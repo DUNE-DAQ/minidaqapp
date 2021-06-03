@@ -13,7 +13,6 @@ Here are the steps that should be used when you first create your local software
 4. `dbt-create.sh dunedaq-v2.6.0 <work_dir>`
 5. `cd <work_dir>`
 6. `dbt-workarea-env`
-8. `dbt-build.sh`
 9. download a raw data file ([CERNBox link](https://cernbox.cern.ch/index.php/s/VAqNtn7bwuQtff3/download)) and put it into `<work_dir>`
 10. `python -m minidaqapp.nanorc.mdapp_multiru_gen -d ./frames.bin -o . -s 10 mdapp_fake`
 11. `nanorc mdapp_fake boot init conf start 101 wait 2 resume wait 60 pause wait 2 stop scrap terminate`
@@ -28,7 +27,6 @@ When you return to this work area (for example, after logging out and back in), 
 2. `source /cvmfs/dunedaq.opensciencegrid.org/setup_dunedaq.sh`
 3. `setup_dbt dunedaq-v2.6.0`
 4. `dbt-workarea-env`
-5. `dbt-build.sh` # probably not needed
 7. `nanorc mdapp_fake boot init conf start 102 wait 2 resume wait 60 pause wait 2 stop scrap terminate`
 
 If/when you want to make code changes in one of the repositories that are part of the MiniDAQ suite, you can clone that package into the /sourcecode subdirectory in your work area and proceed from there.  For example:
