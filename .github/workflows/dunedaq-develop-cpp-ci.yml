@@ -75,6 +75,7 @@ jobs:
           $GITHUB_WORKSPACE/daq-release/scripts/upsify-daq-pkgs.py -w $GITHUB_WORKSPACE/dev -o /tarballs
 
     - name: running minidaqapp with nanorc
+      run: |
           export REPO=$(echo '${{ github.repository }}' | awk -F '/' '{print $2}')
           source $GITHUB_WORKSPACE/daq-buildtools/env.sh
           cd $GITHUB_WORKSPACE/dev
