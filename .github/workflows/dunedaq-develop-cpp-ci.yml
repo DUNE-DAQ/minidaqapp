@@ -4,11 +4,11 @@ name: build-develop
 # or API.
 on:
   push:
-    branches: [ develop ]
+    branches: [ carloschavez/ci_testing ]
     paths-ignore:
       - 'docs/**'
   pull_request:
-    branches: [ develop ]
+    branches: [ carloschavez/ci_testing ]
   schedule:
     - cron: "0 7 * * *"
 
@@ -44,7 +44,13 @@ jobs:
       with:
         repository: DUNE-DAQ/daq-release
         path: daq-release
-        
+
+    - name: Checkout nanorc
+      uses: actions/checkout@v2
+      with:
+        repository: DUNE-DAQ/nanorc
+        path: nanorc
+
     - name: setup dev area
       run: |
           source $GITHUB_WORKSPACE/daq-buildtools/env.sh
@@ -67,7 +73,21 @@ jobs:
           dbt-build.sh --install
           #dbt-build.sh --lint
           $GITHUB_WORKSPACE/daq-release/scripts/upsify-daq-pkgs.py -w $GITHUB_WORKSPACE/dev -o /tarballs
-          
+
+    - name: running minidaqapp with nanorc
+          export REPO=$(echo '${{ github.repository }}' | awk -F '/' '{print $2}')
+          source $GITHUB_WORKSPACE/daq-buildtools/env.sh
+          cd $GITHUB_WORKSPACE/dev
+          dbt-workarea-env || true
+          setup_repo_env="SETUP_$REPO"
+          [[ -z ${!setup_env_repo+x} ]] || unsetup $REPO
+          cp -pr $GITHUB_WORKSPACE/DUNE-DAQ/$REPO $GITHUB_WORKSPACE/dev/sourcecode
+          cp -pr $GITHUB_WORKSPACE/nanorc $GITHUB_WORKSPACE/dev/sourcecode
+          dbt-build.sh --install
+          curl https://cernbox.cern.ch/index.php/s/VAqNtn7bwuQtff3/download -o frames.bin
+          python -m minidaqapp.nanorc.mdapp_multiru_gen --host-ru localhost -d ./frames.bin -o . -s 10 mdapp_4proc
+          nanorc mdapp_4proc boot init conf start 111 wait 2 resume wait 60 pause wait 2 stop scrap terminate
+
     - name: upload UPS tarball and log file
       uses: actions/upload-artifact@v2
       with:
