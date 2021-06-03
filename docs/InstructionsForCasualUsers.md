@@ -1,9 +1,13 @@
 The intention of this page is to provide a few simple instructions that new or casual users can use to quickly demonstrate the operation of a small MiniDAQ system that uses emulators instead of real electronics.
 
-The expected steps will be something like the following
+The steps fall into a few general categories:
 1. setup the environment
 2. generate the sample system configuration
 3. use _nanorc_ to run the sample system
+
+These steps draw on more detailed instructions in a few other repositories.
+
+---
 
 There is a bit of a chicken-and-egg problem, though, because it will be best to document those steps once the v2.6.0 release is complete, and we want to provide some documentation before the release is ready.  
 
