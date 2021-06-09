@@ -135,7 +135,7 @@ def generate(
                 ),
     ])
 
-    startpars = rccmd.StartParams(run=1, disable_data_storage=False)
+    startpars = rccmd.StartParams(run=1)
     cmd_data['start'] = acmd([
         ("mlt", startpars),
         ("ttcm", startpars),
