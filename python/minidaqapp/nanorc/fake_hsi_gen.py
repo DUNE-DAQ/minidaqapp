@@ -124,7 +124,7 @@ def generate(
     ])
  
 
-    startpars = rccmd.StartParams(run=RUN_NUMBER, disable_data_storage=False)
+    startpars = rccmd.StartParams(run=RUN_NUMBER)
     cmd_data['start'] = acmd([
             ("ntoq_timesync_.*", startpars),
             ("fhsig", startpars),

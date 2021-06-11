@@ -104,7 +104,7 @@ def generate(
     ])
  
 
-    startpars = rccmd.StartParams(run=RUN_NUMBER, disable_data_storage=False)
+    startpars = rccmd.StartParams(run=RUN_NUMBER)
     cmd_data['start'] = acmd([
             ("hsir", startpars),
             ("qton_hsievent", startpars)
