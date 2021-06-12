@@ -12,9 +12,9 @@ After you have setup the environment and downloaded the fake input data file
    or clicking on the [CERNBox link](https://cernbox.cern.ch/index.php/s/VAqNtn7bwuQtff3/download)) and put it into `<work_dir>`
 
 
-Now we generate some sample system configurations and use _nanorc_ to run with them.
+Now we generate some sample system configurations and use _[nanorc](https://dune-daq-sw.readthedocs.io/en/latest/packages/nanorc/)_ to run MiniDaq app with them.
 The tools to generate these configurations consist of a single Python script that generates MiniDAQ system configurations with different characteristics based on command-line parameters that are given to the script. This script is minidaqapp/python/minidaqapp/nanorc/mdapp_multiru_gen.py. 
-The config_gen files under `python/minidaqapp/nanorc` directory were developed to work with _nanorc_ package, which itself can be seen as a basic Finite State Machine that sends commands and drives the `minidaqapp`.
+The config_gen files under `python/minidaqapp/nanorc` directory were developed to work with _nanorc_ package, which itself can be seen as a basic Finite State Machine that sends commands and drives the MiniDaq app.
 
 The created configurations will be called `mdapp_fake` and there will be a `mdapp_fake` directory created containing the produced configuration to be used with  _nanorc_.
 The configurations can be run interactively with `nanorc mdapp_fake` from the <work_dir>.
@@ -58,7 +58,7 @@ for example using the following fake IP addresses for the different hosts :  127
 
 the default for all the host options will be `localhost`
 
-8) Running _nanorc_ can be done in interactively or in batch mode, for the later you can specify a sequence of commands to drive minidaqapp, for example run :
+8) Running _nanorc_ can be done in interactively or in batch mode, for the later you can specify a sequence of commands to drive MiniDaq app, for example run :
 
  `nanorc mdapp_fake boot init conf start 102 wait 2 resume wait 60 pause wait 2 stop scrap terminate`
 
