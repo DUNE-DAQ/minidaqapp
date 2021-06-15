@@ -44,7 +44,7 @@ import click
 # trigger options
 @click.option('--ttcm-s1', default=1, help="Timing trigger candidate maker accepted HSI signal ID 1")
 @click.option('--ttcm-s2', default=2, help="Timing trigger candidate maker accepted HSI signal ID 2")
-@click.option('--tr-timeout', default=0, help="Timeout for trigger records to be considered completed, in timestamp units")
+@click.option('--tr-timeout', default=0, help="Timeout for trigger records to be considered completed, in timestamp units. 0 means no timeout.")
 @click.option('--enable-raw-recording', is_flag=True, help="Add queues and modules necessary for the record command")
 @click.option('--raw-recording-output-dir', type=click.Path(), default='.', help="Output directory where recorded data is written to. Data for each link is written to a separate file")
 @click.option('--frontend-type', type=click.Choice(['wib', 'wib2', 'pds_queue', 'pds_list']), default='wib', help="Frontend type (wib, wib2 or pds) and latency buffer implementation in case of pds (folly queue or skip list)")
