@@ -31,3 +31,5 @@ When you return to this work area (for example, after logging out and back in), 
 4. `dbt-workarea-env`
 7. `nanorc mdapp_fake boot init conf start 102 wait 2 resume wait 60 pause wait 2 stop scrap terminate`
 
+
+More detailed explanations on how to create different configurations can be found in [Instructions for different configurations for first-time users](ConfigurationsForCasualUsers.md)
