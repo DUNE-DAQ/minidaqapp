@@ -10,3 +10,5 @@ The focus of this documentation is on providing instructions for using the tools
 
 [Instructions for casual or first-time users](InstructionsForCasualUsers.md)
 
+[Configuration options for casual or first-time users](ConfigurationsForCasualUsers.md)
+

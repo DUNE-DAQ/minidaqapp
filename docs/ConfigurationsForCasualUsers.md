@@ -17,21 +17,21 @@ The tools to generate these configurations consist of a single Python script tha
 The config_gen files under `python/minidaqapp/nanorc` directory were developed to work with _nanorc_ package, which itself can be seen as a basic Finite State Machine that sends commands and drives the MiniDaq app.
 
 The created configurations will be called `mdapp_fake` and there will be a `mdapp_fake` directory created containing the produced configuration to be used with  _nanorc_.
-The configurations can be run interactively with `nanorc mdapp_fake` from the <work_dir>.
+The configurations can be run interactively with `nanorc mdapp_fake` from the `<work_dir>`.
 
 1) In order to get the full set of configuration options and their `help` , run :  
 `python -m minidaqapp.nanorc.mdapp_multiru_gen -h`
 
-2) default system configuration using input data file containing data frames to be replayed by fake cards, as downloaded above use option `-d ./frames.bin`,  and the output will be in the current directory `-o .` , run:
+2) The data `Input` and `Output` system configuration options are as follow. Input data file `-d ./frames.bin` for input file `./frames.bin` containing data frames that are replayed by fake cards in the current system, as above, the input data file can be downloaded with "`curl -o frames.bin -O https://cernbox.cern.ch/index.php/s/VAqNtn7bwuQtff3/download`". The output data path option `-o` , can be used for example to specify the current directory, as in  `-o .` . These options allow the user to change the input data file and the output data directory path as the user see fit.  
+The `Input` and `Output` data system options can be use in the follwing way 
 
 `python -m minidaqapp.nanorc.mdapp_multiru_gen -d ./frames.bin -o .  mdapp_fake`
-
 
 3) The default trigger rate generated is of 1 Hz per readout unit (ru). This can be changed with the option `-t INTEGER`, for example run:
 
 `python -m minidaqapp.nanorc.mdapp_multiru_gen -d ./frames.bin -o . -t 2  mdapp_fake`
 
-4) Use option `-s INTEGER` to slow down the generated data rate by a factor of INTEGER, for example run:
+4) Use option `-s INTEGER` to slow down the generated data rate by a factor of INTEGER, this could be particularly useful when the user is running the system on a slow computer that can't create data fast enough to match what the real electronics can do. For example to slow down the data produccion rate, run the following commmand:
 
 `python -m minidaqapp.nanorc.mdapp_multiru_gen -d ./frames.bin -o . -s 10  mdapp_fake`
 
