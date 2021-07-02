@@ -125,12 +125,14 @@ def cli(number_of_data_producers, emulator_mode, data_rate_slowdown_factor, run_
             HSI_DEVICE_NAME = hsi_device_name,
         )
     else:
+        #We use the option --trigger-rate-hz option (default=1) to devide hsi_event_period, this is our new HSI_EVENT_PERIOD_NS
+        hsi_event_period_rate_hz = math.floor((hsi_event_period/trigger_rate_hz)) 
         cmd_data_hsi = fake_hsi_gen.generate(
             network_endpoints,
             RUN_NUMBER = run_number,
             CLOCK_SPEED_HZ = CLOCK_SPEED_HZ,
             DATA_RATE_SLOWDOWN_FACTOR = data_rate_slowdown_factor,
-            HSI_EVENT_PERIOD_NS = hsi_event_period,
+            HSI_EVENT_PERIOD_NS = hsi_event_period_rate_hz,
             HSI_DEVICE_ID = hsi_device_id,
             MEAN_SIGNAL_MULTIPLICITY = mean_hsi_signal_multiplicity,
             SIGNAL_EMULATION_MODE = hsi_signal_emulation_mode,

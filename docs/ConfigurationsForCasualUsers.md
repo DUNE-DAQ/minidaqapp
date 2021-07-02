@@ -27,11 +27,14 @@ The `Input` and `Output` data system options can be use in the follwing way
 
 `python -m minidaqapp.nanorc.mdapp_multiru_gen -d ./frames.bin -o .  mdapp_fake`
 
-3) The default trigger rate generated is of 1 Hz per readout unit (ru). This can be changed with the option `-t INTEGER`, for example run:
+3) The default trigger rate generated is of 1 Hz per readout unit (ru). This can be changed with the option `--trigger-rate-hz FLOAT` (default 1.0 Hz), or alternatively with the option `--hsi-event-period FLOAT` (default value 1e9, provides 1.0 Hz). For example to increase the trigger rate generated to 2.0 Hz, the user can run with either of these two options:
 
-`python -m minidaqapp.nanorc.mdapp_multiru_gen -d ./frames.bin -o . -t 2  mdapp_fake`
+`python -m minidaqapp.nanorc.mdapp_multiru_gen -d ./frames.bin -o . --trigger-rate-hz 2.0  mdapp_fake`
 
-4) Use option `-s INTEGER` to slow down the generated data rate by a factor of INTEGER, this could be particularly useful when the user is running the system on a slow computer that can't create data fast enough to match what the real electronics can do. For example to slow down the data produccion rate, run the following commmand:
+`python -m minidaqapp.nanorc.mdapp_multiru_gen -d ./frames.bin -o . --hsi-event-period 500000000.0 mdapp_fake`
+  
+
+4) Use option `-s INTEGER` to slow down the generated data rate by a factor of INTEGER, this is achieved by slowing down the simulated clock speed for generating data. This option is particularly useful when the user is running the system on a slow computer that can't create data fast enough to match what the real electronics can do. For example to slowdown the data produccion rate by a factor of 10, run the following commmand:
 
 `python -m minidaqapp.nanorc.mdapp_multiru_gen -d ./frames.bin -o . -s 10  mdapp_fake`
 
