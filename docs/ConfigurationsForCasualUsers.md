@@ -22,8 +22,8 @@ The configurations can be run interactively with `nanorc mdapp_fake` from the `<
 1) In order to get the full set of configuration options and their `help` , run :  
 `python -m minidaqapp.nanorc.mdapp_multiru_gen -h`
 
-2) The data `Input` and `Output` system configuration options are as follow. Input data file `-d ./frames.bin` for input file `./frames.bin` containing data frames that are replayed by fake cards in the current system, as above, the input data file can be downloaded with "`curl -o frames.bin -O https://cernbox.cern.ch/index.php/s/VAqNtn7bwuQtff3/download`". The output data path option `-o` , can be used for example to specify the current directory, as in  `-o .` . These options allow the user to change the input data file and the output data directory path as the user see fit.  
-The `Input` and `Output` data system options can be use in the follwing way 
+2) The data `Input` and `Output` system configuration options allow the user to change the input data file location and the output data directory path as needed. To specify an input `frames.bin` file from the current directory, a user would use `-d ./frames.bin`. This file contains data frames that are replayed by fake cards in the current system, and as mentioned above, this file can be downloaded with "`curl -o frames.bin -O https://cernbox.cern.ch/index.php/s/VAqNtn7bwuQtff3/download`". The output data path option `-o` can be used to specify the directory where output data files are written.  To write the output data files to the current directory, one would use `-o .`
+The `Input` and `Output` data system options can be use in the following way 
 
 `python -m minidaqapp.nanorc.mdapp_multiru_gen -d ./frames.bin -o .  mdapp_fake`
 
