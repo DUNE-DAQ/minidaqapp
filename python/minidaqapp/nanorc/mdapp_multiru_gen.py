@@ -21,7 +21,7 @@ import click
 @click.option('-e', '--emulator-mode', is_flag=True, help="If active, timestamps of data frames are overwritten when processed by the readout. This is necessary if the felix card does not set correct timestamps.")
 @click.option('-s', '--data-rate-slowdown-factor', default=1)
 @click.option('-r', '--run-number', default=333)
-@click.option('-t', '--trigger-rate-hz', default=1.0)
+@click.option('-t', '--trigger-rate-hz', default=1.0, help='Fake HSI only: rate at which fake HSIEvents are sent (this option provides an alternative way to specify the trigger rate compared to --hsi-event-period, however these two options should not be used together!)')
 @click.option('-c', '--token-count', default=10)
 @click.option('-d', '--data-file', type=click.Path(), default='./frames.bin', help="File containing data frames to be replayed by the fake cards")
 @click.option('-o', '--output-path', type=click.Path(), default='.')
@@ -125,12 +125,14 @@ def cli(number_of_data_producers, emulator_mode, data_rate_slowdown_factor, run_
             HSI_DEVICE_NAME = hsi_device_name,
         )
     else:
+        #We use the option --trigger-rate-hz option (default=1) to devide hsi_event_period, this is our new HSI_EVENT_PERIOD_NS
+        hsi_event_period_rate_hz = math.floor((hsi_event_period/trigger_rate_hz)) 
         cmd_data_hsi = fake_hsi_gen.generate(
             network_endpoints,
             RUN_NUMBER = run_number,
             CLOCK_SPEED_HZ = CLOCK_SPEED_HZ,
             DATA_RATE_SLOWDOWN_FACTOR = data_rate_slowdown_factor,
-            HSI_EVENT_PERIOD_NS = hsi_event_period,
+            HSI_EVENT_PERIOD_NS = hsi_event_period_rate_hz,
             HSI_DEVICE_ID = hsi_device_id,
             MEAN_SIGNAL_MULTIPLICITY = mean_hsi_signal_multiplicity,
             SIGNAL_EMULATION_MODE = hsi_signal_emulation_mode,
