@@ -22,6 +22,8 @@ import click
 @click.option('-s', '--data-rate-slowdown-factor', default=1)
 @click.option('-r', '--run-number', default=333)
 @click.option('-t', '--trigger-rate-hz', default=1.0, help='Fake HSI only: rate at which fake HSIEvents are sent (this option provides an alternative way to specify the trigger rate compared to --hsi-event-period, however these two options should not be used together!)')
+@click.option('-b', '--trigger-window-before-ticks', default=1000)
+@click.option('-a', '--trigger-window-after-ticks', default=1000)
 @click.option('-c', '--token-count', default=10)
 @click.option('-d', '--data-file', type=click.Path(), default='./frames.bin', help="File containing data frames to be replayed by the fake cards")
 @click.option('-o', '--output-path', type=click.Path(), default='.')
@@ -48,7 +50,7 @@ import click
 @click.option('--raw-recording-output-dir', type=click.Path(), default='.', help="Output directory where recorded data is written to. Data for each link is written to a separate file")
 @click.option('--frontend-type', type=click.Choice(['wib', 'wib2', 'pds_queue', 'pds_list']), default='wib', help="Frontend type (wib, wib2 or pds) and latency buffer implementation in case of pds (folly queue or skip list)")
 @click.argument('json_dir', type=click.Path())
-def cli(number_of_data_producers, emulator_mode, data_rate_slowdown_factor, run_number, trigger_rate_hz, token_count, data_file, output_path, enable_trace, use_felix, host_df, host_ru, host_trigger, host_hsi, 
+def cli(number_of_data_producers, emulator_mode, data_rate_slowdown_factor, run_number, trigger_rate_hz, trigger_window_before_ticks, trigger_window_after_ticks, token_count, data_file, output_path, enable_trace, use_felix, host_df, host_ru, host_trigger, host_hsi, 
         hsi_device_name, hsi_readout_period, use_hsi_hw, hsi_event_period, hsi_device_id, mean_hsi_signal_multiplicity, hsi_signal_emulation_mode, enabled_hsi_signals,
         ttcm_s1, ttcm_s2,
         enable_raw_recording, raw_recording_output_dir, frontend_type, json_dir):
@@ -147,7 +149,9 @@ def cli(number_of_data_producers, emulator_mode, data_rate_slowdown_factor, run_
         TOKEN_COUNT = trigemu_token_count,
         SYSTEM_TYPE = system_type,
         TTCM_S1=ttcm_s1,
-        TTCM_S2=ttcm_s2
+        TTCM_S2=ttcm_s2,
+        TRIGGER_WINDOW_BEFORE_TICKS = trigger_window_before_ticks,
+        TRIGGER_WINDOW_AFTER_TICKS = trigger_window_after_ticks
     )
 
     console.log("trigger cmd data:", cmd_data_trigger)
