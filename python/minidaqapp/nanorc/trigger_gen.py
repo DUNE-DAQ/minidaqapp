@@ -49,6 +49,8 @@ def generate(
         SYSTEM_TYPE = 'wib',
         TTCM_S1: int = 1,
         TTCM_S2: int = 2,
+        TRIGGER_WINDOW_BEFORE_TICKS: int = 1000,
+        TRIGGER_WINDOW_AFTER_TICKS: int = 1000
 ):
     """
     { item_description }
@@ -107,11 +109,11 @@ def generate(
         
         ("ttcm", ttcm.Conf(
                         s1=ttcm.map_t(signal_type=TTCM_S1,
-                                      time_before=100000,
-                                      time_after=200000),
+                                      time_before=TRIGGER_WINDOW_BEFORE_TICKS,
+                                      time_after=TRIGGER_WINDOW_AFTER_TICKS),
                         s2=ttcm.map_t(signal_type=TTCM_S2,
-                                      time_before=100000,
-                                      time_after=200000)
+                                      time_before=TRIGGER_WINDOW_BEFORE_TICKS,
+                                      time_after=TRIGGER_WINDOW_AFTER_TICKS)
                         )
         ),
 
