@@ -70,7 +70,7 @@ def generate(
 
     # Define modules and queues
     queue_bare_specs = [
-            app.QueueSpec(inst="time_sync_from_netq", kind='FollySPSCQueue', capacity=100),
+            app.QueueSpec(inst="time_sync_from_netq", kind='FollyMPMCQueue', capacity=100),
             app.QueueSpec(inst="hsievent_q_to_net", kind='FollySPSCQueue', capacity=100),
         ]
 
@@ -117,7 +117,8 @@ def generate(
 
                 (f"ntoq_timesync_{idx}", ntoq.Conf(msg_type="dunedaq::dfmessages::TimeSync",
                                            msg_module_name="TimeSyncNQ",
-                                           receiver_config=nor.Conf(ipm_plugin_type="ZmqReceiver",
+                                           receiver_config=nor.Conf(ipm_plugin_type="ZmqSubscriber",
+								    subscriptions=["timesync-messages"],
                                                                     address=NETWORK_ENDPOINTS[inst])
                                            )
                 ) for idx, inst in enumerate(NETWORK_ENDPOINTS) if "timesync" in inst

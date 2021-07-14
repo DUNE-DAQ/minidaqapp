@@ -154,8 +154,9 @@ def generate(NETWORK_ENDPOINTS,
 
                 ("qton_timesync", qton.Conf(msg_type="dunedaq::dfmessages::TimeSync",
                                             msg_module_name="TimeSyncNQ",
-                                            sender_config=nos.Conf(ipm_plugin_type="ZmqSender",
+                                            sender_config=nos.Conf(ipm_plugin_type="ZmqPublisher",
                                                                    address=NETWORK_ENDPOINTS[f"timesync_{HOSTIDX}"],
+								   topic="timesync-messages",
                                                                    stype="msgpack"))),
         
                 ("fake_source",fakecr.Conf(
