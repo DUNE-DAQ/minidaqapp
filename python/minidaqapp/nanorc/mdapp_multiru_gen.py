@@ -6,7 +6,7 @@ from rich.console import Console
 from os.path import exists, join
 
 
-CLOCK_SPEED_HZ = 50000000;
+CLOCK_SPEED_HZ = 50000000
 
 # Add -h as default help option
 CONTEXT_SETTINGS = dict(help_option_names=['-h', '--help'])
@@ -27,7 +27,7 @@ import click
 @click.option('-c', '--token-count', default=10)
 @click.option('-d', '--data-file', type=click.Path(), default='./frames.bin', help="File containing data frames to be replayed by the fake cards")
 @click.option('-o', '--output-path', type=click.Path(), default='.')
-@click.option('--enable-trace', is_flag=True)
+@click.option('--disable-trace', is_flag=True)
 @click.option('-f', '--use-felix', is_flag=True, help="Use real felix cards instead of fake ones")
 @click.option('--host-df', default='localhost')
 @click.option('--host-ru', multiple=True, default=['localhost'], help="This option is repeatable, with each repetition adding an additional ru process.")
@@ -50,7 +50,7 @@ import click
 @click.option('--raw-recording-output-dir', type=click.Path(), default='.', help="Output directory where recorded data is written to. Data for each link is written to a separate file")
 @click.option('--frontend-type', type=click.Choice(['wib', 'wib2', 'pds_queue', 'pds_list']), default='wib', help="Frontend type (wib, wib2 or pds) and latency buffer implementation in case of pds (folly queue or skip list)")
 @click.argument('json_dir', type=click.Path())
-def cli(number_of_data_producers, emulator_mode, data_rate_slowdown_factor, run_number, trigger_rate_hz, trigger_window_before_ticks, trigger_window_after_ticks, token_count, data_file, output_path, enable_trace, use_felix, host_df, host_ru, host_trigger, host_hsi, 
+def cli(number_of_data_producers, emulator_mode, data_rate_slowdown_factor, run_number, trigger_rate_hz, trigger_window_before_ticks, trigger_window_after_ticks, token_count, data_file, output_path, disable_trace, use_felix, host_df, host_ru, host_trigger, host_hsi, 
         hsi_device_name, hsi_readout_period, use_hsi_hw, hsi_event_period, hsi_device_id, mean_hsi_signal_multiplicity, hsi_signal_emulation_mode, enabled_hsi_signals,
         ttcm_s1, ttcm_s2,
         enable_raw_recording, raw_recording_output_dir, frontend_type, json_dir):
@@ -87,7 +87,7 @@ def cli(number_of_data_producers, emulator_mode, data_rate_slowdown_factor, run_
         df_token_count = -1 * token_count
         trigemu_token_count = 0
 
-    network_endpoints={
+    network_endpoints = {
         "hsievent" : "tcp://{host_hsi}:12344",
         "trigdec" : "tcp://{host_trigger}:12345",
         "triginh" : "tcp://{host_df}:12346",
@@ -98,18 +98,19 @@ def cli(number_of_data_producers, emulator_mode, data_rate_slowdown_factor, run_
     else:
         system_type = 'PDS'
 
-    port=12347
+    port = 12347
     for idx in range(total_number_of_data_producers):
-        network_endpoints[f"datareq_{idx}"] = "tcp://{host_df}:"+f"{port}"
+        network_endpoints[f"datareq_{idx}"] = "tcp://{host_df}:" + f"{port}"
         port = port + 1
 
     cardid = {}
     host_id_dict = {}
     for hostidx in range(len(host_ru)):
-        # Should end up something like 'network_endpoints[timesync_0]: "tcp://{host_ru0}:12347"'
+        # Should end up something like 'network_endpoints[timesync_0]:
+        # "tcp://{host_ru0}:12347"'
         network_endpoints[f"timesync_{hostidx}"] = "tcp://{host_ru" + f"{hostidx}" + "}:" + f"{port}"
         port = port + 1
-        network_endpoints[f"frags_{hostidx}"] = "tcp://{host_ru"+ f"{hostidx}" + "}:" + f"{port}"
+        network_endpoints[f"frags_{hostidx}"] = "tcp://{host_ru" + f"{hostidx}" + "}:" + f"{port}"
         port = port + 1
         if host_ru[hostidx] in host_id_dict:
             host_id_dict[host_ru[hostidx]] = host_id_dict[host_ru[hostidx]] + 1
@@ -120,17 +121,15 @@ def cli(number_of_data_producers, emulator_mode, data_rate_slowdown_factor, run_
         hostidx = hostidx + 1
     
     if use_hsi_hw:
-        cmd_data_hsi = hsi_gen.generate(
-            network_endpoints,
+        cmd_data_hsi = hsi_gen.generate(network_endpoints,
             RUN_NUMBER = run_number,
             READOUT_PERIOD_US = hsi_readout_period,
-            HSI_DEVICE_NAME = hsi_device_name,
-        )
+            HSI_DEVICE_NAME = hsi_device_name,)
     else:
-        #We use the option --trigger-rate-hz option (default=1) to devide hsi_event_period, this is our new HSI_EVENT_PERIOD_NS
-        hsi_event_period_rate_hz = math.floor((hsi_event_period/trigger_rate_hz)) 
-        cmd_data_hsi = fake_hsi_gen.generate(
-            network_endpoints,
+        #We use the option --trigger-rate-hz option (default=1) to devide
+        #hsi_event_period, this is our new HSI_EVENT_PERIOD_NS
+        hsi_event_period_rate_hz = math.floor((hsi_event_period / trigger_rate_hz)) 
+        cmd_data_hsi = fake_hsi_gen.generate(network_endpoints,
             RUN_NUMBER = run_number,
             CLOCK_SPEED_HZ = CLOCK_SPEED_HZ,
             DATA_RATE_SLOWDOWN_FACTOR = data_rate_slowdown_factor,
@@ -138,36 +137,30 @@ def cli(number_of_data_producers, emulator_mode, data_rate_slowdown_factor, run_
             HSI_DEVICE_ID = hsi_device_id,
             MEAN_SIGNAL_MULTIPLICITY = mean_hsi_signal_multiplicity,
             SIGNAL_EMULATION_MODE = hsi_signal_emulation_mode,
-            ENABLED_SIGNALS =  enabled_hsi_signals,
-        )
+            ENABLED_SIGNALS =  enabled_hsi_signals,)
     
     console.log("hsi cmd data:", cmd_data_hsi)
 
-    cmd_data_trigger = trigger_gen.generate(
-        network_endpoints,
+    cmd_data_trigger = trigger_gen.generate(network_endpoints,
         NUMBER_OF_DATA_PRODUCERS = total_number_of_data_producers,
         TOKEN_COUNT = trigemu_token_count,
         SYSTEM_TYPE = system_type,
         TTCM_S1=ttcm_s1,
         TTCM_S2=ttcm_s2,
         TRIGGER_WINDOW_BEFORE_TICKS = trigger_window_before_ticks,
-        TRIGGER_WINDOW_AFTER_TICKS = trigger_window_after_ticks
-    )
+        TRIGGER_WINDOW_AFTER_TICKS = trigger_window_after_ticks)
 
     console.log("trigger cmd data:", cmd_data_trigger)
 
-    cmd_data_dataflow = dataflow_gen.generate(
-        network_endpoints,
+    cmd_data_dataflow = dataflow_gen.generate(network_endpoints,
         NUMBER_OF_DATA_PRODUCERS = total_number_of_data_producers,
         RUN_NUMBER = run_number, 
         OUTPUT_PATH = output_path,
         TOKEN_COUNT = df_token_count,
-        SYSTEM_TYPE = system_type
-    )
+        SYSTEM_TYPE = system_type)
     console.log("dataflow cmd data:", cmd_data_dataflow)
 
-    cmd_data_readout = [ readout_gen.generate(
-            network_endpoints,
+    cmd_data_readout = [ readout_gen.generate(network_endpoints,
             NUMBER_OF_DATA_PRODUCERS = number_of_data_producers,
             EMULATOR_MODE = emulator_mode,
             DATA_RATE_SLOWDOWN_FACTOR = data_rate_slowdown_factor,
@@ -180,8 +173,7 @@ def cli(number_of_data_producers, emulator_mode, data_rate_slowdown_factor, run_
             RAW_RECORDING_ENABLED = enable_raw_recording,
             RAW_RECORDING_OUTPUT_DIR = raw_recording_output_dir,
             FRONTEND_TYPE = frontend_type,
-            SYSTEM_TYPE = system_type
-            ) for hostidx in range(len(host_ru))]
+            SYSTEM_TYPE = system_type) for hostidx in range(len(host_ru))]
     console.log("readout cmd data:", cmd_data_readout)
 
     if exists(json_dir):
@@ -190,10 +182,10 @@ def cli(number_of_data_producers, emulator_mode, data_rate_slowdown_factor, run_
     data_dir = join(json_dir, 'data')
     os.makedirs(data_dir)
 
-    app_hsi="hsi"
-    app_trigger="trigger"
-    app_df="dataflow"
-    app_ru=[f"ruflx{idx}" if use_felix else f"ruemu{idx}" for idx in range(len(host_ru))]
+    app_hsi = "hsi"
+    app_trigger = "trigger"
+    app_df = "dataflow"
+    app_ru = [f"ruflx{idx}" if use_felix else f"ruemu{idx}" for idx in range(len(host_ru))]
 
     jf_hsi = join(data_dir, app_hsi)
     jf_trigemu = join(data_dir, app_trigger)
@@ -236,15 +228,13 @@ def cli(number_of_data_producers, emulator_mode, data_rate_slowdown_factor, run_
                 "env": {
                 "DBT_AREA_ROOT": "getenv"
                 },
-                "cmd": [
-                    "CMD_FAC=rest://localhost:${APP_PORT}",
+                "cmd": ["CMD_FAC=rest://localhost:${APP_PORT}",
                     "INFO_SVC=file://info_${APP_NAME}_${APP_PORT}.json",
                     "cd ${DBT_AREA_ROOT}",
                     "source dbt-env.sh",
                     "dbt-workarea-env",
                     "cd ${APP_WD}",
-                    "daq_application --name ${APP_NAME} -c ${CMD_FAC} -i ${INFO_SVC}"
-                ]
+                    "daq_application --name ${APP_NAME} -c ${CMD_FAC} -i ${INFO_SVC}"]
             },
             "daq_application" : {
                 "comment": "Application profile using  PATH variables (lower start time)",
@@ -255,22 +245,25 @@ def cli(number_of_data_producers, emulator_mode, data_rate_slowdown_factor, run_
                     "LD_LIBRARY_PATH": "getenv",
                     "PATH": "getenv"
                 },
-                "cmd": [
-                    "CMD_FAC=rest://localhost:${APP_PORT}",
+                "cmd": ["CMD_FAC=rest://localhost:${APP_PORT}",
                     "INFO_SVC=file://info_${APP_NAME}_${APP_PORT}.json",
                     "cd ${APP_WD}",
-                    "daq_application --name ${APP_NAME} -c ${CMD_FAC} -i ${INFO_SVC}"
-                ]
+                    "daq_application --name ${APP_NAME} -c ${CMD_FAC} -i ${INFO_SVC}"]
             }
         }
 
-        if enable_trace:
-            daq_app_specs["daq_application"]["env"]["TRACE_FILE"] = "getenv"
-            daq_app_specs["daq_application_ups"]["env"]["TRACE_FILE"] = "getenv"
+        if not disable_trace:
+            daq_app_specs["daq_application"]["env"]["TRACE_FILE"] = "getenv:/tmp/trace_buffer_${HOSTNAME}_${USER}"
+            daq_app_specs["daq_application_ups"]["env"]["TRACE_FILE"] = "getenv:/tmp/trace_buffer_${HOSTNAME}_${USER}"
 
         cfg = {
             "env" : {
-                "DUNEDAQ_ERS_VERBOSITY_LEVEL": 1
+                "DUNEDAQ_ERS_VERBOSITY_LEVEL": 1,
+                "DUNEDAQ_PARTITION": "elf_test",
+                "DUNEDAQ_ERS_INFO": "erstrace,throttle(30,100),lstdout",
+                "DUNEDAQ_ERS_WARNING": "erstrace,throttle(30,100),lstderr",
+                "DUNEDAQ_ERS_ERROR": "erstrace,throttle(30,100),lstderr",
+                "DUNEDAQ_ERS_FATAL": "erstrace,lstderr,erskafka"
             },
             "hosts": {
                 "host_df": host_df,
@@ -299,7 +292,7 @@ def cli(number_of_data_producers, emulator_mode, data_rate_slowdown_factor, run_
             },
             "exec": daq_app_specs
         }
-        appport=3335
+        appport = 3335
         for hostidx in range(len(host_ru)):
             cfg["hosts"][f"host_ru{hostidx}"] = host_ru[hostidx]
             cfg["apps"][app_ru[hostidx]] = {
