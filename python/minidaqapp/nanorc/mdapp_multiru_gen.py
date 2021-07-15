@@ -259,11 +259,11 @@ def cli(number_of_data_producers, emulator_mode, data_rate_slowdown_factor, run_
         cfg = {
             "env" : {
                 "DUNEDAQ_ERS_VERBOSITY_LEVEL": 1,
-                "DUNEDAQ_PARTITION": "elf_test",
+                "DUNEDAQ_PARTITION": "${USER}_test",
                 "DUNEDAQ_ERS_INFO": "erstrace,throttle(30,100),lstdout",
                 "DUNEDAQ_ERS_WARNING": "erstrace,throttle(30,100),lstderr",
                 "DUNEDAQ_ERS_ERROR": "erstrace,throttle(30,100),lstderr",
-                "DUNEDAQ_ERS_FATAL": "erstrace,lstderr,erskafka"
+                "DUNEDAQ_ERS_FATAL": "erstrace,lstderr"
             },
             "hosts": {
                 "host_df": host_df,
