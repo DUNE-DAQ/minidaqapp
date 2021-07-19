@@ -17,7 +17,7 @@ console = Console()
 import click
 
 @click.command(context_settings=CONTEXT_SETTINGS)
-@click.option('-n', '--number-of-data-producers', default=2, help="Number of links to use, either per ru (<10) or total. If total is given, will be adjusted to the closest multiple of the number of rus")
+@click.option('-n', '--number-of-data-producers', default=2, help="Number of links to use, either per ru (<=10) or total. If total is given, will be adjusted to the closest multiple of the number of rus")
 @click.option('-e', '--emulator-mode', is_flag=True, help="If active, timestamps of data frames are overwritten when processed by the readout. This is necessary if the felix card does not set correct timestamps.")
 @click.option('-s', '--data-rate-slowdown-factor', default=1)
 @click.option('-r', '--run-number', default=333)
