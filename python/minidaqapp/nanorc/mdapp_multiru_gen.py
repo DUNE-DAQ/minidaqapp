@@ -17,6 +17,7 @@ console = Console()
 import click
 
 @click.command(context_settings=CONTEXT_SETTINGS)
+@click.option('-p', '--partition-name', default="${USER}_test", help="Name of the partition to use, for ERS and OPMON")
 @click.option('-n', '--number-of-data-producers', default=2, help="Number of links to use, either per ru (<10) or total. If total is given, will be adjusted to the closest multiple of the number of rus")
 @click.option('-e', '--emulator-mode', is_flag=True, help="If active, timestamps of data frames are overwritten when processed by the readout. This is necessary if the felix card does not set correct timestamps.")
 @click.option('-s', '--data-rate-slowdown-factor', default=1)
@@ -49,11 +50,16 @@ import click
 @click.option('--enable-raw-recording', is_flag=True, help="Add queues and modules necessary for the record command")
 @click.option('--raw-recording-output-dir', type=click.Path(), default='.', help="Output directory where recorded data is written to. Data for each link is written to a separate file")
 @click.option('--frontend-type', type=click.Choice(['wib', 'wib2', 'pds_queue', 'pds_list']), default='wib', help="Frontend type (wib, wib2 or pds) and latency buffer implementation in case of pds (folly queue or skip list)")
+@click.option('--opmon-impl', type=click.Choice(['json','cern','pocket'], case_sensitive=False),default='json', help="Info collector service implementation to use")
+@click.option('--ers-impl', type=click.Choice(['local','cern','pocket'], case_sensitive=False), default='local', help="ERS destination (Kafka used for cern and pocket)")
+@click.option('--pocket-url', default='127.0.0.1', help="URL for connecting to Pocket services")
 @click.argument('json_dir', type=click.Path())
-def cli(number_of_data_producers, emulator_mode, data_rate_slowdown_factor, run_number, trigger_rate_hz, trigger_window_before_ticks, trigger_window_after_ticks, token_count, data_file, output_path, disable_trace, use_felix, host_df, host_ru, host_trigger, host_hsi, 
+
+def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowdown_factor, run_number, trigger_rate_hz, trigger_window_before_ticks, trigger_window_after_ticks,
+        token_count, data_file, output_path, disable_trace, use_felix, host_df, host_ru, host_trigger, host_hsi, 
         hsi_device_name, hsi_readout_period, use_hsi_hw, hsi_event_period, hsi_device_id, mean_hsi_signal_multiplicity, hsi_signal_emulation_mode, enabled_hsi_signals,
         ttcm_s1, ttcm_s2,
-        enable_raw_recording, raw_recording_output_dir, frontend_type, json_dir):
+        enable_raw_recording, raw_recording_output_dir, frontend_type, opmon_impl, ers_impl, pocket_url, json_dir):
     """
       JSON_DIR: Json file output folder
     """
@@ -97,6 +103,32 @@ def cli(number_of_data_producers, emulator_mode, data_rate_slowdown_factor, run_
         system_type = 'TPC'
     else:
         system_type = 'PDS'
+
+    if opmon_impl == 'cern':
+        info_svc_uri = "influx://188.185.88.195:80/write?db=db1"
+    elif opmon_impl == 'pocket':
+        info_svc_uri = "influx://" + pocket_url + ":31002/write?db=influxdb"
+    else:
+        info_svc_uri = "file://info_${APP_NAME}_${APP_PORT}.json"
+
+    if ers_impl == 'cern':
+        use_kafka = True
+        ers_info = "erstrace,throttle(30,100),lstdout,erskafka(dqmbroadcast:9092)"
+        ers_warning = "erstrace,throttle(30,100),lstderr,erskafka(dqmbroadcast:9092)"
+        ers_error = "erstrace,throttle(30,100),lstderr,erskafka(dqmbroadcast:9092)"
+        ers_fatal = "erstrace,lstderr,erskafka(dqmbroadcast:9092)"
+    elif ers_impl == 'pocket':
+        use_kafka = True
+        ers_info = "erstrace,throttle(30,100),lstdout,erskafka(" + pocket_url + ":9092)"
+        ers_warning = "erstrace,throttle(30,100),lstderr,erskafka(" + pocket_url + ":9092)"
+        ers_error = "erstrace,throttle(30,100),lstderr,erskafka(" + pocket_url + ":9092)"
+        ers_fatal = "erstrace,lstderr,erskafka(" + pocket_url + ":9092)"
+    else:
+        use_kafka = False
+        ers_info = "erstrace,throttle(30,100),lstdout"
+        ers_warning = "erstrace,throttle(30,100),lstderr"
+        ers_error = "erstrace,throttle(30,100),lstderr"
+        ers_fatal = "erstrace,lstderr"
 
     port = 12347
     for idx in range(total_number_of_data_producers):
@@ -229,7 +261,6 @@ def cli(number_of_data_producers, emulator_mode, data_rate_slowdown_factor, run_
                 "DBT_AREA_ROOT": "getenv"
                 },
                 "cmd": ["CMD_FAC=rest://localhost:${APP_PORT}",
-                    "INFO_SVC=file://info_${APP_NAME}_${APP_PORT}.json",
                     "cd ${DBT_AREA_ROOT}",
                     "source dbt-env.sh",
                     "dbt-workarea-env",
@@ -246,7 +277,6 @@ def cli(number_of_data_producers, emulator_mode, data_rate_slowdown_factor, run_
                     "PATH": "getenv"
                 },
                 "cmd": ["CMD_FAC=rest://localhost:${APP_PORT}",
-                    "INFO_SVC=file://info_${APP_NAME}_${APP_PORT}.json",
                     "cd ${APP_WD}",
                     "daq_application --name ${APP_NAME} -c ${CMD_FAC} -i ${INFO_SVC}"]
             }
@@ -259,11 +289,12 @@ def cli(number_of_data_producers, emulator_mode, data_rate_slowdown_factor, run_
         cfg = {
             "env" : {
                 "DUNEDAQ_ERS_VERBOSITY_LEVEL": 1,
-                "DUNEDAQ_PARTITION": "${USER}_test",
-                "DUNEDAQ_ERS_INFO": "erstrace,throttle(30,100),lstdout",
-                "DUNEDAQ_ERS_WARNING": "erstrace,throttle(30,100),lstderr",
-                "DUNEDAQ_ERS_ERROR": "erstrace,throttle(30,100),lstderr",
-                "DUNEDAQ_ERS_FATAL": "erstrace,lstderr"
+                "DUNEDAQ_PARTITION": partition_name,
+                "DUNEDAQ_ERS_INFO": ers_info,
+                "DUNEDAQ_ERS_WARNING": ers_warning,
+                "DUNEDAQ_ERS_ERROR": ers_error,
+                "DUNEDAQ_ERS_FATAL": ers_fatal,
+                "INFO_SVC": info_svc_uri
             },
             "hosts": {
                 "host_df": host_df,
@@ -292,6 +323,10 @@ def cli(number_of_data_producers, emulator_mode, data_rate_slowdown_factor, run_
             },
             "exec": daq_app_specs
         }
+
+        if use_kafka:
+            cfg["env"]["DUNEDAQ_ERS_STREAM_LIBS"] = "erskafka"
+
         appport = 3335
         for hostidx in range(len(host_ru)):
             cfg["hosts"][f"host_ru{hostidx}"] = host_ru[hostidx]
