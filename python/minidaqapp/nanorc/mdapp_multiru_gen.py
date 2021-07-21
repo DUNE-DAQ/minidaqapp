@@ -49,11 +49,12 @@ import click
 @click.option('--enable-raw-recording', is_flag=True, help="Add queues and modules necessary for the record command")
 @click.option('--raw-recording-output-dir', type=click.Path(), default='.', help="Output directory where recorded data is written to. Data for each link is written to a separate file")
 @click.option('--frontend-type', type=click.Choice(['wib', 'wib2', 'pds_queue', 'pds_list']), default='wib', help="Frontend type (wib, wib2 or pds) and latency buffer implementation in case of pds (folly queue or skip list)")
+@click.option('--enable-dqm', is_flag=True, help="Enable Data Quality Monitoring")
 @click.argument('json_dir', type=click.Path())
 def cli(number_of_data_producers, emulator_mode, data_rate_slowdown_factor, run_number, trigger_rate_hz, trigger_window_before_ticks, trigger_window_after_ticks, token_count, data_file, output_path, enable_trace, use_felix, host_df, host_ru, host_trigger, host_hsi, 
         hsi_device_name, hsi_readout_period, use_hsi_hw, hsi_event_period, hsi_device_id, mean_hsi_signal_multiplicity, hsi_signal_emulation_mode, enabled_hsi_signals,
         ttcm_s1, ttcm_s2,
-        enable_raw_recording, raw_recording_output_dir, frontend_type, json_dir):
+        enable_raw_recording, raw_recording_output_dir, frontend_type, enable_dqm, json_dir):
     """
       JSON_DIR: Json file output folder
     """
@@ -180,7 +181,8 @@ def cli(number_of_data_producers, emulator_mode, data_rate_slowdown_factor, run_
             RAW_RECORDING_ENABLED = enable_raw_recording,
             RAW_RECORDING_OUTPUT_DIR = raw_recording_output_dir,
             FRONTEND_TYPE = frontend_type,
-            SYSTEM_TYPE = system_type
+            SYSTEM_TYPE = system_type,
+            DQM_ENABLED=enable_dqm
             ) for hostidx in range(len(host_ru))]
     console.log("readout cmd data:", cmd_data_readout)
 
