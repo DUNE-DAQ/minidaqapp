@@ -18,7 +18,7 @@ moo.otypes.load_types('flxlibs/felixcardreader.jsonnet')
 moo.otypes.load_types('readout/fakecardreader.jsonnet')
 moo.otypes.load_types('readout/datalinkhandler.jsonnet')
 moo.otypes.load_types('readout/datarecorder.jsonnet')
-
+moo.otypes.load_types('dqm/dqmprocessor.jsonnet')
 
 # Import new types
 import dunedaq.cmdlib.cmd as basecmd # AddressedCmd,
@@ -33,6 +33,8 @@ import dunedaq.readout.fakecardreader as fakecr
 import dunedaq.flxlibs.felixcardreader as flxcr
 import dunedaq.readout.datalinkhandler as dlh
 import dunedaq.readout.datarecorder as dr
+import dunedaq.dfmodules.triggerrecordbuilder as trb
+import dunedaq.dqm.dqmprocessor as dqmprocessor
 
 from appfwk.utils import acmd, mcmd, mrccmd, mspec
 
@@ -56,7 +58,8 @@ def generate(NETWORK_ENDPOINTS,
         RAW_RECORDING_ENABLED=False,
         RAW_RECORDING_OUTPUT_DIR=".",
         FRONTEND_TYPE='wib',
-        SYSTEM_TYPE='TPC'):
+        SYSTEM_TYPE='TPC',
+        DQM_ENABLED=False):
     """Generate the json configuration for the readout and DF process"""
 
     cmd_data = {}
@@ -90,42 +93,84 @@ def generate(NETWORK_ENDPOINTS,
             app.QueueSpec(inst=f"{FRONTEND_TYPE}_recording_link_{idx}", kind='FollySPSCQueue', capacity=100000)
             for idx in range(NUMBER_OF_DATA_PRODUCERS)
         ]
-    
+
+    if DQM_ENABLED:
+        queue_bare_specs += [
+            app.QueueSpec(inst=f"time_sync_dqm_q", kind='FollyMPMCQueue', capacity=1000),
+            app.QueueSpec(inst="data_fragments_q_dqm", kind='FollyMPMCQueue', capacity=1000),
+            app.QueueSpec(inst="trigger_decision_q_dqm", kind='FollySPSCQueue', capacity=20),
+            app.QueueSpec(inst="trigger_record_q_dqm", kind='FollySPSCQueue', capacity=20),
+        ] + [
+            app.QueueSpec(inst=f"data_requests_dqm_{idx}", kind='FollySPSCQueue', capacity=100)
+                for idx in range(MIN_LINK,MAX_LINK)
+        ]
 
     # Only needed to reproduce the same order as when using jsonnet
     queue_specs = app.QueueSpecs(sorted(queue_bare_specs, key=lambda x: x.inst))
 
     mod_specs = [
-        mspec("qton_timesync", "QueueToNetwork", [app.QueueInfo(name="input", inst="time_sync_q", dir="input")]),
+        # mspec("qton_timesync", "QueueToNetwork", [app.QueueInfo(name="input", inst="time_sync_q", dir="input")]),
         mspec("qton_fragments", "QueueToNetwork", [app.QueueInfo(name="input", inst="data_fragments_q", dir="input")]),
     ] + [
         mspec(f"ntoq_datareq_{idx}", "NetworkToQueue", [app.QueueInfo(name="output", inst=f"data_requests_{idx}", dir="output")]) for idx in range(MIN_LINK,MAX_LINK)
     ]
 
-    if RAW_RECORDING_ENABLED:
-        mod_specs = mod_specs + [
-            mspec(f"datahandler_{idx + MIN_LINK}", "DataLinkHandler", [
+
+    # There are two flags to be checked so a for loop is a compromise between
+    # so it's hard to make it in a single block without it being very ugly
+
+    for idx in range(NUMBER_OF_DATA_PRODUCERS):
+        ls = [
                 app.QueueInfo(name="raw_input", inst=f"{FRONTEND_TYPE}_link_{idx}", dir="input"),
                 app.QueueInfo(name="timesync", inst="time_sync_q", dir="output"),
-                app.QueueInfo(name="requests", inst=f"data_requests_{idx + MIN_LINK}", dir="input"),
-                app.QueueInfo(name="fragments", inst="data_fragments_q", dir="output"),
-                app.QueueInfo(name="raw_recording", inst=f"{FRONTEND_TYPE}_recording_link_{idx}", dir="output")
-            ]) for idx in range(NUMBER_OF_DATA_PRODUCERS)
-        ] + [
+                app.QueueInfo(name="data_requests_0", inst=f"data_requests_{idx + MIN_LINK}", dir="input"),
+                app.QueueInfo(name="data_response_0", inst="data_fragments_q", dir="output"),
+            ]
+
+        if RAW_RECORDING_ENABLED:
+            ls.append(app.QueueInfo(name="raw_recording", inst=f"{FRONTEND_TYPE}_recording_link_{idx}", dir="output"))
+        else: # This else can be removed once readout doesn't always check for the raw_recording queue
+            ls.append(app.QueueInfo(name="raw_recording", inst=f"{FRONTEND_TYPE}_recording_link_{idx}", dir="output"))
+
+        if DQM_ENABLED:
+            ls.extend([
+            app.QueueInfo(name="data_requests_1", inst=f"data_requests_dqm_{idx + MIN_LINK}", dir="input"),
+            app.QueueInfo(name="data_response_1", inst="data_fragments_q_dqm", dir="output")])
+        mod_specs += [mspec(f"datahandler_{idx + MIN_LINK}", "DataLinkHandler", ls)]
+
+    if RAW_RECORDING_ENABLED:
+        mod_specs += [
             mspec(f"data_recorder_{idx}", "DataRecorder", [
                 app.QueueInfo(name="raw_recording", inst=f"{FRONTEND_TYPE}_recording_link_{idx}", dir="input")
             ]) for idx in range(NUMBER_OF_DATA_PRODUCERS)
         ]
-    else:
-        mod_specs = mod_specs + [
-            mspec(f"datahandler_{idx + MIN_LINK}", "DataLinkHandler", [
-                app.QueueInfo(name="raw_input", inst=f"{FRONTEND_TYPE}_link_{idx}", dir="input"),
-                app.QueueInfo(name="timesync", inst="time_sync_q", dir="output"),
-                app.QueueInfo(name="requests", inst=f"data_requests_{idx + MIN_LINK}", dir="input"),
-                app.QueueInfo(name="fragments", inst="data_fragments_q", dir="output")
-            ]) for idx in range(NUMBER_OF_DATA_PRODUCERS)
+
+    mod_specs += [mspec("timesync_to_network", "QueueToNetwork",
+              [app.QueueInfo(name="input", inst="time_sync_q", dir="input")]
+              )]
+
+    if DQM_ENABLED:
+        mod_specs += [mspec("trb_dqm", "TriggerRecordBuilder", [
+                        app.QueueInfo(name="trigger_decision_input_queue", inst="trigger_decision_q_dqm", dir="input"),
+                        app.QueueInfo(name="trigger_record_output_queue", inst="trigger_record_q_dqm", dir="output"),
+                        app.QueueInfo(name="data_fragment_input_queue", inst="data_fragments_q_dqm", dir="input")
+                    ] + [
+                        app.QueueInfo(name=f"data_request_{idx}_output_queue", inst=f"data_requests_dqm_{idx}", dir="output")
+                            for idx in range(NUMBER_OF_DATA_PRODUCERS)
+                    ]),
+        ]
+        mod_specs += [mspec("dqmprocessor", "DQMProcessor", [
+                        app.QueueInfo(name="trigger_record_dqm_processor", inst="trigger_record_q_dqm", dir="input"),
+                        app.QueueInfo(name="trigger_decision_dqm_processor", inst="trigger_decision_q_dqm", dir="output"),
+                        # app.QueueInfo(name="timesync_dqm_processor", inst="time_sync_q", dir="input"),
+                        app.QueueInfo(name="timesync_dqm_processor", inst="time_sync_dqm_q", dir="input"),
+                    ]),
+
         ]
 
+        mod_specs += [mspec("dqm_subscriber", "NetworkToQueue",
+                [app.QueueInfo(name="output", inst="time_sync_dqm_q", dir="output")]
+                )]
     if FLX_INPUT:
         mod_specs.append(mspec("flxcard_0", "FelixCardReader", [
                         app.QueueInfo(name=f"output_{idx}", inst=f"{FRONTEND_TYPE}_link_{idx}", dir="output")
@@ -203,6 +248,36 @@ def generate(NETWORK_ENDPOINTS,
                         output_file = f"output_{idx + MIN_LINK}.out",
                         compression_algorithm = "None",
                         stream_buffer_size = 8388608)) for idx in range(NUMBER_OF_DATA_PRODUCERS)
+                ("trb_dqm", trb.ConfParams(
+                        general_queue_timeout=QUEUE_POP_WAIT_MS,
+                        map=trb.mapgeoidqueue([
+                                trb.geoidinst(region=0, element=idx, system="TPC", queueinstance=f"data_requests_dqm_{idx}") for idx in range(NUMBER_OF_DATA_PRODUCERS)
+                            ]),
+                        )),
+            ] + [
+                ('dqmprocessor', dqmprocessor.Conf(
+                        mode='debug' # normal or debug
+                        ))
+            ] + [
+                ("timesync_to_network", qton.Conf(msg_type="dunedaq::dfmessages::TimeSync",
+                                msg_module_name="TimeSyncNQ",
+                                sender_config=nos.Conf(ipm_plugin_type="ZmqPublisher",
+                                                        address=NETWORK_ENDPOINTS[f"timesync_{HOSTIDX}"],
+                                                        topic="Timesync",
+                                                        stype="msgpack")
+                                )
+                )
+            ] + [
+                ("dqm_subscriber", ntoq.Conf(msg_type="dunedaq::dfmessages::TimeSync",
+                                msg_module_name="TimeSyncNQ",
+                                receiver_config=nor.Conf(ipm_plugin_type="ZmqSubscriber",
+                                                        address=NETWORK_ENDPOINTS[f"timesync_{HOSTIDX}"],
+                                                        subscriptions=["Timesync"],
+                                                        # stype="msgpack")
+                                                         )
+                                )
+                )
+
     ])
 
 
@@ -214,7 +289,9 @@ def generate(NETWORK_ENDPOINTS,
             ("fake_source", startpars),
             ("flxcard.*", startpars),
             ("ntoq_datareq_.*", startpars),
-            ("ntoq_trigdec", startpars),])
+            ("ntoq_trigdec", startpars),
+            ("trb_dqm", startpars),
+            ("dqmprocessor", startpars),])
 
     cmd_data['stop'] = acmd([("ntoq_trigdec", None),
             ("ntoq_datareq_.*", None),
@@ -223,7 +300,9 @@ def generate(NETWORK_ENDPOINTS,
             ("datahandler_.*", None),
             ("data_recorder_.*", None),
             ("qton_timesync", None),
-            ("qton_fragments", None),])
+            ("qton_fragments", None),
+            ("trb_dqm", None),
+            ("dqmprocessor", None),])
 
     cmd_data['pause'] = acmd([("", None)])
 
