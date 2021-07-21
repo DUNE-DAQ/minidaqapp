@@ -261,6 +261,7 @@ def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowd
                 "DBT_AREA_ROOT": "getenv"
                 },
                 "cmd": ["CMD_FAC=rest://localhost:${APP_PORT}",
+                    "INFO_SVC=" + info_svc_uri,
                     "cd ${DBT_AREA_ROOT}",
                     "source dbt-env.sh",
                     "dbt-workarea-env",
@@ -277,6 +278,7 @@ def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowd
                     "PATH": "getenv"
                 },
                 "cmd": ["CMD_FAC=rest://localhost:${APP_PORT}",
+                    "INFO_SVC=" + info_svc_uri,
                     "cd ${APP_WD}",
                     "daq_application --name ${APP_NAME} -c ${CMD_FAC} -i ${INFO_SVC}"]
             }
@@ -293,8 +295,7 @@ def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowd
                 "DUNEDAQ_ERS_INFO": ers_info,
                 "DUNEDAQ_ERS_WARNING": ers_warning,
                 "DUNEDAQ_ERS_ERROR": ers_error,
-                "DUNEDAQ_ERS_FATAL": ers_fatal,
-                "INFO_SVC": info_svc_uri
+                "DUNEDAQ_ERS_FATAL": ers_fatal
             },
             "hosts": {
                 "host_df": host_df,
