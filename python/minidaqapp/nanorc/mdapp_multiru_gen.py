@@ -38,7 +38,6 @@ import click
 @click.option('--hsi-readout-period', default=1e3, help='Real HSI hardware only: Period between HSI hardware polling [us]')
 # fake hsi options
 @click.option('--use-hsi-hw', is_flag=True, default=False, help='Flag to control whether fake or real hardware HSI config is generated. Default is fake')
-@click.option('--hsi-event-period', default=1e9, help='Fake HSI only: how often are fake HSIEvents sent (given valid generated signal)')
 @click.option('--hsi-device-id', default=0, help='Fake HSI only: device ID of fake HSIEvents')
 @click.option('--mean-hsi-signal-multiplicity', default=1, help='Fake HSI only: rate of individual HSI signals in emulation mode 1')
 @click.option('--hsi-signal-emulation-mode', default=0, help='Fake HSI only: HSI signal emulation mode')
@@ -51,7 +50,7 @@ import click
 @click.option('--frontend-type', type=click.Choice(['wib', 'wib2', 'pds_queue', 'pds_list']), default='wib', help="Frontend type (wib, wib2 or pds) and latency buffer implementation in case of pds (folly queue or skip list)")
 @click.argument('json_dir', type=click.Path())
 def cli(number_of_data_producers, emulator_mode, data_rate_slowdown_factor, run_number, trigger_rate_hz, trigger_window_before_ticks, trigger_window_after_ticks, token_count, data_file, output_path, enable_trace, use_felix, host_df, host_ru, host_trigger, host_hsi, 
-        hsi_device_name, hsi_readout_period, use_hsi_hw, hsi_event_period, hsi_device_id, mean_hsi_signal_multiplicity, hsi_signal_emulation_mode, enabled_hsi_signals,
+        hsi_device_name, hsi_readout_period, use_hsi_hw, hsi_device_id, mean_hsi_signal_multiplicity, hsi_signal_emulation_mode, enabled_hsi_signals,
         ttcm_s1, ttcm_s2,
         enable_raw_recording, raw_recording_output_dir, frontend_type, json_dir):
     """
@@ -127,14 +126,12 @@ def cli(number_of_data_producers, emulator_mode, data_rate_slowdown_factor, run_
             HSI_DEVICE_NAME = hsi_device_name,
         )
     else:
-        #We use the option --trigger-rate-hz option (default=1) to devide hsi_event_period, this is our new HSI_EVENT_PERIOD_NS
-        hsi_event_period_rate_hz = math.floor((hsi_event_period/trigger_rate_hz)) 
         cmd_data_hsi = fake_hsi_gen.generate(
             network_endpoints,
             RUN_NUMBER = run_number,
             CLOCK_SPEED_HZ = CLOCK_SPEED_HZ,
             DATA_RATE_SLOWDOWN_FACTOR = data_rate_slowdown_factor,
-            HSI_EVENT_PERIOD_NS = hsi_event_period_rate_hz,
+            TRIGGER_RATE_HZ = trigger_rate_hz,
             HSI_DEVICE_ID = hsi_device_id,
             MEAN_SIGNAL_MULTIPLICITY = mean_hsi_signal_multiplicity,
             SIGNAL_EMULATION_MODE = hsi_signal_emulation_mode,
@@ -221,7 +218,8 @@ def cli(number_of_data_producers, emulator_mode, data_rate_slowdown_factor, run_
                 cfg['order'] = start_order[::-1]
             elif c in ('resume', 'pause'):
                 del cfg['apps'][app_df]
-                del cfg['apps'][app_hsi]
+                if use_hsi_hw:
+                    del cfg['apps'][app_hsi]
                 for ruapp in app_ru:
                     del cfg['apps'][ruapp]
 

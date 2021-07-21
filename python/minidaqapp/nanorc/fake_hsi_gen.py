@@ -53,7 +53,7 @@ def generate(
         RUN_NUMBER = 333,
         CLOCK_SPEED_HZ: int = 50000000,
         DATA_RATE_SLOWDOWN_FACTOR: int = 1,
-        HSI_EVENT_PERIOD_NS: int = 20,
+        TRIGGER_RATE_HZ: int = 1,
         HSI_DEVICE_ID: int = 0,
         MEAN_SIGNAL_MULTIPLICITY: int = 0,
         SIGNAL_EMULATION_MODE: int = 0,
@@ -96,11 +96,13 @@ def generate(
 
     cmd_data['init'] = app.Init(queues=queue_specs, modules=mod_specs)
 
+    trigger_interval_ticks=math.floor((1/TRIGGER_RATE_HZ) * CLOCK_SPEED_HZ/DATA_RATE_SLOWDOWN_FACTOR)
+    
     cmd_data['conf'] = acmd([
 
                 ("fhsig", fhsig.Conf(
                         clock_frequency=CLOCK_SPEED_HZ/DATA_RATE_SLOWDOWN_FACTOR,
-                        event_period=HSI_EVENT_PERIOD_NS,
+                        trigger_interval_ticks=trigger_interval_ticks,
                         mean_signal_multiplicity=MEAN_SIGNAL_MULTIPLICITY,
                         signal_emulation_mode=SIGNAL_EMULATION_MODE,
                         enabled_signals=ENABLED_SIGNALS,
@@ -124,7 +126,9 @@ def generate(
     ])
  
 
-    startpars = rccmd.StartParams(run=RUN_NUMBER)
+    startpars = rccmd.StartParams(run=RUN_NUMBER, trigger_interval_ticks = trigger_interval_ticks)
+    resumepars = rccmd.ResumeParams(trigger_interval_ticks = trigger_interval_ticks)
+
     cmd_data['start'] = acmd([
             ("ntoq_timesync_.*", startpars),
             ("fhsig", startpars),
@@ -142,8 +146,8 @@ def generate(
         ])
 
     cmd_data['resume'] = acmd([
-            ("", None)
-        ])
+        ("fhsig", resumepars)
+    ])
 
     cmd_data['scrap'] = acmd([
             ("", None)
