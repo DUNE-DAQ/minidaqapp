@@ -248,12 +248,13 @@ def generate(NETWORK_ENDPOINTS,
                         output_file = f"output_{idx + MIN_LINK}.out",
                         compression_algorithm = "None",
                         stream_buffer_size = 8388608)) for idx in range(NUMBER_OF_DATA_PRODUCERS)
+            ] + [
                 ("trb_dqm", trb.ConfParams(
                         general_queue_timeout=QUEUE_POP_WAIT_MS,
                         map=trb.mapgeoidqueue([
                                 trb.geoidinst(region=0, element=idx, system="TPC", queueinstance=f"data_requests_dqm_{idx}") for idx in range(NUMBER_OF_DATA_PRODUCERS)
                             ]),
-                        )),
+                        ))
             ] + [
                 ('dqmprocessor', dqmprocessor.Conf(
                         mode='debug' # normal or debug
