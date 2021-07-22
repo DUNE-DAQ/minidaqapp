@@ -157,7 +157,7 @@ def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowd
 
     timing_cmds_port=port+total_number_of_data_producers
     if use_timing_hw:
-        network_endpoints[f"timing_cmds"] = "tcp://{host_timing_hw}"+f"{timing_cmds_port}"
+        network_endpoints[f"timing_cmds"] = "tcp://{host_timing_hw}:"+f"{timing_cmds_port}"
 
     cardid = {}
     host_id_dict = {}
@@ -300,7 +300,7 @@ def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowd
             cfg = {
                 "apps": { app: f'data/{app}_{c}' for app in apps }
             }
-            if c in ['start','init']:
+            if c in ['start','init', 'conf']:
                 cfg['order'] = start_order
             elif c == 'stop':
                 cfg['order'] = start_order[::-1]

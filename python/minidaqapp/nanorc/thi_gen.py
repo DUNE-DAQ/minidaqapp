@@ -87,7 +87,7 @@ def generate(
     mod_specs = [
     
                     mspec("ntoq_timing_cmds", "NetworkToQueue", [
-                                    app.QueueInfo(name="output", inst="hsievent_from_netq", dir="output")
+                                    app.QueueInfo(name="output", inst="ntoq_timing_cmds", dir="output")
                                 ]),
 
                     app.ModSpec(inst="thi", plugin="TimingHardwareManagerPDI", data=thi_init_data),
@@ -97,13 +97,13 @@ def generate(
 
     cmd_data['conf'] = acmd([
 
-                ("qton_hsievent", qton.Conf(msg_type="dunedaq::timinglibs::timingcmd::TimingHwCmd",
-                                           msg_module_name="TimingHwCmdNQ",
-                                           sender_config=nos.Conf(ipm_plugin_type="ZmqReceiver",
-                                                                  address=NETWORK_ENDPOINTS["timing_cmds"],
-                                                                  stype="msgpack")
-                                           )
-                 ),
+                ("ntoq_timing_cmds", ntoq.Conf(msg_type="dunedaq::timinglibs::timingcmd::TimingHwCmd",
+                                               msg_module_name="TimingHwCmdNQ",
+                                               receiver_config=nor.Conf(ipm_plugin_type="ZmqReceiver",
+                                                                        address=NETWORK_ENDPOINTS["timing_cmds"]
+                                                                        )
+                                              )
+                ),
     ])
  
 
