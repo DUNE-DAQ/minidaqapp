@@ -34,6 +34,8 @@ import click
 @click.option('--host-ru', multiple=True, default=['localhost'], help="This option is repeatable, with each repetition adding an additional ru process.")
 @click.option('--host-trigger', default='localhost', help='Host to run the trigger app on')
 @click.option('--host-hsi', default='localhost', help='Host to run the HSI app on')
+@click.option('--host-timing-hw', default='np04-srv-012.cern.ch', help='Host to run the timing hardware interface app on')
+@click.option('--use-timing-hw', is_flag=True, default=False, help='Flag to control whether we are controlling timing hardware')
 # hsi readout options
 @click.option('--hsi-device-name', default="BOREAS_TLU", help='Real HSI hardware only: device name of HSI hw')
 @click.option('--hsi-readout-period', default=1e3, help='Real HSI hardware only: Period between HSI hardware polling [us]')
@@ -63,7 +65,7 @@ import click
 @click.argument('json_dir', type=click.Path())
 
 def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowdown_factor, run_number, trigger_rate_hz, trigger_window_before_ticks, trigger_window_after_ticks,
-        token_count, data_file, output_path, disable_trace, use_felix, host_df, host_ru, host_trigger, host_hsi, 
+        token_count, data_file, output_path, disable_trace, use_felix, host_df, host_ru, host_trigger, host_hsi, host_hsi, host_timing_hw, use_timing_hw,
         hsi_device_name, hsi_readout_period, use_hsi_hw, hsi_device_id, mean_hsi_signal_multiplicity, hsi_signal_emulation_mode, enabled_hsi_signals,
         ttcm_s1, ttcm_s2, trigger_activity_plugin, trigger_activity_config, trigger_candidate_plugin, trigger_candidate_config,
         enable_raw_recording, raw_recording_output_dir, frontend_type, opmon_impl, enable_dqm, ers_impl, dqm_impl, pocket_url, enable_software_tpg, json_dir):
@@ -80,6 +82,8 @@ def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowd
     from . import hsi_gen
     console.log("Loading fake hsi config generator")
     from . import fake_hsi_gen
+    console.log("Loading timing hardware config generator")
+    from . import thi_gen
     console.log(f"Generating configs for hosts trigger={host_trigger} dataflow={host_df} readout={host_ru} hsi={host_hsi}")
 
     total_number_of_data_producers = 0
@@ -151,6 +155,10 @@ def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowd
 
 
 
+    timing_cmds_port=port+total_number_of_data_producers
+    if use_timing_hw:
+        network_endpoints[f"timing_cmds"] = "tcp://{host_timing_hw}"+f"{timing_cmds_port}"
+
     cardid = {}
     host_id_dict = {}
     for hostidx in range(len(host_ru)):
@@ -174,6 +182,13 @@ def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowd
             host_id_dict[host_ru[hostidx]] = 0
         hostidx = hostidx + 1
     
+    if use_timing_hw:
+        cmd_data_thi = thi_gen.generate(
+            network_endpoints,
+            HSI_DEVICE_NAME=hsi_device_name,
+        )
+        console.log("thi cmd data:", cmd_data_thi)
+
     if use_hsi_hw:
         cmd_data_hsi = hsi_gen.generate(network_endpoints,
             RUN_NUMBER = run_number,
@@ -246,6 +261,7 @@ def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowd
     data_dir = join(json_dir, 'data')
     os.makedirs(data_dir)
 
+    app_thi="thi"
     app_hsi = "hsi"
     app_trigger = "trigger"
     app_df = "dataflow"
@@ -255,9 +271,18 @@ def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowd
     jf_trigemu = join(data_dir, app_trigger)
     jf_df = join(data_dir, app_df)
     jf_ru = [join(data_dir, app_ru[idx]) for idx in range(len(host_ru))]
+    if use_timing_hw:
+        jf_thi=join(data_dir, app_thi)
 
     cmd_set = ["init", "conf", "start", "stop", "pause", "resume", "scrap", "record"]
-    for app,data in [(app_hsi, cmd_data_hsi), (app_trigger, cmd_data_trigger), (app_df, cmd_data_dataflow)] + list(zip(app_ru, cmd_data_readout)):
+    
+    apps =  [app_hsi, app_trigger, app_df] + app_ru
+    cmds_data =  [cmd_data_hsi, cmd_data_trigger, cmd_data_dataflow] + cmd_data_readout
+    if use_timing_hw:
+        apps.append(app_thi)
+        cmds_data.append(cmd_data_thi)
+
+    for app,data in zip(apps, cmds_data):
         console.log(f"Generating {app} command data json files")
         for c in cmd_set:
             with open(f'{join(data_dir, app)}_{c}.json', 'w') as f:
@@ -265,13 +290,17 @@ def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowd
 
 
     console.log(f"Generating top-level command json files")
+
     start_order = [app_df] + [app_trigger] + app_ru + [app_hsi]
+    if use_timing_hw:
+        start_order.insert(0, app_thi)
+
     for c in cmd_set:
         with open(join(json_dir,f'{c}.json'), 'w') as f:
             cfg = {
-                "apps": { app: f'data/{app}_{c}' for app in [app_trigger, app_df, app_hsi] + app_ru }
+                "apps": { app: f'data/{app}_{c}' for app in apps }
             }
-            if c == 'start':
+            if c in ['start','init']:
                 cfg['order'] = start_order
             elif c == 'stop':
                 cfg['order'] = start_order[::-1]
@@ -279,6 +308,8 @@ def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowd
                 del cfg['apps'][app_df]
                 if use_hsi_hw:
                     del cfg['apps'][app_hsi]
+                if use_timing_hw:
+                    del cfg['apps'][app_thi]
                 for ruapp in app_ru:
                     del cfg['apps'][ruapp]
 
@@ -371,6 +402,14 @@ def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowd
                     "host": f"host_ru{hostidx}",
                     "port": appport }
             appport = appport + 1
+        
+        if use_timing_hw:
+            cfg["hosts"][f"host_timing_hw"] = host_timing_hw
+            cfg["apps"][app_thi] = {
+                    "exec": "daq_application",
+                    "host": "host_timing_hw",
+                    "port": appport+len(host_ru) }
+
         json.dump(cfg, f, indent=4, sort_keys=True)
     console.log(f"MDAapp config generated in {json_dir}")
 
