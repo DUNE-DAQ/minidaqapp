@@ -117,7 +117,8 @@ def generate(
 
                 (f"ntoq_timesync_{idx}", ntoq.Conf(msg_type="dunedaq::dfmessages::TimeSync",
                                            msg_module_name="TimeSyncNQ",
-                                           receiver_config=nor.Conf(ipm_plugin_type="ZmqReceiver",
+                                           receiver_config=nor.Conf(ipm_plugin_type="ZmqSubscriber",
+								    subscriptions=["Timesync"],
                                                                     address=NETWORK_ENDPOINTS[inst])
                                            )
                 ) for idx, inst in enumerate(NETWORK_ENDPOINTS) if "timesync" in inst
