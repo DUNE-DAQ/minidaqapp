@@ -70,7 +70,7 @@ def generate(
 
     # Define modules and queues
     queue_bare_specs = [
-            app.QueueSpec(inst="time_sync_from_netq", kind='FollySPSCQueue', capacity=100),
+            app.QueueSpec(inst="time_sync_from_netq", kind='FollyMPMCQueue', capacity=100),
             app.QueueSpec(inst="hsievent_q_to_net", kind='FollySPSCQueue', capacity=100),
         ]
 
