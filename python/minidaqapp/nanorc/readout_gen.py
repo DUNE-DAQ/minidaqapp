@@ -257,7 +257,8 @@ def generate(NETWORK_ENDPOINTS,
                         ))
             ] + [
                 ('dqmprocessor', dqmprocessor.Conf(
-                        mode='debug' # normal or debug
+                        mode='debug', # normal or debug
+                        sdqm=[1, 1, 1],
                         ))
             ] + [
                 ("timesync_to_network", qton.Conf(msg_type="dunedaq::dfmessages::TimeSync",
