@@ -101,7 +101,7 @@ def generate(NETWORK_ENDPOINTS,
             app.QueueSpec(inst="trigger_decision_q_dqm", kind='FollySPSCQueue', capacity=20),
             app.QueueSpec(inst="trigger_record_q_dqm", kind='FollySPSCQueue', capacity=20),
         ] + [
-            app.QueueSpec(inst=f"data_requests_dqm_{idx}", kind='FollySPSCQueue', capacity=100)
+            app.QueueSpec(inst=f"data_requests_dqm_{idx+MIN_LINK}", kind='FollySPSCQueue', capacity=100)
                 for idx in range(NUMBER_OF_DATA_PRODUCERS)
         ]
 
@@ -134,7 +134,7 @@ def generate(NETWORK_ENDPOINTS,
 
         if DQM_ENABLED:
             ls.extend([
-            app.QueueInfo(name="data_requests_1", inst=f"data_requests_dqm_{idx}", dir="input"),
+            app.QueueInfo(name="data_requests_1", inst=f"data_requests_dqm_{idx+MIN_LINK}", dir="input"),
             app.QueueInfo(name="data_response_1", inst="data_fragments_q_dqm", dir="output")])
         mod_specs += [mspec(f"datahandler_{idx + MIN_LINK}", "DataLinkHandler", ls)]
 
@@ -155,7 +155,8 @@ def generate(NETWORK_ENDPOINTS,
                         app.QueueInfo(name="trigger_record_output_queue", inst="trigger_record_q_dqm", dir="output"),
                         app.QueueInfo(name="data_fragment_input_queue", inst="data_fragments_q_dqm", dir="input")
                     ] + [
-                        app.QueueInfo(name=f"data_request_{idx}_output_queue", inst=f"data_requests_dqm_{idx}", dir="output")
+                        app.QueueInfo(name=f"data_request_{idx}_output_queue", inst=f"data_requests_dqm_{idx+MIN_LINK}", dir="output")
+                            # for idx in range(NUMBER_OF_DATA_PRODUCERS)
                             for idx in range(NUMBER_OF_DATA_PRODUCERS)
                     ]),
         ]
@@ -252,7 +253,7 @@ def generate(NETWORK_ENDPOINTS,
                 ("trb_dqm", trb.ConfParams(
                         general_queue_timeout=QUEUE_POP_WAIT_MS,
                         map=trb.mapgeoidqueue([
-                                trb.geoidinst(region=0, element=idx, system="TPC", queueinstance=f"data_requests_dqm_{idx}") for idx in range(NUMBER_OF_DATA_PRODUCERS)
+                                trb.geoidinst(region=0, element=idx, system="TPC", queueinstance=f"data_requests_dqm_{idx+MIN_LINK}") for idx in range(NUMBER_OF_DATA_PRODUCERS)
                             ]),
                         ))
             ] + [
