@@ -102,7 +102,7 @@ def generate(NETWORK_ENDPOINTS,
             app.QueueSpec(inst="trigger_record_q_dqm", kind='FollySPSCQueue', capacity=20),
         ] + [
             app.QueueSpec(inst=f"data_requests_dqm_{idx}", kind='FollySPSCQueue', capacity=100)
-                for idx in range(MIN_LINK,MAX_LINK)
+                for idx in range(NUMBER_OF_DATA_PRODUCERS)
         ]
 
     # Only needed to reproduce the same order as when using jsonnet
@@ -134,7 +134,7 @@ def generate(NETWORK_ENDPOINTS,
 
         if DQM_ENABLED:
             ls.extend([
-            app.QueueInfo(name="data_requests_1", inst=f"data_requests_dqm_{idx + MIN_LINK}", dir="input"),
+            app.QueueInfo(name="data_requests_1", inst=f"data_requests_dqm_{idx}", dir="input"),
             app.QueueInfo(name="data_response_1", inst="data_fragments_q_dqm", dir="output")])
         mod_specs += [mspec(f"datahandler_{idx + MIN_LINK}", "DataLinkHandler", ls)]
 
