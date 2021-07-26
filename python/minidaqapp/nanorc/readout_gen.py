@@ -116,8 +116,8 @@ def generate(NETWORK_ENDPOINTS,
     ]
 
 
-    # There are two flags to be checked so a for loop is a compromise between
-    # so it's hard to make it in a single block without it being very ugly
+    # There are two flags to be checked so I think a for loop
+    # is the closest way to the blocks that are being used here
 
     for idx in range(NUMBER_OF_DATA_PRODUCERS):
         ls = [
@@ -129,7 +129,9 @@ def generate(NETWORK_ENDPOINTS,
 
         if RAW_RECORDING_ENABLED:
             ls.append(app.QueueInfo(name="raw_recording", inst=f"{FRONTEND_TYPE}_recording_link_{idx}", dir="output"))
-        else: # This else can be removed once readout doesn't always check for the raw_recording queue
+        else:
+            # This else can be removed once readout doesn't always check for the raw_recording queue
+            # At the moment it is needed or it won't find the queue and crash
             ls.append(app.QueueInfo(name="raw_recording", inst=f"{FRONTEND_TYPE}_recording_link_{idx}", dir="output"))
 
         if DQM_ENABLED:
