@@ -262,6 +262,7 @@ def generate(NETWORK_ENDPOINTS,
                 ('dqmprocessor', dqmprocessor.Conf(
                         mode='debug', # normal or debug
                         sdqm=[1, 1, 1],
+                        kafka_address="dqmbroadcast:9092",
                         ))
             ] + [
                 ("timesync_to_network", qton.Conf(msg_type="dunedaq::dfmessages::TimeSync",
