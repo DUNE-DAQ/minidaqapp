@@ -13,6 +13,7 @@ moo.otypes.load_types('trigger/intervaltccreator.jsonnet')
 moo.otypes.load_types('trigger/moduleleveltrigger.jsonnet')
 moo.otypes.load_types('trigger/fakedataflow.jsonnet')
 moo.otypes.load_types('trigger/timingtriggercandidatemaker.jsonnet')
+moo.otypes.load_types('trigger/tpsetbuffercreator.jsonnet')
 
 moo.otypes.load_types('nwqueueadapters/queuetonetwork.jsonnet')
 moo.otypes.load_types('nwqueueadapters/networktoqueue.jsonnet')
@@ -20,14 +21,15 @@ moo.otypes.load_types('nwqueueadapters/networkobjectreceiver.jsonnet')
 moo.otypes.load_types('nwqueueadapters/networkobjectsender.jsonnet')
 
 # Import new types
-import dunedaq.cmdlib.cmd as basecmd # AddressedCmd, 
-import dunedaq.rcif.cmd as rccmd # AddressedCmd, 
-import dunedaq.appfwk.cmd as cmd # AddressedCmd, 
+import dunedaq.cmdlib.cmd as basecmd # AddressedCmd,
+import dunedaq.rcif.cmd as rccmd # AddressedCmd,
+import dunedaq.appfwk.cmd as cmd # AddressedCmd,
 import dunedaq.appfwk.app as app # AddressedCmd,
 import dunedaq.trigger.intervaltccreator as itcc
 import dunedaq.trigger.moduleleveltrigger as mlt
 import dunedaq.trigger.fakedataflow as fdf
 import dunedaq.trigger.timingtriggercandidatemaker as ttcm
+import dunedaq.trigger.tpsetbuffercreator as buf
 
 import dunedaq.nwqueueadapters.networktoqueue as ntoq
 import dunedaq.nwqueueadapters.queuetonetwork as qton
@@ -63,15 +65,30 @@ def generate(
     # Define modules and queues
     queue_bare_specs = [
         app.QueueSpec(inst="hsievent_from_netq", kind='FollyMPMCQueue', capacity=1000),
-        app.QueueSpec(inst="token_from_netq", kind='FollySPSCQueue', capacity=2000),        
+        app.QueueSpec(inst="token_from_netq", kind='FollySPSCQueue', capacity=2000),
         app.QueueSpec(inst="trigger_decision_to_netq", kind='FollySPSCQueue', capacity=2000),
         app.QueueSpec(inst="trigger_candidate_q", kind='FollySPSCQueue', capacity=2000),
+        app.QueueSpec(inst="tpset_q", kind='FollySPSCQueue', capacity=1000),
+        app.QueueSpec(inst="fragment_q", kind='FollySPSCQueue', capacity=1000),
+        app.QueueSpec(inst="data_request_q", kind='FollySPSCQueue', capacity=1000),
     ]
 
     # Only needed to reproduce the same order as when using jsonnet
     queue_specs = app.QueueSpecs(sorted(queue_bare_specs, key=lambda x: x.inst))
 
     mod_specs = [
+
+        mspec(f"ntoq_tpset", "NetworkToQueue", [
+            app.QueueInfo(name="output", inst="tpset_q", dir="output")
+        ]),
+
+        mspec(f"ntoq_data_request", "NetworkToQueue", [
+            app.QueueInfo(name="output", inst="data_request_q", dir="output")
+        ]),
+
+        mspec(f"qton_fragment", "QueueToNetwork", [
+            app.QueueInfo(name="input", inst="fragment_q", dir="input")
+        ]),
 
         mspec("ntoq_hsievent", "NetworkToQueue", [
                         app.QueueInfo(name="output", inst="hsievent_from_netq", dir="output")
@@ -96,6 +113,11 @@ def generate(
             app.QueueInfo(name="output", inst="trigger_candidate_q", dir="output"),
         ]),
 
+        mspec("buf", "TPSetBufferCreator", [
+            app.QueueInfo(name="tpset_source", inst="tpset_q", dir="input"),
+            app.QueueInfo(name="data_request_source", inst="data_request_q", dir="input"),
+            app.QueueInfo(name="fragment_sink", inst="fragment_q", dir="output"),
+        ]),
 
     ]
 
@@ -104,9 +126,13 @@ def generate(
     cmd_data['conf'] = acmd([
         ("mlt", mlt.ConfParams(
             links=[mlt.GeoID(system=SYSTEM_TYPE, region=0, element=idx) for idx in range(NUMBER_OF_DATA_PRODUCERS)],
-            initial_token_count=TOKEN_COUNT                    
+            initial_token_count=TOKEN_COUNT
         )),
-        
+
+        ("buf", buf.Conf(
+            tpset_buffer_size=10000,
+        )),
+
         ("ttcm", ttcm.Conf(
                         s1=ttcm.map_t(signal_type=TTCM_S1,
                                       time_before=TRIGGER_WINDOW_BEFORE_TICKS,
@@ -122,7 +148,29 @@ def generate(
                                            receiver_config=nor.Conf(ipm_plugin_type="ZmqReceiver",
                                                                     address=NETWORK_ENDPOINTS["hsievent"])
                                            )
-                ),
+         ),
+
+        ("ntoq_tpset", ntoq.Conf(msg_type="dunedaq::trigger::TPSet",
+                                           msg_module_name="TPSetNQ",
+                                           receiver_config=nor.Conf(ipm_plugin_type="ZmqSubscriber",
+                                                                    address=NETWORK_ENDPOINTS["tpsets_0"],
+                                                                    subscriptions=["tpsets"])
+                                           )
+         ),
+
+        ("ntoq_data_request", ntoq.Conf(msg_type="dunedaq::dfmessages::DataRequest",
+                                           msg_module_name="DataRequestNQ",
+                                           receiver_config=nor.Conf(ipm_plugin_type="ZmqReceiver",
+                                                                    address=NETWORK_ENDPOINTS["datareq_0"])
+                                           )
+         ),
+
+        ("qton_fragment", qton.Conf(msg_type="std::unique_ptr<dunedaq::dataformats::Fragment>",
+                                           msg_module_name="FragmentNQ",
+                                           sender_config=nos.Conf(ipm_plugin_type="ZmqSender",
+                                                                  address=NETWORK_ENDPOINTS[f"frags_tpset"],
+                                                                  stype="msgpack"))),
+
         ("ntoq_token", ntoq.Conf(msg_type="dunedaq::dfmessages::TriggerDecisionToken",
                                            msg_module_name="TriggerDecisionTokenNQ",
                                            receiver_config=nor.Conf(ipm_plugin_type="ZmqReceiver",
@@ -139,19 +187,23 @@ def generate(
 
     startpars = rccmd.StartParams(run=1)
     cmd_data['start'] = acmd([
+        ("buf", startpars),
         ("mlt", startpars),
         ("ttcm", startpars),
         ("ntoq_hsievent", startpars),
         ("ntoq_token", startpars),
         ("qton_trigdec", startpars),
+        ("ntoq_tpset", startpars),
     ])
 
     cmd_data['stop'] = acmd([
+        ("ntoq_hsievent", None),
+        ("ntoq_token", None),
+        ("qton_trigdec", None),
+        ("ntoq_tpset", None),
         ("mlt", None),
         ("ttcm", None),
-        ("ntoq_hsievent", None),
-        ("ntoq_token", startpars),
-        ("qton_trigdec", startpars),
+        ("buf", None),
     ])
 
     cmd_data['pause'] = acmd([

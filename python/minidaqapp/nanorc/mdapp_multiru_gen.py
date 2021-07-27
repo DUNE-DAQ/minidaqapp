@@ -55,7 +55,7 @@ import click
 @click.argument('json_dir', type=click.Path())
 
 def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowdown_factor, run_number, trigger_rate_hz, trigger_window_before_ticks, trigger_window_after_ticks,
-        token_count, data_file, output_path, disable_trace, use_felix, host_df, host_ru, host_trigger, host_hsi, 
+        token_count, data_file, output_path, disable_trace, use_felix, host_df, host_ru, host_trigger, host_hsi,
         hsi_device_name, hsi_readout_period, use_hsi_hw, hsi_device_id, mean_hsi_signal_multiplicity, hsi_signal_emulation_mode, enabled_hsi_signals,
         ttcm_s1, ttcm_s2,
         enable_raw_recording, raw_recording_output_dir, frontend_type, opmon_impl, ers_impl, pocket_url, json_dir):
@@ -83,7 +83,7 @@ def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowd
     else:
         total_number_of_data_producers = number_of_data_producers * len(host_ru)
         console.log(f"10 or fewer data producers were requested: Will setup {number_of_data_producers} per host, for a total of {total_number_of_data_producers}")
-        
+
 
     if token_count > 0:
         df_token_count = 0
@@ -130,12 +130,18 @@ def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowd
         ers_fatal = "erstrace,lstderr"
 
     port = 12347
-    for idx in range(total_number_of_data_producers):
+    for idx in range(total_number_of_data_producers+1):
         network_endpoints[f"datareq_{idx}"] = "tcp://{host_df}:" + f"{port}"
         port = port + 1
 
     cardid = {}
     host_id_dict = {}
+
+    network_endpoints['tpset'] = "tcp://{host_ru0}:"+str(port)
+    port += 1
+    network_endpoints['frags_tpset'] = "tcp://{host_trigger}:"+str(port)
+    port += 1
+
     for hostidx in range(len(host_ru)):
         # Should end up something like 'network_endpoints[timesync_0]:
         # "tcp://{host_ru0}:12347"'
@@ -143,6 +149,9 @@ def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowd
         port = port + 1
         network_endpoints[f"frags_{hostidx}"] = "tcp://{host_ru" + f"{hostidx}" + "}:" + f"{port}"
         port = port + 1
+        network_endpoints[f"tpsets_{hostidx}"] = "tcp://{host_ru" + f"{hostidx}" + "}:" + f"{port}"
+        port = port + 1
+
         if host_ru[hostidx] in host_id_dict:
             host_id_dict[host_ru[hostidx]] = host_id_dict[host_ru[hostidx]] + 1
             cardid[hostidx] = host_id_dict[host_ru[hostidx]]
@@ -150,7 +159,7 @@ def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowd
             cardid[hostidx] = 0
             host_id_dict[host_ru[hostidx]] = 0
         hostidx = hostidx + 1
-    
+
     if use_hsi_hw:
         cmd_data_hsi = hsi_gen.generate(network_endpoints,
             RUN_NUMBER = run_number,
@@ -167,7 +176,7 @@ def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowd
             MEAN_SIGNAL_MULTIPLICITY = mean_hsi_signal_multiplicity,
             SIGNAL_EMULATION_MODE = hsi_signal_emulation_mode,
             ENABLED_SIGNALS =  enabled_hsi_signals,)
-    
+
     console.log("hsi cmd data:", cmd_data_hsi)
 
     cmd_data_trigger = trigger_gen.generate(network_endpoints,
@@ -183,7 +192,7 @@ def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowd
 
     cmd_data_dataflow = dataflow_gen.generate(network_endpoints,
         NUMBER_OF_DATA_PRODUCERS = total_number_of_data_producers,
-        RUN_NUMBER = run_number, 
+        RUN_NUMBER = run_number,
         OUTPUT_PATH = output_path,
         TOKEN_COUNT = df_token_count,
         SYSTEM_TYPE = system_type)
@@ -193,7 +202,7 @@ def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowd
             NUMBER_OF_DATA_PRODUCERS = number_of_data_producers,
             EMULATOR_MODE = emulator_mode,
             DATA_RATE_SLOWDOWN_FACTOR = data_rate_slowdown_factor,
-            RUN_NUMBER = run_number, 
+            RUN_NUMBER = run_number,
             DATA_FILE = data_file,
             FLX_INPUT = use_felix,
             CLOCK_SPEED_HZ = CLOCK_SPEED_HZ,
@@ -293,7 +302,8 @@ def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowd
                 "DUNEDAQ_ERS_INFO": ers_info,
                 "DUNEDAQ_ERS_WARNING": ers_warning,
                 "DUNEDAQ_ERS_ERROR": ers_error,
-                "DUNEDAQ_ERS_FATAL": ers_fatal
+                "DUNEDAQ_ERS_FATAL": ers_fatal,
+                "DUNEDAQ_ERS_DEBUG_LEVEL": "getenv"
             },
             "hosts": {
                 "host_df": host_df,
