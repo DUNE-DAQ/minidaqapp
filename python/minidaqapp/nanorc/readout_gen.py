@@ -153,7 +153,8 @@ def generate(NETWORK_ENDPOINTS,
 			link_number = idx,
 			time_tick_diff = 25,
 			frame_size = 464,
-			response_delay = 0)) for idx in range(MIN_LINK,MAX_LINK)
+			response_delay = 0,
+			fragment_type = "kTPCData")) for idx in range(MIN_LINK,MAX_LINK)
             ] + [
                 (f"data_recorder_{idx}", dr.Conf(
                         output_file = f"output_{idx + MIN_LINK}.out",
