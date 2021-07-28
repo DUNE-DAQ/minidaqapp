@@ -260,7 +260,7 @@ def generate(NETWORK_ENDPOINTS,
                         ))
             ] + [
                 ('dqmprocessor', dqmprocessor.Conf(
-                        mode='debug', # normal or debug
+                        mode='normal', # normal or debug
                         sdqm=[1, 1, 1],
                         kafka_address="dqmbroadcast:9092",
                         ))
