@@ -46,6 +46,10 @@ import click
 # trigger options
 @click.option('--ttcm-s1', default=1, help="Timing trigger candidate maker accepted HSI signal ID 1")
 @click.option('--ttcm-s2', default=2, help="Timing trigger candidate maker accepted HSI signal ID 2")
+@click.option('--trigger-activity-plugin', default='TriggerActivityMakerPrescalePlugin', help="Trigger activity algorithm plugin")
+@click.option('--trigger-activity-config', default='dict(prescale=100)', help="Trigger activity algorithm config (string containing python dictionary)")
+@click.option('--trigger-candidate-plugin', default='TriggerCandidateMakerPrescalePlugin', help="Trigger candidate algorithm plugin")
+@click.option('--trigger-candidate-config', default='dict(prescale=100)', help="Trigger candidate algorithm config (string containing python dictionary)")
 
 @click.option('--enable-raw-recording', is_flag=True, help="Add queues and modules necessary for the record command")
 @click.option('--raw-recording-output-dir', type=click.Path(), default='.', help="Output directory where recorded data is written to. Data for each link is written to a separate file")
@@ -60,7 +64,7 @@ import click
 def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowdown_factor, run_number, trigger_rate_hz, trigger_window_before_ticks, trigger_window_after_ticks,
         token_count, data_file, output_path, disable_trace, use_felix, host_df, host_ru, host_trigger, host_hsi, 
         hsi_device_name, hsi_readout_period, use_hsi_hw, hsi_device_id, mean_hsi_signal_multiplicity, hsi_signal_emulation_mode, enabled_hsi_signals,
-        ttcm_s1, ttcm_s2,
+        ttcm_s1, ttcm_s2, trigger_activity_plugin, trigger_activity_config, trigger_candidate_plugin, trigger_candidate_config,
         enable_raw_recording, raw_recording_output_dir, frontend_type, opmon_impl, enable_dqm, ers_impl, pocket_url, enable_software_tpg, json_dir):
     """
       JSON_DIR: Json file output folder
@@ -187,7 +191,12 @@ def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowd
     console.log("hsi cmd data:", cmd_data_hsi)
 
     cmd_data_trigger = trigger_gen.generate(network_endpoints,
-        NUMBER_OF_DATA_PRODUCERS = total_number_of_data_producers,
+        TOTAL_NUMBER_OF_DATA_PRODUCERS = total_number_of_data_producers,
+        SUBSCRIBE_TO_TPSETS = enable_software_tpg,
+        ACTIVITY_PLUGIN = trigger_activity_plugin,
+        ACTIVITY_CONFIG = eval(trigger_activity_config),
+        CANDIDATE_PLUGIN = trigger_candidate_plugin,
+        CANDIDATE_CONFIG = eval(trigger_candidate_config),
         TOKEN_COUNT = trigemu_token_count,
         SYSTEM_TYPE = system_type,
         TTCM_S1=ttcm_s1,

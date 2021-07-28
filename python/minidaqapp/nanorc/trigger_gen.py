@@ -69,7 +69,9 @@ def make_moo_record(conf_dict,name,path='temptypes'):
 #===============================================================================
 def generate(
         NETWORK_ENDPOINTS: list,
-        NUMBER_OF_DATA_PRODUCERS: int = 2,
+        
+        TOTAL_NUMBER_OF_DATA_PRODUCERS: int = 2,
+        SUBSCRIBE_TO_TPSETS: bool = True,
         
         ACTIVITY_PLUGIN: str = 'TriggerActivityMakerPrescalePlugin',
         ACTIVITY_CONFIG: dict = dict(prescale=1000),
@@ -94,9 +96,11 @@ def generate(
 
     # Define modules and queues
     queue_bare_specs = [
-        app.QueueSpec(inst="tpsets_from_netq", kind='FollyMPMCQueue', capacity=1000),
-        app.QueueSpec(inst='zipped_tpset_q', kind='FollySPSCQueue', capacity=1000),
-        app.QueueSpec(inst='taset_q', kind='FollySPSCQueue', capacity=1000),
+        ] + ([
+            app.QueueSpec(inst="tpsets_from_netq", kind='FollyMPMCQueue', capacity=1000),
+            app.QueueSpec(inst='zipped_tpset_q', kind='FollySPSCQueue', capacity=1000),
+            app.QueueSpec(inst='taset_q', kind='FollySPSCQueue', capacity=1000),
+        ] if SUBSCRIBE_TO_TPSETS else []) + [
         app.QueueSpec(inst='trigger_candidate_q', kind='FollyMPMCQueue', capacity=1000),
         app.QueueSpec(inst="hsievent_from_netq", kind='FollyMPMCQueue', capacity=1000),
         app.QueueSpec(inst="token_from_netq", kind='FollySPSCQueue', capacity=1000),        
@@ -107,31 +111,34 @@ def generate(
     queue_specs = app.QueueSpecs(sorted(queue_bare_specs, key=lambda x: x.inst))
 
     mod_specs = [
+        ] + ([        
+            
+            ### TPSet input
         
-        ### TPSet input
-        
-        ] + [
-            mspec(f"tpset_subscriber_{idx}", "NetworkToQueue", [ 
-                app.QueueInfo(name="output", inst=f"tpsets_from_netq", dir="output")
-            ]) for idx in range(NUMBER_OF_DATA_PRODUCERS)
-        ] + [
-        
-        mspec("zip", "TPZipper", [
-            app.QueueInfo(name="input", inst="tpsets_from_netq", dir="input"),
-            app.QueueInfo(name="output", inst="zipped_tpset_q", dir="output"), #FIXME need to fanout this zipped_tpset_q if using multiple algorithms
-        ]),
-        
-        ### Algorithms
-        
-        mspec('tam', 'TriggerActivityMaker', [ # TPSet -> TASet
-            app.QueueInfo(name='input', inst='zipped_tpset_q', dir='input'),
-            app.QueueInfo(name='output', inst='taset_q', dir='output'),
-        ]),
-        
-        mspec('tcm', 'TriggerCandidateMaker', [ # TASet -> TC
-            app.QueueInfo(name='input', inst='taset_q', dir='input'),
-            app.QueueInfo(name='output', inst='trigger_candidate_q', dir='output'),
-        ]),
+            ] + [
+                mspec(f"tpset_subscriber_{idx}", "NetworkToQueue", [ 
+                    app.QueueInfo(name="output", inst=f"tpsets_from_netq", dir="output")
+                ]) for idx in range(TOTAL_NUMBER_OF_DATA_PRODUCERS)
+            ] + [
+            
+            mspec("zip", "TPZipper", [
+                app.QueueInfo(name="input", inst="tpsets_from_netq", dir="input"),
+                app.QueueInfo(name="output", inst="zipped_tpset_q", dir="output"), #FIXME need to fanout this zipped_tpset_q if using multiple algorithms
+            ]),
+            
+            ### Algorithm(s)
+            
+            mspec('tam', 'TriggerActivityMaker', [ # TPSet -> TASet
+                app.QueueInfo(name='input', inst='zipped_tpset_q', dir='input'),
+                app.QueueInfo(name='output', inst='taset_q', dir='output'),
+            ]),
+            
+            mspec('tcm', 'TriggerCandidateMaker', [ # TASet -> TC
+                app.QueueInfo(name='input', inst='taset_q', dir='input'),
+                app.QueueInfo(name='output', inst='trigger_candidate_q', dir='output'),
+            ])
+            
+        ] if SUBSCRIBE_TO_TPSETS else []) + [
         
         ### Timing TCs
         
@@ -173,20 +180,19 @@ def generate(
     cmd_data['conf'] = acmd([
         
         ### TPSet input
-        ] + [
+        ] + ([
             (f"tpset_subscriber_{idx}", ntoq.Conf(
                 msg_type="dunedaq::trigger::TPSet",
                 msg_module_name="TPSetNQ",
-                #FIXME this info needs to come from readout / NETWORK_ENDPOINTS
                 receiver_config=nor.Conf(ipm_plugin_type="ZmqSubscriber",
-                                         address=f'tcp://127.0.0.1:{5000+idx}',
-                                         subscriptions=["foo"])
+                                         address=NETWORK_ENDPOINTS[f'tpsets_{idx}'],
+                                         subscriptions=["TPSets"])
             ))
-            for idx in range(NUMBER_OF_DATA_PRODUCERS)
-        ] + [
+            for idx in range(TOTAL_NUMBER_OF_DATA_PRODUCERS)
+        ] if SUBSCRIBE_TO_TPSETS else [])  + [
         
         ("zip", tzip.ConfParams(
-             cardinality=NUMBER_OF_DATA_PRODUCERS,
+             cardinality=TOTAL_NUMBER_OF_DATA_PRODUCERS,
              max_latency_ms=1000,
              region_id=0, # Fake placeholder
              element_id=0 # Fake placeholder
@@ -244,17 +250,19 @@ def generate(
         )),
         
         ("mlt", mlt.ConfParams(
-            links=[mlt.GeoID(system=SYSTEM_TYPE, region=0, element=idx) for idx in range(NUMBER_OF_DATA_PRODUCERS)],
+            links=[mlt.GeoID(system=SYSTEM_TYPE, region=0, element=idx) for idx in range(TOTAL_NUMBER_OF_DATA_PRODUCERS)],
             initial_token_count=TOKEN_COUNT                    
         )),
     ])
 
     startpars = rccmd.StartParams(run=1)
     cmd_data['start'] = acmd([
-        ("tpset_subscriber", startpars),
-        ("zip", startpars),
-        ("tam", startpars),
-        ("tcm", startpars),
+        ] + ([
+            ("tpset_subscriber", startpars),
+            ("zip", startpars),
+            ("tam", startpars),
+            ("tcm", startpars),
+        ] if SUBSCRIBE_TO_TPSETS else []) + [
         ("mlt", startpars),
         ("ttcm", startpars),
         ("ntoq_hsievent", startpars),
@@ -263,10 +271,12 @@ def generate(
     ])
 
     cmd_data['stop'] = acmd([
-        ("tpset_subscriber", None),
-        ("zip", None),
-        ("tam", None),
-        ("tcm", None),
+        ] + ([
+            ("tpset_subscriber", None),
+            ("zip", None),
+            ("tam", None),
+            ("tcm", None),
+        ] if SUBSCRIBE_TO_TPSETS else []) + [
         ("mlt", None),
         ("ttcm", None),
         ("ntoq_hsievent", None),
