@@ -143,6 +143,7 @@ def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowd
             port = port + 1
 
 
+
     cardid = {}
     host_id_dict = {}
     for hostidx in range(len(host_ru)):
@@ -155,8 +156,9 @@ def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowd
         if enable_software_tpg:
             network_endpoints[f"tp_frags_{hostidx}"] = "tcp://{host_ru" + f"{hostidx}" + "}:" + f"{port}"
             port = port + 1
-            network_endpoints[f"tpsets_{hostidx}"] = "tcp://{host_ru" + f"{hostidx}" + "}:" + f"{port}"
-            port = port + 1
+            for idx in range(number_of_data_producers):
+                network_endpoints[f"tpsets_{hostidx*number_of_data_producers+idx}"] = "tcp://{host_ru" + f"{hostidx}" + "}:" + f"{port}"
+                port = port + 1
         if host_ru[hostidx] in host_id_dict:
             host_id_dict[host_ru[hostidx]] = host_id_dict[host_ru[hostidx]] + 1
             cardid[hostidx] = host_id_dict[host_ru[hostidx]]

@@ -113,7 +113,8 @@ def generate(NETWORK_ENDPOINTS,
         ] + [
             app.QueueSpec(inst=f"tp_fragments_q", kind='FollyMPMCQueue', capacity=100)
         ] + [
-            app.QueueSpec(inst=f"tpset_queue", kind='FollyMPMCQueue', capacity=10000)
+            app.QueueSpec(inst=f"tpset_queue_{idx}", kind='FollyMPMCQueue', capacity=10000)
+                for idx in range(MIN_LINK, MAX_LINK)
         ] + [
             app.QueueSpec(inst=f"tp_requests_{idx}", kind='FollySPSCQueue', capacity=100)
                 for idx in range(MIN_LINK, MAX_LINK)
@@ -144,9 +145,9 @@ def generate(NETWORK_ENDPOINTS,
                 app.QueueInfo(name="timesync", inst="time_sync_q", dir="output")
             ]) for idx in range(MIN_LINK, MAX_LINK)
         ] + [
-            mspec(f"tpset_publisher", "QueueToNetwork", [
-                app.QueueInfo(name="input", inst=f"tpset_queue", dir="input")
-            ])
+            mspec(f"tpset_publisher_{idx}", "QueueToNetwork", [
+                app.QueueInfo(name="input", inst=f"tpset_queue_{idx}", dir="input")
+            ]) for idx in range(MIN_LINK, MAX_LINK)
         ]
 
 
@@ -176,7 +177,7 @@ def generate(NETWORK_ENDPOINTS,
         if SOFTWARE_TPG_ENABLED:
             ls.extend([
                 app.QueueInfo(name="tp_out", inst=f"tp_link_{idx+MIN_LINK}", dir="output"),
-                app.QueueInfo(name="tpset_out", inst=f"tpset_queue", dir="output")
+                app.QueueInfo(name="tpset_out", inst=f"tpset_queue_{idx+MIN_LINK}", dir="output")
             ])
 
         mod_specs += [mspec(f"datahandler_{idx + MIN_LINK}", "DataLinkHandler", ls)]
@@ -234,7 +235,7 @@ def generate(NETWORK_ENDPOINTS,
     cmd_data['init'] = app.Init(queues=queue_specs, modules=mod_specs)
 
 
-    cmd_data['conf'] = acmd([("qton_fragments", qton.Conf(msg_type="std::unique_ptr<dunedaq::dataformats::Fragment>",
+    conf_list = [("qton_fragments", qton.Conf(msg_type="std::unique_ptr<dunedaq::dataformats::Fragment>",
                                            msg_module_name="FragmentNQ",
                                            sender_config=nos.Conf(ipm_plugin_type="ZmqSender",
                                                                   address=NETWORK_ENDPOINTS[f"frags_{HOSTIDX}"],
@@ -337,25 +338,30 @@ def generate(NETWORK_ENDPOINTS,
                                                          )
                                 )
                 )
-            ] + [
-                ("qton_tp_fragments", qton.Conf(msg_type="std::unique_ptr<dunedaq::dataformats::Fragment>",
-                                                msg_module_name="FragmentNQ",
-                                                sender_config=nos.Conf(ipm_plugin_type="ZmqSender",
-                                                                       address=NETWORK_ENDPOINTS[f"tp_frags_{HOSTIDX}"],
-                                                                       stype="msgpack")))
-            ] + [
-                (f"ntoq_tp_datarequests_{idx}", ntoq.Conf(msg_type="dunedaq::dfmessages::DataRequest",
-                                            msg_module_name="DataRequestNQ",
-                                            receiver_config=nor.Conf(ipm_plugin_type="ZmqReceiver",
-                                                                    address=NETWORK_ENDPOINTS[f"tp_datareq_{idx}"]))) for idx in range(MIN_LINK,MAX_LINK)
-            ] + [
-                (f"tpset_publisher", qton.Conf(msg_type="dunedaq::trigger::TPSet",
-                                             msg_module_name="TPSetNQ",
-                                             sender_config=nos.Conf(ipm_plugin_type="ZmqPublisher",
-                                                                    address=NETWORK_ENDPOINTS[f"tpsets_{HOSTIDX}"],
-                                                                    topic="TPSets",
-                                                                    stype="msgpack")))
-    ])
+            ]
+
+    if SOFTWARE_TPG_ENABLED:
+        conf_list.extend([
+                            ("qton_tp_fragments", qton.Conf(msg_type="std::unique_ptr<dunedaq::dataformats::Fragment>",
+                                                            msg_module_name="FragmentNQ",
+                                                            sender_config=nos.Conf(ipm_plugin_type="ZmqSender",
+                                                                                   address=NETWORK_ENDPOINTS[f"tp_frags_{HOSTIDX}"],
+                                                                                   stype="msgpack")))
+                        ] + [
+                            (f"ntoq_tp_datarequests_{idx}", ntoq.Conf(msg_type="dunedaq::dfmessages::DataRequest",
+                                                                      msg_module_name="DataRequestNQ",
+                                                                      receiver_config=nor.Conf(ipm_plugin_type="ZmqReceiver",
+                                                                                               address=NETWORK_ENDPOINTS[f"tp_datareq_{idx}"]))) for idx in range(MIN_LINK,MAX_LINK)
+                        ] + [
+                            (f"tpset_publisher_{idx}", qton.Conf(msg_type="dunedaq::trigger::TPSet",
+                                                                 msg_module_name="TPSetNQ",
+                                                                 sender_config=nos.Conf(ipm_plugin_type="ZmqPublisher",
+                                                                                        address=NETWORK_ENDPOINTS[f"tpsets_{idx}"],
+                                                                                        topic="TPSets",
+                                                                                        stype="msgpack"))) for idx in range(MIN_LINK, MAX_LINK)
+                        ])
+
+    cmd_data['conf'] = acmd(conf_list)
 
 
     startpars = rccmd.StartParams(run=RUN_NUMBER)
@@ -372,7 +378,7 @@ def generate(NETWORK_ENDPOINTS,
             ("qton_tp_fragments", startpars),
             (f"ntoq_tp_datarequests_.*", startpars),
             (f"tp_datahandler_.*", startpars),
-            (f"tpset_publisher", startpars)])
+            (f"tpset_publisher_.*", startpars)])
 
     cmd_data['stop'] = acmd([("ntoq_trigdec", None),
             ("ntoq_datareq_.*", None),
@@ -387,7 +393,7 @@ def generate(NETWORK_ENDPOINTS,
             ("qton_tp_fragments", startpars),
             (f"ntoq_tp_datarequests_.*", startpars),
             (f"tp_datahandler_.*", startpars),
-            (f"tpset_publisher", startpars)])
+            (f"tpset_publisher_.*", startpars)])
 
     cmd_data['pause'] = acmd([("", None)])
 
