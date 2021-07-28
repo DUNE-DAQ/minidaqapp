@@ -59,7 +59,8 @@ def generate(NETWORK_ENDPOINTS,
         RAW_RECORDING_OUTPUT_DIR=".",
         FRONTEND_TYPE='wib',
         SYSTEM_TYPE='TPC',
-        DQM_ENABLED=False):
+        DQM_ENABLED=False,
+        SOFTWARE_TPG_ENABLED=False):
     """Generate the json configuration for the readout and DF process"""
 
     cmd_data = {}
@@ -105,6 +106,19 @@ def generate(NETWORK_ENDPOINTS,
                 for idx in range(NUMBER_OF_DATA_PRODUCERS)
         ]
 
+    if SOFTWARE_TPG_ENABLED:
+        queue_bare_specs += [
+            app.QueueSpec(inst=f"tp_link_{idx}", kind='FollySPSCQueue', capacity=100000)
+                for idx in range(MIN_LINK, MAX_LINK)
+        ] + [
+            app.QueueSpec(inst=f"tp_fragments_q", kind='FollyMPMCQueue', capacity=100)
+        ] + [
+            app.QueueSpec(inst=f"tpset_queue", kind='FollyMPMCQueue', capacity=10000)
+        ] + [
+            app.QueueSpec(inst=f"tp_requests_{idx}", kind='FollySPSCQueue', capacity=100)
+                for idx in range(MIN_LINK, MAX_LINK)
+        ]
+
     # Only needed to reproduce the same order as when using jsonnet
     queue_specs = app.QueueSpecs(sorted(queue_bare_specs, key=lambda x: x.inst))
 
@@ -114,6 +128,26 @@ def generate(NETWORK_ENDPOINTS,
     ] + [
         mspec(f"ntoq_datareq_{idx}", "NetworkToQueue", [app.QueueInfo(name="output", inst=f"data_requests_{idx}", dir="output")]) for idx in range(MIN_LINK,MAX_LINK)
     ]
+
+    if SOFTWARE_TPG_ENABLED:
+        mod_specs += [
+            mspec("qton_tp_fragments", "QueueToNetwork", [app.QueueInfo(name="input", inst="tp_fragments_q", dir="input")])
+        ] + [
+            mspec(f"ntoq_tp_datarequests_{idx}", "NetworkToQueue", [app.QueueInfo(name="output", inst=f"tp_requests_{idx}", dir="output")]) for idx in range(MIN_LINK,MAX_LINK)
+        ] + [
+            mspec(f"tp_datahandler_{idx}", "DataLinkHandler", [
+                app.QueueInfo(name="raw_input", inst=f"tp_link_{idx}", dir="input")
+            ] + [
+                app.QueueInfo(name="data_requests_0", inst=f"tp_requests_{idx}", dir="input")
+            ] + [
+                app.QueueInfo(name="data_response_0", inst="tp_fragments_q", dir="output"),
+                app.QueueInfo(name="timesync", inst="time_sync_q", dir="output")
+            ]) for idx in range(MIN_LINK, MAX_LINK)
+        ] + [
+            mspec(f"tpset_publisher", "QueueToNetwork", [
+                app.QueueInfo(name="input", inst=f"tpset_queue", dir="input")
+            ])
+        ]
 
 
     # There are two flags to be checked so I think a for loop
@@ -138,6 +172,13 @@ def generate(NETWORK_ENDPOINTS,
             ls.extend([
             app.QueueInfo(name="data_requests_1", inst=f"data_requests_dqm_{idx+MIN_LINK}", dir="input"),
             app.QueueInfo(name="data_response_1", inst="data_fragments_q_dqm", dir="output")])
+
+        if SOFTWARE_TPG_ENABLED:
+            ls.extend([
+                app.QueueInfo(name="tp_out", inst=f"tp_link_{idx+MIN_LINK}", dir="output"),
+                app.QueueInfo(name="tpset_out", inst=f"tpset_queue", dir="output")
+            ])
+
         mod_specs += [mspec(f"datahandler_{idx + MIN_LINK}", "DataLinkHandler", ls)]
 
     if RAW_RECORDING_ENABLED:
@@ -237,8 +278,21 @@ def generate(NETWORK_ENDPOINTS,
                                            receiver_config=nor.Conf(ipm_plugin_type="ZmqReceiver",
                                                                     address=NETWORK_ENDPOINTS[f"datareq_{idx}"]))) for idx in range(MIN_LINK,MAX_LINK)
             ] + [
+                (f"tp_datahandler_{idx}", dlh.Conf(
+                    emulator_mode = False,
+                    enable_software_tpg = False,
+                    # fake_trigger_flag=0, # default
+                    source_queue_timeout_ms= QUEUE_POP_WAIT_MS,
+                    latency_buffer_size = LATENCY_BUFFER_SIZE,
+                    pop_limit_pct = 0.8,
+                    pop_size_pct = 0.1,
+                    apa_number = 0,
+                    link_number = idx
+                )) for idx in range(MIN_LINK, MAX_LINK)
+            ] + [
                 (f"datahandler_{idx}", dlh.Conf(
                         emulator_mode = EMULATOR_MODE,
+                        enable_software_tpg = SOFTWARE_TPG_ENABLED,
                         # fake_trigger_flag=0, # default
                         source_queue_timeout_ms= QUEUE_POP_WAIT_MS,
                         latency_buffer_size = LATENCY_BUFFER_SIZE,
@@ -283,7 +337,24 @@ def generate(NETWORK_ENDPOINTS,
                                                          )
                                 )
                 )
-
+            ] + [
+                ("qton_tp_fragments", qton.Conf(msg_type="std::unique_ptr<dunedaq::dataformats::Fragment>",
+                                                msg_module_name="FragmentNQ",
+                                                sender_config=nos.Conf(ipm_plugin_type="ZmqSender",
+                                                                       address=NETWORK_ENDPOINTS[f"tp_frags_{HOSTIDX}"],
+                                                                       stype="msgpack")))
+            ] + [
+                (f"ntoq_tp_datarequests_{idx}", ntoq.Conf(msg_type="dunedaq::dfmessages::DataRequest",
+                                            msg_module_name="DataRequestNQ",
+                                            receiver_config=nor.Conf(ipm_plugin_type="ZmqReceiver",
+                                                                    address=NETWORK_ENDPOINTS[f"tp_datareq_{idx}"]))) for idx in range(MIN_LINK,MAX_LINK)
+            ] + [
+                (f"tpset_publisher", qton.Conf(msg_type="dunedaq::trigger::TPSet",
+                                             msg_module_name="TPSetNQ",
+                                             sender_config=nos.Conf(ipm_plugin_type="ZmqPublisher",
+                                                                    address=NETWORK_ENDPOINTS[f"tpsets_{HOSTIDX}"],
+                                                                    topic="TPSets",
+                                                                    stype="msgpack")))
     ])
 
 
@@ -297,7 +368,11 @@ def generate(NETWORK_ENDPOINTS,
             ("ntoq_datareq_.*", startpars),
             ("ntoq_trigdec", startpars),
             ("trb_dqm", startpars),
-            ("dqmprocessor", startpars),])
+            ("dqmprocessor", startpars),
+            ("qton_tp_fragments", startpars),
+            (f"ntoq_tp_datarequests_.*", startpars),
+            (f"tp_datahandler_.*", startpars),
+            (f"tpset_publisher", startpars)])
 
     cmd_data['stop'] = acmd([("ntoq_trigdec", None),
             ("ntoq_datareq_.*", None),
@@ -308,7 +383,11 @@ def generate(NETWORK_ENDPOINTS,
             ("qton_timesync", None),
             ("qton_fragments", None),
             ("trb_dqm", None),
-            ("dqmprocessor", None),])
+            ("dqmprocessor", None),
+            ("qton_tp_fragments", startpars),
+            (f"ntoq_tp_datarequests_.*", startpars),
+            (f"tp_datahandler_.*", startpars),
+            (f"tpset_publisher", startpars)])
 
     cmd_data['pause'] = acmd([("", None)])
 
