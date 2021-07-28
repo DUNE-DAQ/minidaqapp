@@ -46,19 +46,22 @@ import click
 # trigger options
 @click.option('--ttcm-s1', default=1, help="Timing trigger candidate maker accepted HSI signal ID 1")
 @click.option('--ttcm-s2', default=2, help="Timing trigger candidate maker accepted HSI signal ID 2")
+
 @click.option('--enable-raw-recording', is_flag=True, help="Add queues and modules necessary for the record command")
 @click.option('--raw-recording-output-dir', type=click.Path(), default='.', help="Output directory where recorded data is written to. Data for each link is written to a separate file")
 @click.option('--frontend-type', type=click.Choice(['wib', 'wib2', 'pds_queue', 'pds_list']), default='wib', help="Frontend type (wib, wib2 or pds) and latency buffer implementation in case of pds (folly queue or skip list)")
+@click.option('--enable-dqm', is_flag=True, help="Enable Data Quality Monitoring")
 @click.option('--opmon-impl', type=click.Choice(['json','cern','pocket'], case_sensitive=False),default='json', help="Info collector service implementation to use")
 @click.option('--ers-impl', type=click.Choice(['local','cern','pocket'], case_sensitive=False), default='local', help="ERS destination (Kafka used for cern and pocket)")
 @click.option('--pocket-url', default='127.0.0.1', help="URL for connecting to Pocket services")
+@click.option('--enable-software-tpg', is_flag=True, default=False, help="Enable software TPG")
 @click.argument('json_dir', type=click.Path())
 
 def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowdown_factor, run_number, trigger_rate_hz, trigger_window_before_ticks, trigger_window_after_ticks,
         token_count, data_file, output_path, disable_trace, use_felix, host_df, host_ru, host_trigger, host_hsi, 
         hsi_device_name, hsi_readout_period, use_hsi_hw, hsi_device_id, mean_hsi_signal_multiplicity, hsi_signal_emulation_mode, enabled_hsi_signals,
         ttcm_s1, ttcm_s2,
-        enable_raw_recording, raw_recording_output_dir, frontend_type, opmon_impl, ers_impl, pocket_url, json_dir):
+        enable_raw_recording, raw_recording_output_dir, frontend_type, opmon_impl, enable_dqm, ers_impl, pocket_url, enable_software_tpg, json_dir):
     """
       JSON_DIR: Json file output folder
     """
@@ -83,7 +86,9 @@ def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowd
     else:
         total_number_of_data_producers = number_of_data_producers * len(host_ru)
         console.log(f"10 or fewer data producers were requested: Will setup {number_of_data_producers} per host, for a total of {total_number_of_data_producers}")
-        
+
+    if enable_software_tpg and frontend_type != 'wib':
+        raise Exception("Software TPG is only available for the wib at the moment!")
 
     if token_count > 0:
         df_token_count = 0
@@ -133,6 +138,11 @@ def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowd
     for idx in range(total_number_of_data_producers):
         network_endpoints[f"datareq_{idx}"] = "tcp://{host_df}:" + f"{port}"
         port = port + 1
+        if enable_software_tpg:
+            network_endpoints[f"tp_datareq_{idx}"] = "tcp://{host_df}:" + f"{port}"
+            port = port + 1
+
+
 
     cardid = {}
     host_id_dict = {}
@@ -143,6 +153,12 @@ def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowd
         port = port + 1
         network_endpoints[f"frags_{hostidx}"] = "tcp://{host_ru" + f"{hostidx}" + "}:" + f"{port}"
         port = port + 1
+        if enable_software_tpg:
+            network_endpoints[f"tp_frags_{hostidx}"] = "tcp://{host_ru" + f"{hostidx}" + "}:" + f"{port}"
+            port = port + 1
+            for idx in range(number_of_data_producers):
+                network_endpoints[f"tpsets_{hostidx*number_of_data_producers+idx}"] = "tcp://{host_ru" + f"{hostidx}" + "}:" + f"{port}"
+                port = port + 1
         if host_ru[hostidx] in host_id_dict:
             host_id_dict[host_ru[hostidx]] = host_id_dict[host_ru[hostidx]] + 1
             cardid[hostidx] = host_id_dict[host_ru[hostidx]]
@@ -202,7 +218,10 @@ def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowd
             RAW_RECORDING_ENABLED = enable_raw_recording,
             RAW_RECORDING_OUTPUT_DIR = raw_recording_output_dir,
             FRONTEND_TYPE = frontend_type,
-            SYSTEM_TYPE = system_type) for hostidx in range(len(host_ru))]
+            SYSTEM_TYPE = system_type,
+            DQM_ENABLED=enable_dqm,
+            SOFTWARE_TPG_ENABLED= enable_software_tpg
+            ) for hostidx in range(len(host_ru))]
     console.log("readout cmd data:", cmd_data_readout)
 
     if exists(json_dir):
