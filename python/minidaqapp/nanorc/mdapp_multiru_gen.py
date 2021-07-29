@@ -49,6 +49,7 @@ import click
 @click.option('--enable-raw-recording', is_flag=True, help="Add queues and modules necessary for the record command")
 @click.option('--raw-recording-output-dir', type=click.Path(), default='.', help="Output directory where recorded data is written to. Data for each link is written to a separate file")
 @click.option('--frontend-type', type=click.Choice(['wib', 'wib2', 'pds_queue', 'pds_list']), default='wib', help="Frontend type (wib, wib2 or pds) and latency buffer implementation in case of pds (folly queue or skip list)")
+@click.option('--enable-dqm', is_flag=True, help="Enable Data Quality Monitoring")
 @click.option('--opmon-impl', type=click.Choice(['json','cern','pocket'], case_sensitive=False),default='json', help="Info collector service implementation to use")
 @click.option('--ers-impl', type=click.Choice(['local','cern','pocket'], case_sensitive=False), default='local', help="ERS destination (Kafka used for cern and pocket)")
 @click.option('--pocket-url', default='127.0.0.1', help="URL for connecting to Pocket services")
@@ -58,7 +59,7 @@ def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowd
         token_count, data_file, output_path, disable_trace, use_felix, host_df, host_ru, host_trigger, host_hsi, 
         hsi_device_name, hsi_readout_period, use_hsi_hw, hsi_device_id, mean_hsi_signal_multiplicity, hsi_signal_emulation_mode, enabled_hsi_signals,
         ttcm_s1, ttcm_s2,
-        enable_raw_recording, raw_recording_output_dir, frontend_type, opmon_impl, ers_impl, pocket_url, json_dir):
+        enable_raw_recording, raw_recording_output_dir, frontend_type, opmon_impl, enable_dqm, ers_impl, pocket_url, json_dir):
     """
       JSON_DIR: Json file output folder
     """
@@ -112,21 +113,21 @@ def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowd
 
     if ers_impl == 'cern':
         use_kafka = True
-        ers_info = "erstrace,throttle(30,100),lstdout,erskafka(dqmbroadcast:9092)"
-        ers_warning = "erstrace,throttle(30,100),lstderr,erskafka(dqmbroadcast:9092)"
-        ers_error = "erstrace,throttle(30,100),lstderr,erskafka(dqmbroadcast:9092)"
+        ers_info = "erstrace,throttle,lstdout,erskafka(dqmbroadcast:9092)"
+        ers_warning = "erstrace,throttle,lstderr,erskafka(dqmbroadcast:9092)"
+        ers_error = "erstrace,throttle,lstderr,erskafka(dqmbroadcast:9092)"
         ers_fatal = "erstrace,lstderr,erskafka(dqmbroadcast:9092)"
     elif ers_impl == 'pocket':
         use_kafka = True
-        ers_info = "erstrace,throttle(30,100),lstdout,erskafka(" + pocket_url + ":9092)"
-        ers_warning = "erstrace,throttle(30,100),lstderr,erskafka(" + pocket_url + ":9092)"
-        ers_error = "erstrace,throttle(30,100),lstderr,erskafka(" + pocket_url + ":9092)"
-        ers_fatal = "erstrace,lstderr,erskafka(" + pocket_url + ":9092)"
+        ers_info = "erstrace,throttle,lstdout,erskafka(" + pocket_url + ":30092)"
+        ers_warning = "erstrace,throttle,lstderr,erskafka(" + pocket_url + ":30092)"
+        ers_error = "erstrace,throttle,lstderr,erskafka(" + pocket_url + ":30092)"
+        ers_fatal = "erstrace,lstderr,erskafka(" + pocket_url + ":30092)"
     else:
         use_kafka = False
-        ers_info = "erstrace,throttle(30,100),lstdout"
-        ers_warning = "erstrace,throttle(30,100),lstderr"
-        ers_error = "erstrace,throttle(30,100),lstderr"
+        ers_info = "erstrace,throttle,lstdout"
+        ers_warning = "erstrace,throttle,lstderr"
+        ers_error = "erstrace,throttle,lstderr"
         ers_fatal = "erstrace,lstderr"
 
     port = 12347
@@ -202,7 +203,9 @@ def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowd
             RAW_RECORDING_ENABLED = enable_raw_recording,
             RAW_RECORDING_OUTPUT_DIR = raw_recording_output_dir,
             FRONTEND_TYPE = frontend_type,
-            SYSTEM_TYPE = system_type) for hostidx in range(len(host_ru))]
+            SYSTEM_TYPE = system_type,
+            DQM_ENABLED=enable_dqm
+            ) for hostidx in range(len(host_ru))]
     console.log("readout cmd data:", cmd_data_readout)
 
     if exists(json_dir):
