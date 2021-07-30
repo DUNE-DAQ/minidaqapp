@@ -207,6 +207,7 @@ def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowd
 
     cmd_data_readout = [ readout_gen.generate(network_endpoints,
             NUMBER_OF_DATA_PRODUCERS = number_of_data_producers,
+            TOTAL_NUMBER_OF_DATA_PRODUCERS=total_number_of_data_producers,
             EMULATOR_MODE = emulator_mode,
             DATA_RATE_SLOWDOWN_FACTOR = data_rate_slowdown_factor,
             RUN_NUMBER = run_number, 
@@ -292,7 +293,8 @@ def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowd
                     "DUNEDAQ_SHARE_PATH": "getenv",
                     "TIMING_SHARE": "getenv",
                     "LD_LIBRARY_PATH": "getenv",
-                    "PATH": "getenv"
+                    "PATH": "getenv",
+                    "READOUT_SHARE": "getenv"
                 },
                 "cmd": ["CMD_FAC=rest://localhost:${APP_PORT}",
                     "INFO_SVC=" + info_svc_uri,

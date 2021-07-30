@@ -48,6 +48,7 @@ QUEUE_POP_WAIT_MS = 100
 
 def generate(NETWORK_ENDPOINTS,
         NUMBER_OF_DATA_PRODUCERS=2,
+        TOTAL_NUMBER_OF_DATA_PRODUCERS=2,
         EMULATOR_MODE=False,
         DATA_RATE_SLOWDOWN_FACTOR=1,
         RUN_NUMBER=333, 
@@ -136,13 +137,12 @@ def generate(NETWORK_ENDPOINTS,
         ] + [
             mspec(f"ntoq_tp_datarequests_{idx}", "NetworkToQueue", [app.QueueInfo(name="output", inst=f"tp_requests_{idx}", dir="output")]) for idx in range(MIN_LINK,MAX_LINK)
         ] + [
-            mspec(f"tp_datahandler_{idx}", "DataLinkHandler", [
-                app.QueueInfo(name="raw_input", inst=f"tp_link_{idx}", dir="input")
-            ] + [
-                app.QueueInfo(name="data_requests_0", inst=f"tp_requests_{idx}", dir="input")
-            ] + [
+            mspec(f"tp_datahandler_{TOTAL_NUMBER_OF_DATA_PRODUCERS + idx}", "DataLinkHandler", [
+                app.QueueInfo(name="raw_input", inst=f"tp_link_{idx}", dir="input"),
+                app.QueueInfo(name="data_requests_0", inst=f"tp_requests_{idx}", dir="input"),
                 app.QueueInfo(name="data_response_0", inst="tp_fragments_q", dir="output"),
-                app.QueueInfo(name="timesync", inst="time_sync_q", dir="output")
+                app.QueueInfo(name="timesync", inst="time_sync_q", dir="output"),
+                app.QueueInfo(name="raw_recording", inst=f"tp_recording_link_{idx}", dir="output")
             ]) for idx in range(MIN_LINK, MAX_LINK)
         ] + [
             mspec(f"tpset_publisher_{idx}", "QueueToNetwork", [
@@ -279,7 +279,7 @@ def generate(NETWORK_ENDPOINTS,
                                            receiver_config=nor.Conf(ipm_plugin_type="ZmqReceiver",
                                                                     address=NETWORK_ENDPOINTS[f"datareq_{idx}"]))) for idx in range(MIN_LINK,MAX_LINK)
             ] + [
-                (f"tp_datahandler_{idx}", dlh.Conf(
+                (f"tp_datahandler_{TOTAL_NUMBER_OF_DATA_PRODUCERS + idx}", dlh.Conf(
                     emulator_mode = False,
                     enable_software_tpg = False,
                     # fake_trigger_flag=0, # default
@@ -288,7 +288,7 @@ def generate(NETWORK_ENDPOINTS,
                     pop_limit_pct = 0.8,
                     pop_size_pct = 0.1,
                     apa_number = 0,
-                    link_number = idx
+                    link_number = TOTAL_NUMBER_OF_DATA_PRODUCERS + idx
                 )) for idx in range(MIN_LINK, MAX_LINK)
             ] + [
                 (f"datahandler_{idx}", dlh.Conf(
