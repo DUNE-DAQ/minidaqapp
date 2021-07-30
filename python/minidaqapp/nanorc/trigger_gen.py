@@ -70,8 +70,8 @@ def make_moo_record(conf_dict,name,path='temptypes'):
 def generate(
         NETWORK_ENDPOINTS: list,
         
-        TOTAL_NUMBER_OF_DATA_PRODUCERS: int = 2,
-        SUBSCRIBE_TO_TPSETS: bool = True,
+        NUMBER_OF_RAWDATA_PRODUCERS: int = 2,
+        NUMBER_OF_TPSET_PRODUCERS: int = 2,
         
         ACTIVITY_PLUGIN: str = 'TriggerActivityMakerPrescalePlugin',
         ACTIVITY_CONFIG: dict = dict(prescale=1000),
@@ -85,20 +85,11 @@ def generate(
         TTCM_S2: int = 2,
         TRIGGER_WINDOW_BEFORE_TICKS: int = 1000,
         TRIGGER_WINDOW_AFTER_TICKS: int = 1000,
-        SOFTWARE_TPG_ENABLED = False
 ):
     """
     { item_description }
     """
     cmd_data = {}
-
-    # Derived parameters
-    # TRIGGER_INTERVAL_NS = math.floor((1e9/TRIGGER_RATE_HZ))
-
-    if SOFTWARE_TPG_ENABLED:
-        NUMBER_OF_TP_PRODUCERS = NUMBER_OF_DATA_PRODUCERS
-    else:
-        NUMBER_OF_TP_PRODUCERS = 0
 
     # Define modules and queues
     queue_bare_specs = [
@@ -106,7 +97,7 @@ def generate(
             app.QueueSpec(inst="tpsets_from_netq", kind='FollyMPMCQueue', capacity=1000),
             app.QueueSpec(inst='zipped_tpset_q', kind='FollySPSCQueue', capacity=1000),
             app.QueueSpec(inst='taset_q', kind='FollySPSCQueue', capacity=1000),
-        ] if SUBSCRIBE_TO_TPSETS else []) + [
+        ] if NUMBER_OF_TPSET_PRODUCERS else []) + [
         app.QueueSpec(inst='trigger_candidate_q', kind='FollyMPMCQueue', capacity=1000),
         app.QueueSpec(inst="hsievent_from_netq", kind='FollyMPMCQueue', capacity=1000),
         app.QueueSpec(inst="token_from_netq", kind='FollySPSCQueue', capacity=1000),        
@@ -124,7 +115,7 @@ def generate(
             ] + [
                 mspec(f"tpset_subscriber_{idx}", "NetworkToQueue", [ 
                     app.QueueInfo(name="output", inst=f"tpsets_from_netq", dir="output")
-                ]) for idx in range(TOTAL_NUMBER_OF_DATA_PRODUCERS)
+                ]) for idx in range(NUMBER_OF_TPSET_PRODUCERS)
             ] + [
             
             mspec("zip", "TPZipper", [
@@ -144,7 +135,7 @@ def generate(
                 app.QueueInfo(name='output', inst='trigger_candidate_q', dir='output'),
             ])
             
-        ] if SUBSCRIBE_TO_TPSETS else []) + [
+            ] if NUMBER_OF_TPSET_PRODUCERS else []) + [
         
         ### Timing TCs
         
@@ -186,7 +177,7 @@ def generate(
     cmd_data['conf'] = acmd([
         
         ### TPSet input
-        ] + ([
+        ] + [
             (f"tpset_subscriber_{idx}", ntoq.Conf(
                 msg_type="dunedaq::trigger::TPSet",
                 msg_module_name="TPSetNQ",
@@ -194,11 +185,11 @@ def generate(
                                          address=NETWORK_ENDPOINTS[f'tpsets_{idx}'],
                                          subscriptions=["TPSets"])
             ))
-            for idx in range(TOTAL_NUMBER_OF_DATA_PRODUCERS)
-        ] if SUBSCRIBE_TO_TPSETS else [])  + [
+            for idx in range(NUMBER_OF_TPSET_PRODUCERS)
+        ] + [
         
         ("zip", tzip.ConfParams(
-             cardinality=TOTAL_NUMBER_OF_DATA_PRODUCERS,
+             cardinality=NUMBER_OF_TPSET_PRODUCERS,
              max_latency_ms=1000,
              region_id=0, # Fake placeholder
              element_id=0 # Fake placeholder
@@ -256,7 +247,10 @@ def generate(
         )),
         
         ("mlt", mlt.ConfParams(
-            links=[mlt.GeoID(system=SYSTEM_TYPE, region=0, element=idx) for idx in range(TOTAL_NUMBER_OF_DATA_PRODUCERS + TOTAL_NUMBER_OF_TP_PRODUCERS)],
+            # This line requests the raw data from upstream DAQ _and_ the raw TPs from upstream DAQ
+            links=[mlt.GeoID(system=SYSTEM_TYPE, region=0, element=idx) for idx in range(NUMBER_OF_RAWDATA_PRODUCERS + NUMBER_OF_TPSET_PRODUCERS)],
+            # PAR 2021-07-30 We'll add the following line when we have TPSet buffers in the trigger app
+            # [mlt.GeoID(system="DataSelection", region=0, element=idx) for idx in range(NUMBER_OF_TPSET_PRODUCERS)],
             initial_token_count=TOKEN_COUNT                    
         )),
     ])
@@ -268,7 +262,7 @@ def generate(
             ("zip", startpars),
             ("tam", startpars),
             ("tcm", startpars),
-        ] if SUBSCRIBE_TO_TPSETS else []) + [
+        ] if NUMBER_OF_TPSET_PRODUCERS else []) + [
         ("mlt", startpars),
         ("ttcm", startpars),
         ("ntoq_hsievent", startpars),
@@ -282,7 +276,7 @@ def generate(
             ("zip", None),
             ("tam", None),
             ("tcm", None),
-        ] if SUBSCRIBE_TO_TPSETS else []) + [
+        ] if NUMBER_OF_TPSET_PRODUCERS else []) + [
         ("mlt", None),
         ("ttcm", None),
         ("ntoq_hsievent", None),

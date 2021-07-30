@@ -191,8 +191,8 @@ def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowd
     console.log("hsi cmd data:", cmd_data_hsi)
 
     cmd_data_trigger = trigger_gen.generate(network_endpoints,
-        TOTAL_NUMBER_OF_DATA_PRODUCERS = total_number_of_data_producers,
-        SUBSCRIBE_TO_TPSETS = enable_software_tpg,
+        NUMBER_OF_RAWDATA_PRODUCERS = total_number_of_data_producers,
+        NUMBER_OF_TPSET_PRODUCERS = total_number_of_data_producers if enable_software_tpg else 0,
         ACTIVITY_PLUGIN = trigger_activity_plugin,
         ACTIVITY_CONFIG = eval(trigger_activity_config),
         CANDIDATE_PLUGIN = trigger_candidate_plugin,
@@ -202,8 +202,8 @@ def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowd
         TTCM_S1=ttcm_s1,
         TTCM_S2=ttcm_s2,
         TRIGGER_WINDOW_BEFORE_TICKS = trigger_window_before_ticks,
-        TRIGGER_WINDOW_AFTER_TICKS = trigger_window_after_ticks,
-        SOFTWARE_TPG_ENABLED = enable_software_tpg)
+        TRIGGER_WINDOW_AFTER_TICKS = trigger_window_after_ticks)
+
 
     console.log("trigger cmd data:", cmd_data_trigger)
 
