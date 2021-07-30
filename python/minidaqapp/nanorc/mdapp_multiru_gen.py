@@ -121,21 +121,21 @@ def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowd
 
     if ers_impl == 'cern':
         use_kafka = True
-        ers_info = "erstrace,throttle(30,100),lstdout,erskafka(dqmbroadcast:9092)"
-        ers_warning = "erstrace,throttle(30,100),lstderr,erskafka(dqmbroadcast:9092)"
-        ers_error = "erstrace,throttle(30,100),lstderr,erskafka(dqmbroadcast:9092)"
+        ers_info = "erstrace,throttle,lstdout,erskafka(dqmbroadcast:9092)"
+        ers_warning = "erstrace,throttle,lstderr,erskafka(dqmbroadcast:9092)"
+        ers_error = "erstrace,throttle,lstderr,erskafka(dqmbroadcast:9092)"
         ers_fatal = "erstrace,lstderr,erskafka(dqmbroadcast:9092)"
     elif ers_impl == 'pocket':
         use_kafka = True
-        ers_info = "erstrace,throttle(30,100),lstdout,erskafka(" + pocket_url + ":9092)"
-        ers_warning = "erstrace,throttle(30,100),lstderr,erskafka(" + pocket_url + ":9092)"
-        ers_error = "erstrace,throttle(30,100),lstderr,erskafka(" + pocket_url + ":9092)"
-        ers_fatal = "erstrace,lstderr,erskafka(" + pocket_url + ":9092)"
+        ers_info = "erstrace,throttle,lstdout,erskafka(" + pocket_url + ":30092)"
+        ers_warning = "erstrace,throttle,lstderr,erskafka(" + pocket_url + ":30092)"
+        ers_error = "erstrace,throttle,lstderr,erskafka(" + pocket_url + ":30092)"
+        ers_fatal = "erstrace,lstderr,erskafka(" + pocket_url + ":30092)"
     else:
         use_kafka = False
-        ers_info = "erstrace,throttle(30,100),lstdout"
-        ers_warning = "erstrace,throttle(30,100),lstderr"
-        ers_error = "erstrace,throttle(30,100),lstderr"
+        ers_info = "erstrace,throttle,lstdout"
+        ers_warning = "erstrace,throttle,lstderr"
+        ers_error = "erstrace,throttle,lstderr"
         ers_fatal = "erstrace,lstderr"
 
     port = 12347
@@ -202,7 +202,8 @@ def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowd
         TTCM_S1=ttcm_s1,
         TTCM_S2=ttcm_s2,
         TRIGGER_WINDOW_BEFORE_TICKS = trigger_window_before_ticks,
-        TRIGGER_WINDOW_AFTER_TICKS = trigger_window_after_ticks)
+        TRIGGER_WINDOW_AFTER_TICKS = trigger_window_after_ticks,
+        SOFTWARE_TPG_ENABLED = enable_software_tpg)
 
     console.log("trigger cmd data:", cmd_data_trigger)
 
@@ -211,11 +212,13 @@ def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowd
         RUN_NUMBER = run_number, 
         OUTPUT_PATH = output_path,
         TOKEN_COUNT = df_token_count,
-        SYSTEM_TYPE = system_type)
+        SYSTEM_TYPE = system_type,
+        SOFTWARE_TPG_ENABLED = enable_software_tpg)
     console.log("dataflow cmd data:", cmd_data_dataflow)
 
     cmd_data_readout = [ readout_gen.generate(network_endpoints,
             NUMBER_OF_DATA_PRODUCERS = number_of_data_producers,
+            TOTAL_NUMBER_OF_DATA_PRODUCERS=total_number_of_data_producers,
             EMULATOR_MODE = emulator_mode,
             DATA_RATE_SLOWDOWN_FACTOR = data_rate_slowdown_factor,
             RUN_NUMBER = run_number, 
@@ -301,7 +304,8 @@ def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowd
                     "DUNEDAQ_SHARE_PATH": "getenv",
                     "TIMING_SHARE": "getenv",
                     "LD_LIBRARY_PATH": "getenv",
-                    "PATH": "getenv"
+                    "PATH": "getenv",
+                    "READOUT_SHARE": "getenv"
                 },
                 "cmd": ["CMD_FAC=rest://localhost:${APP_PORT}",
                     "INFO_SVC=" + info_svc_uri,
