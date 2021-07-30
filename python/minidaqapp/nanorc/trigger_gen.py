@@ -50,7 +50,8 @@ def generate(
         TTCM_S1: int = 1,
         TTCM_S2: int = 2,
         TRIGGER_WINDOW_BEFORE_TICKS: int = 1000,
-        TRIGGER_WINDOW_AFTER_TICKS: int = 1000
+        TRIGGER_WINDOW_AFTER_TICKS: int = 1000,
+        SOFTWARE_TPG_ENABLED = False
 ):
     """
     { item_description }
@@ -59,6 +60,11 @@ def generate(
 
     # Derived parameters
     # TRIGGER_INTERVAL_NS = math.floor((1e9/TRIGGER_RATE_HZ))
+
+    if SOFTWARE_TPG_ENABLED:
+        NUMBER_OF_TP_PRODUCERS = NUMBER_OF_DATA_PRODUCERS
+    else:
+        NUMBER_OF_TP_PRODUCERS = 0
 
     # Define modules and queues
     queue_bare_specs = [
@@ -103,7 +109,7 @@ def generate(
 
     cmd_data['conf'] = acmd([
         ("mlt", mlt.ConfParams(
-            links=[mlt.GeoID(system=SYSTEM_TYPE, region=0, element=idx) for idx in range(NUMBER_OF_DATA_PRODUCERS)],
+            links=[mlt.GeoID(system=SYSTEM_TYPE, region=0, element=idx) for idx in range(NUMBER_OF_DATA_PRODUCERS + NUMBER_OF_TP_PRODUCERS)],
             initial_token_count=TOKEN_COUNT                    
         )),
         

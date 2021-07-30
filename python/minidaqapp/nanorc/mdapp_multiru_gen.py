@@ -193,7 +193,8 @@ def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowd
         TTCM_S1=ttcm_s1,
         TTCM_S2=ttcm_s2,
         TRIGGER_WINDOW_BEFORE_TICKS = trigger_window_before_ticks,
-        TRIGGER_WINDOW_AFTER_TICKS = trigger_window_after_ticks)
+        TRIGGER_WINDOW_AFTER_TICKS = trigger_window_after_ticks,
+        SOFTWARE_TPG_ENABLED = enable_software_tpg)
 
     console.log("trigger cmd data:", cmd_data_trigger)
 
@@ -202,7 +203,8 @@ def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowd
         RUN_NUMBER = run_number, 
         OUTPUT_PATH = output_path,
         TOKEN_COUNT = df_token_count,
-        SYSTEM_TYPE = system_type)
+        SYSTEM_TYPE = system_type,
+        SOFTWARE_TPG_ENABLED = enable_software_tpg)
     console.log("dataflow cmd data:", cmd_data_dataflow)
 
     cmd_data_readout = [ readout_gen.generate(network_endpoints,
