@@ -325,7 +325,8 @@ def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowd
                 "DUNEDAQ_ERS_INFO": ers_info,
                 "DUNEDAQ_ERS_WARNING": ers_warning,
                 "DUNEDAQ_ERS_ERROR": ers_error,
-                "DUNEDAQ_ERS_FATAL": ers_fatal
+                "DUNEDAQ_ERS_FATAL": ers_fatal,
+                "DUNEDAQ_ERS_DEBUG_LEVEL": "getenv:-1",
             },
             "hosts": {
                 "host_df": host_df,
