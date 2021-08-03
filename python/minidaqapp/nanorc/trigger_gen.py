@@ -255,37 +255,36 @@ def generate(
         )),
     ])
 
-    startpars = rccmd.StartParams(run=1)
-    cmd_data['start'] = acmd([
-        ] + ([
-            ("tpset_subscriber", startpars),
-            ("zip", startpars),
-            ("tam", startpars),
-            ("tcm", startpars),
-        ] if NUMBER_OF_TPSET_PRODUCERS else []) + [
-        ("mlt", startpars),
-        ("ttcm", startpars),
-        ("ntoq_hsievent", startpars),
-        ("ntoq_token", startpars),
-        ("qton_trigdec", startpars),
-    ])
+    # We start modules in "downstream-to-upstream" order, so that each
+    # module is ready before its input starts sending data. The stop
+    # order is the reverse (upstream-to-downstream), so each module
+    # can process all of its input then stop, ensuring all data gets
+    # processed
+    start_order = [
+        "mlt",
+        "ttcm",
+        "ntoq_hsievent",
+        "ntoq_token",
+        "qton_trigdec"
+    ]
 
-    cmd_data['stop'] = acmd([
-        ] + ([
-            ("tpset_subscriber", None),
-            ("zip", None),
-            ("tam", None),
-            ("tcm", None),
-        ] if NUMBER_OF_TPSET_PRODUCERS else []) + [
-        ("mlt", None),
-        ("ttcm", None),
-        ("ntoq_hsievent", None),
-        ("ntoq_token", None),
-        ("qton_trigdec", None),
-    ])
+    if NUMBER_OF_TPSET_PRODUCERS:
+        start_order += [
+            "tcm",
+            "tam",
+            "zip",
+            "tpset_subscriber_.*"
+        ]
+
+    stop_order = start_order[::-1]
+
+    startpars = rccmd.StartParams(run=1)
+    cmd_data['start'] = acmd([ (m, startpars) for m in start_order ])
+
+    cmd_data['stop'] = acmd([ (m, None) for m in stop_order ])
 
     cmd_data['pause'] = acmd([
-        ("", None)
+        ("mlt", None)
     ])
 
     resumepars = rccmd.ResumeParams(trigger_interval_ticks=50000000)
