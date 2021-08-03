@@ -261,7 +261,7 @@ def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowd
 
 
     console.log(f"Generating top-level command json files")
-    start_order = [app_df] + app_ru + [app_trigger] + [app_hsi]
+    start_order = [app_df] + [app_trigger] + app_ru + [app_hsi]
     for c in cmd_set:
         with open(join(json_dir,f'{c}.json'), 'w') as f:
             cfg = {
