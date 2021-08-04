@@ -65,7 +65,7 @@ import click
 @click.argument('json_dir', type=click.Path())
 
 def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowdown_factor, run_number, trigger_rate_hz, trigger_window_before_ticks, trigger_window_after_ticks,
-        token_count, data_file, output_path, disable_trace, use_felix, host_df, host_ru, host_trigger, host_hsi, host_hsi, host_timing_hw, use_timing_hw,
+        token_count, data_file, output_path, disable_trace, use_felix, host_df, host_ru, host_trigger, host_hsi, host_timing_hw, use_timing_hw,
         hsi_device_name, hsi_readout_period, use_hsi_hw, hsi_device_id, mean_hsi_signal_multiplicity, hsi_signal_emulation_mode, enabled_hsi_signals,
         ttcm_s1, ttcm_s2, trigger_activity_plugin, trigger_activity_config, trigger_candidate_plugin, trigger_candidate_config,
         enable_raw_recording, raw_recording_output_dir, frontend_type, opmon_impl, enable_dqm, ers_impl, dqm_impl, pocket_url, enable_software_tpg, json_dir):
@@ -318,10 +318,6 @@ def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowd
                     del cfg['apps'][app_hsi]
                 for ruapp in app_ru:
                     del cfg['apps'][ruapp]
-                if c == 'resume':
-                    cfg[f'order'] = resume_order
-                else:
-                    cfg[f'order'] = resume_order[::-1]
 
             json.dump(cfg, f, indent=4, sort_keys=True)
 
