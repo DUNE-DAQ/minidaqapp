@@ -294,24 +294,34 @@ def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowd
     start_order = [app_df] + [app_trigger] + app_ru + [app_hsi]
     if use_timing_hw:
         start_order.insert(0, app_thi)
-
+    
     for c in cmd_set:
         with open(join(json_dir,f'{c}.json'), 'w') as f:
             cfg = {
                 "apps": { app: f'data/{app}_{c}' for app in apps }
             }
-            if c in ['start','init', 'conf']:
-                cfg['order'] = start_order
-            elif c == 'stop':
-                cfg['order'] = start_order[::-1]
-            elif c in ('resume', 'pause'):
-                del cfg['apps'][app_df]
-                if use_hsi_hw:
-                    del cfg['apps'][app_hsi]
+            if c in [ 'conf']:
+                cfg[f'order'] = start_order
+            elif c == 'start':
+                cfg[f'order'] = start_order
                 if use_timing_hw:
                     del cfg['apps'][app_thi]
+            elif c == 'stop':
+                cfg[f'order'] = start_order[::-1]
+                if use_timing_hw:
+                    del cfg['apps'][app_thi]
+            elif c in ('resume', 'pause'):
+                del cfg['apps'][app_df]
+                if use_timing_hw:
+                    del cfg['apps'][app_thi]
+                if use_hsi_hw:
+                    del cfg['apps'][app_hsi]
                 for ruapp in app_ru:
                     del cfg['apps'][ruapp]
+                if c == 'resume':
+                    cfg[f'order'] = resume_order
+                else:
+                    cfg[f'order'] = resume_order[::-1]
 
             json.dump(cfg, f, indent=4, sort_keys=True)
 
