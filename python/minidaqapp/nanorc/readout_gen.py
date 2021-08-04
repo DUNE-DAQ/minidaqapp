@@ -264,6 +264,7 @@ def generate(NETWORK_ENDPOINTS,
                         sdqm=[1, 1, 1],
                         kafka_address="dqmbroadcast:9092",
                         link_idx=list(range(MIN_LINK, MAX_LINK)),
+                        clock_frequency=CLOCK_SPEED_HZ,
                         ))
             ] + [
                 ("timesync_to_network", qton.Conf(msg_type="dunedaq::dfmessages::TimeSync",
