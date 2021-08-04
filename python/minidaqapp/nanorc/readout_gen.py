@@ -255,7 +255,7 @@ def generate(NETWORK_ENDPOINTS,
                 ("trb_dqm", trb.ConfParams(
                         general_queue_timeout=QUEUE_POP_WAIT_MS,
                         map=trb.mapgeoidqueue([
-                                trb.geoidinst(region=0, element=idx, system="TPC", queueinstance=f"data_requests_dqm_{idx+MIN_LINK}") for idx in range(NUMBER_OF_DATA_PRODUCERS)
+                                trb.geoidinst(region=0, element=idx, system="TPC", queueinstance=f"data_requests_dqm_{idx}") for idx in range(MIN_LINK, MAX_LINK)
                             ]),
                         ))
             ] + [
@@ -263,6 +263,7 @@ def generate(NETWORK_ENDPOINTS,
                         mode='normal', # normal or debug
                         sdqm=[1, 1, 1],
                         kafka_address="dqmbroadcast:9092",
+                        link_idx=list(range(MIN_LINK, MAX_LINK)),
                         ))
             ] + [
                 ("timesync_to_network", qton.Conf(msg_type="dunedaq::dfmessages::TimeSync",
