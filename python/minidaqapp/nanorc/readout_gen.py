@@ -59,7 +59,7 @@ def generate(NETWORK_ENDPOINTS,
         RAW_RECORDING_OUTPUT_DIR=".",
         FRONTEND_TYPE='wib',
         SYSTEM_TYPE='TPC',
-        DQM_ENABLED=False
+        DQM_ENABLED=False,
         DQM_KAFKA_ADDRESS=''):
     """Generate the json configuration for the readout and DF process"""
 
