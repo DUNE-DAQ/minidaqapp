@@ -59,7 +59,8 @@ def generate(NETWORK_ENDPOINTS,
         RAW_RECORDING_OUTPUT_DIR=".",
         FRONTEND_TYPE='wib',
         SYSTEM_TYPE='TPC',
-        DQM_ENABLED=False):
+        DQM_ENABLED=False
+        DQM_KAFKA_ADDRESS=''):
     """Generate the json configuration for the readout and DF process"""
 
     cmd_data = {}
@@ -262,7 +263,7 @@ def generate(NETWORK_ENDPOINTS,
                 ('dqmprocessor', dqmprocessor.Conf(
                         mode='normal', # normal or debug
                         sdqm=[1, 1, 1],
-                        kafka_address="dqmbroadcast:9092",
+                        kafka_address=DQM_KAFKA_ADDRESS,
                         link_idx=list(range(MIN_LINK, MAX_LINK)),
                         clock_frequency=CLOCK_SPEED_HZ,
                         ))

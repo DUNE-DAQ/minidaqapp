@@ -117,18 +117,21 @@ def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowd
         ers_warning = "erstrace,throttle,lstderr,erskafka(dqmbroadcast:9092)"
         ers_error = "erstrace,throttle,lstderr,erskafka(dqmbroadcast:9092)"
         ers_fatal = "erstrace,lstderr,erskafka(dqmbroadcast:9092)"
+        dqm_kafka_address = "dqmbroadcast:9092"
     elif ers_impl == 'pocket':
         use_kafka = True
         ers_info = "erstrace,throttle,lstdout,erskafka(" + pocket_url + ":30092)"
         ers_warning = "erstrace,throttle,lstderr,erskafka(" + pocket_url + ":30092)"
         ers_error = "erstrace,throttle,lstderr,erskafka(" + pocket_url + ":30092)"
         ers_fatal = "erstrace,lstderr,erskafka(" + pocket_url + ":30092)"
+        dqm_kafka_address = pocket_url + ":30092"
     else:
         use_kafka = False
         ers_info = "erstrace,throttle,lstdout"
         ers_warning = "erstrace,throttle,lstderr"
         ers_error = "erstrace,throttle,lstderr"
         ers_fatal = "erstrace,lstderr"
+        dqm_kafka_address = ""
 
     port = 12347
     for idx in range(total_number_of_data_producers):
@@ -204,7 +207,8 @@ def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowd
             RAW_RECORDING_OUTPUT_DIR = raw_recording_output_dir,
             FRONTEND_TYPE = frontend_type,
             SYSTEM_TYPE = system_type,
-            DQM_ENABLED=enable_dqm
+            DQM_ENABLED=enable_dqm,
+            DQM_KAFKA_ADDRESS=dqm_kafka_address
             ) for hostidx in range(len(host_ru))]
     console.log("readout cmd data:", cmd_data_readout)
 
