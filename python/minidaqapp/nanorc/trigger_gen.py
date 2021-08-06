@@ -106,6 +106,7 @@ def generate(
         app.QueueSpec(inst="data_request_q", kind='FollySPSCQueue', capacity=1000),
         app.QueueSpec(inst="token_from_netq", kind='FollySPSCQueue', capacity=1000),        
         app.QueueSpec(inst="trigger_decision_to_netq", kind='FollySPSCQueue', capacity=1000),
+        app.QueueSpec(inst="tpset_q_for_buf", kind='FollySPSCQueue', capacity=1000),
     ]
 
     # Only needed to reproduce the same order as when using jsonnet
@@ -115,6 +116,11 @@ def generate(
             mspec(f"ntoq_data_request", "NetworkToQueue", [
                 app.QueueInfo(name="output", inst="data_request_q", dir="output")
             ]),
+
+            mspec(f"ntoq_tpset_for_buf", "NetworkToQueue", [
+                app.QueueInfo(name="output", inst="tpset_q_for_buf", dir="output")
+            ]),
+
 
             mspec(f"qton_fragment", "QueueToNetwork", [
                 app.QueueInfo(name="input", inst="fragment_q", dir="input")
@@ -175,7 +181,7 @@ def generate(
         ]),
 
         mspec("buf", "TPSetBufferCreator", [
-            app.QueueInfo(name="tpset_source", inst="tpset_q", dir="input"),
+            app.QueueInfo(name="tpset_source", inst="tpset_q_for_buf", dir="input"),
             app.QueueInfo(name="data_request_source", inst="data_request_q", dir="input"),
             app.QueueInfo(name="fragment_sink", inst="fragment_q", dir="output"),
         ]),
@@ -204,7 +210,15 @@ def generate(
             ))
             for idx in range(NUMBER_OF_TPSET_PRODUCERS)
         ] + [
-        
+
+        ("ntoq_tpset_for_buf", ntoq.Conf(
+                msg_type="dunedaq::trigger::TPSet",
+                msg_module_name="TPSetNQ",
+                receiver_config=nor.Conf(ipm_plugin_type="ZmqSubscriber",
+                                         address=NETWORK_ENDPOINTS[f'tpsets_0'],
+                                         subscriptions=["TPSets"])
+        )),
+
         ("zip", tzip.ConfParams(
              cardinality=NUMBER_OF_TPSET_PRODUCERS,
              max_latency_ms=1000,
@@ -291,6 +305,7 @@ def generate(
     # can process all of its input then stop, ensuring all data gets
     # processed
     start_order = [
+        "buf",
         "mlt",
         "ttcm",
         "ntoq_hsievent",
