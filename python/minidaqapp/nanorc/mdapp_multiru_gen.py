@@ -52,6 +52,7 @@ import click
 @click.option('--enable-dqm', is_flag=True, help="Enable Data Quality Monitoring")
 @click.option('--opmon-impl', type=click.Choice(['json','cern','pocket'], case_sensitive=False),default='json', help="Info collector service implementation to use")
 @click.option('--ers-impl', type=click.Choice(['local','cern','pocket'], case_sensitive=False), default='local', help="ERS destination (Kafka used for cern and pocket)")
+@click.option('--dqm-impl', type=click.Choice(['local','cern','pocket'], case_sensitive=False), default='local', help="DQM destination (Kafka used for cern and pocket)")
 @click.option('--pocket-url', default='127.0.0.1', help="URL for connecting to Pocket services")
 @click.argument('json_dir', type=click.Path())
 
@@ -59,7 +60,7 @@ def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowd
         token_count, data_file, output_path, disable_trace, use_felix, host_df, host_ru, host_trigger, host_hsi, 
         hsi_device_name, hsi_readout_period, use_hsi_hw, hsi_device_id, mean_hsi_signal_multiplicity, hsi_signal_emulation_mode, enabled_hsi_signals,
         ttcm_s1, ttcm_s2,
-        enable_raw_recording, raw_recording_output_dir, frontend_type, opmon_impl, enable_dqm, ers_impl, pocket_url, json_dir):
+        enable_raw_recording, raw_recording_output_dir, frontend_type, opmon_impl, enable_dqm, ers_impl, dqm_impl, pocket_url, json_dir):
     """
       JSON_DIR: Json file output folder
     """
@@ -117,21 +118,20 @@ def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowd
         ers_warning = "erstrace,throttle,lstderr,erskafka(dqmbroadcast:9092)"
         ers_error = "erstrace,throttle,lstderr,erskafka(dqmbroadcast:9092)"
         ers_fatal = "erstrace,lstderr,erskafka(dqmbroadcast:9092)"
-        dqm_kafka_address = "dqmbroadcast:9092"
     elif ers_impl == 'pocket':
         use_kafka = True
         ers_info = "erstrace,throttle,lstdout,erskafka(" + pocket_url + ":30092)"
         ers_warning = "erstrace,throttle,lstderr,erskafka(" + pocket_url + ":30092)"
         ers_error = "erstrace,throttle,lstderr,erskafka(" + pocket_url + ":30092)"
         ers_fatal = "erstrace,lstderr,erskafka(" + pocket_url + ":30092)"
-        dqm_kafka_address = pocket_url + ":30092"
     else:
         use_kafka = False
         ers_info = "erstrace,throttle,lstdout"
         ers_warning = "erstrace,throttle,lstderr"
         ers_error = "erstrace,throttle,lstderr"
         ers_fatal = "erstrace,lstderr"
-        dqm_kafka_address = ""
+
+    dqm_kafka_address = "dqmbroadcast:9092" if dqm_impl == 'cern' else pocket_url + ":30092" if dqm_impl == 'pocket' else ''
 
     port = 12347
     for idx in range(total_number_of_data_producers):
