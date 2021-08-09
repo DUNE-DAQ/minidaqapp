@@ -46,6 +46,11 @@ import click
 # trigger options
 @click.option('--ttcm-s1', default=1, help="Timing trigger candidate maker accepted HSI signal ID 1")
 @click.option('--ttcm-s2', default=2, help="Timing trigger candidate maker accepted HSI signal ID 2")
+@click.option('--trigger-activity-plugin', default='TriggerActivityMakerPrescalePlugin', help="Trigger activity algorithm plugin")
+@click.option('--trigger-activity-config', default='dict(prescale=100)', help="Trigger activity algorithm config (string containing python dictionary)")
+@click.option('--trigger-candidate-plugin', default='TriggerCandidateMakerPrescalePlugin', help="Trigger candidate algorithm plugin")
+@click.option('--trigger-candidate-config', default='dict(prescale=100)', help="Trigger candidate algorithm config (string containing python dictionary)")
+
 @click.option('--enable-raw-recording', is_flag=True, help="Add queues and modules necessary for the record command")
 @click.option('--raw-recording-output-dir', type=click.Path(), default='.', help="Output directory where recorded data is written to. Data for each link is written to a separate file")
 @click.option('--frontend-type', type=click.Choice(['wib', 'wib2', 'pds_queue', 'pds_list']), default='wib', help="Frontend type (wib, wib2 or pds) and latency buffer implementation in case of pds (folly queue or skip list)")
@@ -54,13 +59,14 @@ import click
 @click.option('--ers-impl', type=click.Choice(['local','cern','pocket'], case_sensitive=False), default='local', help="ERS destination (Kafka used for cern and pocket)")
 @click.option('--dqm-impl', type=click.Choice(['local','cern','pocket'], case_sensitive=False), default='local', help="DQM destination (Kafka used for cern and pocket)")
 @click.option('--pocket-url', default='127.0.0.1', help="URL for connecting to Pocket services")
+@click.option('--enable-software-tpg', is_flag=True, default=False, help="Enable software TPG")
 @click.argument('json_dir', type=click.Path())
 
 def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowdown_factor, run_number, trigger_rate_hz, trigger_window_before_ticks, trigger_window_after_ticks,
         token_count, data_file, output_path, disable_trace, use_felix, host_df, host_ru, host_trigger, host_hsi, 
         hsi_device_name, hsi_readout_period, use_hsi_hw, hsi_device_id, mean_hsi_signal_multiplicity, hsi_signal_emulation_mode, enabled_hsi_signals,
-        ttcm_s1, ttcm_s2,
-        enable_raw_recording, raw_recording_output_dir, frontend_type, opmon_impl, enable_dqm, ers_impl, dqm_impl, pocket_url, json_dir):
+        ttcm_s1, ttcm_s2, trigger_activity_plugin, trigger_activity_config, trigger_candidate_plugin, trigger_candidate_config,
+        enable_raw_recording, raw_recording_output_dir, frontend_type, opmon_impl, enable_dqm, ers_impl, dqm_impl, pocket_url, enable_software_tpg, json_dir):
     """
       JSON_DIR: Json file output folder
     """
@@ -85,7 +91,9 @@ def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowd
     else:
         total_number_of_data_producers = number_of_data_producers * len(host_ru)
         console.log(f"10 or fewer data producers were requested: Will setup {number_of_data_producers} per host, for a total of {total_number_of_data_producers}")
-        
+
+    if enable_software_tpg and frontend_type != 'wib':
+        raise Exception("Software TPG is only available for the wib at the moment!")
 
     if token_count > 0:
         df_token_count = 0
@@ -137,6 +145,11 @@ def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowd
     for idx in range(total_number_of_data_producers):
         network_endpoints[f"datareq_{idx}"] = "tcp://{host_df}:" + f"{port}"
         port = port + 1
+        if enable_software_tpg:
+            network_endpoints[f"tp_datareq_{idx}"] = "tcp://{host_df}:" + f"{port}"
+            port = port + 1
+
+
 
     cardid = {}
     host_id_dict = {}
@@ -147,6 +160,12 @@ def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowd
         port = port + 1
         network_endpoints[f"frags_{hostidx}"] = "tcp://{host_ru" + f"{hostidx}" + "}:" + f"{port}"
         port = port + 1
+        if enable_software_tpg:
+            network_endpoints[f"tp_frags_{hostidx}"] = "tcp://{host_ru" + f"{hostidx}" + "}:" + f"{port}"
+            port = port + 1
+            for idx in range(number_of_data_producers):
+                network_endpoints[f"tpsets_{hostidx*number_of_data_producers+idx}"] = "tcp://{host_ru" + f"{hostidx}" + "}:" + f"{port}"
+                port = port + 1
         if host_ru[hostidx] in host_id_dict:
             host_id_dict[host_ru[hostidx]] = host_id_dict[host_ru[hostidx]] + 1
             cardid[hostidx] = host_id_dict[host_ru[hostidx]]
@@ -175,13 +194,19 @@ def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowd
     console.log("hsi cmd data:", cmd_data_hsi)
 
     cmd_data_trigger = trigger_gen.generate(network_endpoints,
-        NUMBER_OF_DATA_PRODUCERS = total_number_of_data_producers,
+        NUMBER_OF_RAWDATA_PRODUCERS = total_number_of_data_producers,
+        NUMBER_OF_TPSET_PRODUCERS = total_number_of_data_producers if enable_software_tpg else 0,
+        ACTIVITY_PLUGIN = trigger_activity_plugin,
+        ACTIVITY_CONFIG = eval(trigger_activity_config),
+        CANDIDATE_PLUGIN = trigger_candidate_plugin,
+        CANDIDATE_CONFIG = eval(trigger_candidate_config),
         TOKEN_COUNT = trigemu_token_count,
         SYSTEM_TYPE = system_type,
         TTCM_S1=ttcm_s1,
         TTCM_S2=ttcm_s2,
         TRIGGER_WINDOW_BEFORE_TICKS = trigger_window_before_ticks,
         TRIGGER_WINDOW_AFTER_TICKS = trigger_window_after_ticks)
+
 
     console.log("trigger cmd data:", cmd_data_trigger)
 
@@ -190,11 +215,13 @@ def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowd
         RUN_NUMBER = run_number, 
         OUTPUT_PATH = output_path,
         TOKEN_COUNT = df_token_count,
-        SYSTEM_TYPE = system_type)
+        SYSTEM_TYPE = system_type,
+        SOFTWARE_TPG_ENABLED = enable_software_tpg)
     console.log("dataflow cmd data:", cmd_data_dataflow)
 
     cmd_data_readout = [ readout_gen.generate(network_endpoints,
             NUMBER_OF_DATA_PRODUCERS = number_of_data_producers,
+            TOTAL_NUMBER_OF_DATA_PRODUCERS=total_number_of_data_producers,
             EMULATOR_MODE = emulator_mode,
             DATA_RATE_SLOWDOWN_FACTOR = data_rate_slowdown_factor,
             RUN_NUMBER = run_number, 
@@ -208,7 +235,8 @@ def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowd
             FRONTEND_TYPE = frontend_type,
             SYSTEM_TYPE = system_type,
             DQM_ENABLED=enable_dqm,
-            DQM_KAFKA_ADDRESS=dqm_kafka_address
+            DQM_KAFKA_ADDRESS=dqm_kafka_address,
+            SOFTWARE_TPG_ENABLED= enable_software_tpg
             ) for hostidx in range(len(host_ru))]
     console.log("readout cmd data:", cmd_data_readout)
 
@@ -237,7 +265,7 @@ def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowd
 
 
     console.log(f"Generating top-level command json files")
-    start_order = [app_df] + app_ru + [app_trigger] + [app_hsi]
+    start_order = [app_df] + [app_trigger] + app_ru + [app_hsi]
     for c in cmd_set:
         with open(join(json_dir,f'{c}.json'), 'w') as f:
             cfg = {
@@ -280,7 +308,8 @@ def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowd
                     "DUNEDAQ_SHARE_PATH": "getenv",
                     "TIMING_SHARE": "getenv",
                     "LD_LIBRARY_PATH": "getenv",
-                    "PATH": "getenv"
+                    "PATH": "getenv",
+                    "READOUT_SHARE": "getenv"
                 },
                 "cmd": ["CMD_FAC=rest://localhost:${APP_PORT}",
                     "INFO_SVC=" + info_svc_uri,
@@ -300,7 +329,8 @@ def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowd
                 "DUNEDAQ_ERS_INFO": ers_info,
                 "DUNEDAQ_ERS_WARNING": ers_warning,
                 "DUNEDAQ_ERS_ERROR": ers_error,
-                "DUNEDAQ_ERS_FATAL": ers_fatal
+                "DUNEDAQ_ERS_FATAL": ers_fatal,
+                "DUNEDAQ_ERS_DEBUG_LEVEL": "getenv:-1",
             },
             "hosts": {
                 "host_df": host_df,
