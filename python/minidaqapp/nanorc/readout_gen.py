@@ -51,7 +51,7 @@ def generate(NETWORK_ENDPOINTS,
         TOTAL_NUMBER_OF_DATA_PRODUCERS=2,
         EMULATOR_MODE=False,
         DATA_RATE_SLOWDOWN_FACTOR=1,
-        RUN_NUMBER=333,
+        RUN_NUMBER=333, 
         DATA_FILE="./frames.bin",
         FLX_INPUT=True,
         CLOCK_SPEED_HZ=50000000,
@@ -87,12 +87,6 @@ def generate(NETWORK_ENDPOINTS,
                 for idx in range(MIN_LINK,MAX_LINK)
         ] + [
             app.QueueSpec(inst=f"{FRONTEND_TYPE}_link_{idx}", kind='FollySPSCQueue', capacity=100000)
-                for idx in range(NUMBER_OF_DATA_PRODUCERS)
-        ] + [
-            app.QueueSpec(inst=f"tpset_link_{idx}", kind='FollySPSCQueue', capacity=10000)
-                for idx in range(NUMBER_OF_DATA_PRODUCERS)
-        ] + [
-            app.QueueSpec(inst=f"tp_queue_{idx}", kind='FollySPSCQueue', capacity=100000)
                 for idx in range(NUMBER_OF_DATA_PRODUCERS)
         ]
 
@@ -135,18 +129,6 @@ def generate(NETWORK_ENDPOINTS,
         mspec("qton_fragments", "QueueToNetwork", [app.QueueInfo(name="input", inst="data_fragments_q", dir="input")]),
     ] + [
         mspec(f"ntoq_datareq_{idx}", "NetworkToQueue", [app.QueueInfo(name="output", inst=f"data_requests_{idx}", dir="output")]) for idx in range(MIN_LINK,MAX_LINK)
-    ] + [
-        mspec(f"tpset_publisher_{idx}", "QueueToNetwork", [
-            app.QueueInfo(name="input", inst=f"tpset_link_{idx}", dir="input")
-        ]) for idx in range(NUMBER_OF_DATA_PRODUCERS)
-    ] + [
-        mspec(f"tp_handler_{idx}", "DataLinkHandler", [
-            app.QueueInfo(name="raw_input", inst=f"tp_queue_{idx}", dir="input"),
-            app.QueueInfo(name="timesync", inst="time_sync_q", dir="output"),
-            app.QueueInfo(name="requests", inst="tp_data_requests", dir="input"),
-            app.QueueInfo(name="fragments", inst="data_fragments_q", dir="output"),
-            app.QueueInfo(name="raw_recording", inst="tp_recording_link", dir="output")
-        ]) for idx in range(NUMBER_OF_DATA_PRODUCERS)
     ]
 
     if SOFTWARE_TPG_ENABLED:
@@ -265,16 +247,15 @@ def generate(NETWORK_ENDPOINTS,
                                             sender_config=nos.Conf(ipm_plugin_type="ZmqSender",
                                                                    address=NETWORK_ENDPOINTS[f"timesync_{HOSTIDX}"],
                                                                    stype="msgpack"))),
-
+        
                 ("fake_source",fakecr.Conf(
                             link_confs=[fakecr.LinkConfiguration(
                             geoid=fakecr.GeoID(system=SYSTEM_TYPE, region=0, element=idx),
                                 slowdown=DATA_RATE_SLOWDOWN_FACTOR,
                                 queue_name=f"output_{idx-MIN_LINK}",
-                                data_filename = DATA_FILE,
-                                input_limit=1048510000, # default
+                                data_filename = DATA_FILE
                                 ) for idx in range(MIN_LINK,MAX_LINK)],
-
+                            # input_limit=10485100, # default
                             queue_timeout_ms = QUEUE_POP_WAIT_MS)),
                 ("flxcard_0",flxcr.Conf(card_id=CARDID,
                             logical_unit=0,
@@ -296,7 +277,7 @@ def generate(NETWORK_ENDPOINTS,
                 (f"ntoq_datareq_{idx}", ntoq.Conf(msg_type="dunedaq::dfmessages::DataRequest",
                                            msg_module_name="DataRequestNQ",
                                            receiver_config=nor.Conf(ipm_plugin_type="ZmqReceiver",
-                                                                    address=NETWORK_ENDPOINTS[f"datareq_{idx+1}"]))) for idx in range(MIN_LINK,MAX_LINK)
+                                                                    address=NETWORK_ENDPOINTS[f"datareq_{idx}"]))) for idx in range(MIN_LINK,MAX_LINK)
             ] + [
                 (f"tp_datahandler_{TOTAL_NUMBER_OF_DATA_PRODUCERS + idx}", dlh.Conf(
                     emulator_mode = False,
@@ -319,7 +300,6 @@ def generate(NETWORK_ENDPOINTS,
                         pop_limit_pct = 0.8,
                         pop_size_pct = 0.1,
                         apa_number = 0,
-                        enable_software_tpg = True,
                         link_number = idx)) for idx in range(MIN_LINK,MAX_LINK)
             ] + [
                 (f"data_recorder_{idx}", dr.Conf(
@@ -383,11 +363,11 @@ def generate(NETWORK_ENDPOINTS,
 
     cmd_data['conf'] = acmd(conf_list)
 
+
     startpars = rccmd.StartParams(run=RUN_NUMBER)
     cmd_data['start'] = acmd([("qton_fragments", startpars),
             ("qton_timesync", startpars),
             ("datahandler_.*", startpars),
-            ("tp_handler_.*", startpars),
             ("data_recorder_.*", startpars),
             ("fake_source", startpars),
             ("flxcard.*", startpars),
@@ -404,7 +384,6 @@ def generate(NETWORK_ENDPOINTS,
             ("ntoq_datareq_.*", None),
             ("flxcard.*", None),
             ("fake_source", None),
-            ("tp_handler_.*", None),
             ("datahandler_.*", None),
             ("data_recorder_.*", None),
             ("qton_timesync", None),

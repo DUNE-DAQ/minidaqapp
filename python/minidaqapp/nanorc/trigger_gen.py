@@ -76,10 +76,10 @@ def generate(
         NUMBER_OF_TPSET_PRODUCERS: int = 2,
         
         ACTIVITY_PLUGIN: str = 'TriggerActivityMakerPrescalePlugin',
-        ACTIVITY_CONFIG: dict = dict(prescale=1000),
+        ACTIVITY_CONFIG: dict = dict(prescale=10000),
         
         CANDIDATE_PLUGIN: str = 'TriggerCandidateMakerPrescalePlugin',
-        CANDIDATE_CONFIG: int = dict(prescale=1000),
+        CANDIDATE_CONFIG: int = dict(prescale=10),
         
         TOKEN_COUNT: int = 10,
         SYSTEM_TYPE = 'wib',
@@ -265,14 +265,14 @@ def generate(
         ("ntoq_data_request", ntoq.Conf(msg_type="dunedaq::dfmessages::DataRequest",
                                            msg_module_name="DataRequestNQ",
                                            receiver_config=nor.Conf(ipm_plugin_type="ZmqReceiver",
-                                                                    address=NETWORK_ENDPOINTS["datareq_0"])
+                                                                    address=NETWORK_ENDPOINTS["ds_tp_datareq_0"])
                                            )
          ),
 
         ("qton_fragment", qton.Conf(msg_type="std::unique_ptr<dunedaq::dataformats::Fragment>",
                                            msg_module_name="FragmentNQ",
                                            sender_config=nos.Conf(ipm_plugin_type="ZmqSender",
-                                                                  address=NETWORK_ENDPOINTS[f"frags_tpset"],
+                                                                  address=NETWORK_ENDPOINTS[f"frags_tpset_ds"],
                                                                   stype="msgpack"))),
 
         # Module level trigger
@@ -292,9 +292,12 @@ def generate(
         
         ("mlt", mlt.ConfParams(
             # This line requests the raw data from upstream DAQ _and_ the raw TPs from upstream DAQ
-            links=[mlt.GeoID(system=SYSTEM_TYPE, region=0, element=idx) for idx in range(NUMBER_OF_RAWDATA_PRODUCERS + NUMBER_OF_TPSET_PRODUCERS)],
-            # PAR 2021-07-30 We'll add the following line when we have TPSet buffers in the trigger app
-            # [mlt.GeoID(system="DataSelection", region=0, element=idx) for idx in range(NUMBER_OF_TPSET_PRODUCERS)],
+            links=[
+                mlt.GeoID(system=SYSTEM_TYPE, region=0, element=idx)
+                for idx in range(NUMBER_OF_RAWDATA_PRODUCERS + NUMBER_OF_TPSET_PRODUCERS)
+            ] + [
+                mlt.GeoID(system="DataSelection", region=0, element=0)
+                ],
             initial_token_count=TOKEN_COUNT                    
         )),
     ])
@@ -306,6 +309,7 @@ def generate(
     # processed
     start_order = [
         "buf",
+        "ntoq_tpset_for_buf",
         "mlt",
         "ttcm",
         "ntoq_hsievent",

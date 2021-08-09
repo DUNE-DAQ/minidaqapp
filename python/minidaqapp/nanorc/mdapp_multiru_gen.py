@@ -151,11 +151,11 @@ def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowd
     cardid = {}
     host_id_dict = {}
 
-    network_endpoints['tpset'] = "tcp://{host_ru0}:"+str(port)
-    port += 1
-
-    network_endpoints['frags_tpset_ds'] = "tcp://{host_trigger}:"+str(port)
-    port += 1
+    if enable_software_tpg:
+        network_endpoints['frags_tpset_ds'] = "tcp://{host_trigger}:"+str(port)
+        port += 1
+        network_endpoints[f"ds_tp_datareq_0"] = "tcp://{host_df}:" + f"{port}"
+        port += 1
 
     for hostidx in range(len(host_ru)):
         # Should end up something like 'network_endpoints[timesync_0]:
@@ -328,7 +328,7 @@ def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowd
 
         cfg = {
             "env" : {
-                "DUNEDAQ_ERS_VERBOSITY_LEVEL": 1,
+                "DUNEDAQ_ERS_VERBOSITY_LEVEL": "getenv:-1",
                 "DUNEDAQ_PARTITION": partition_name,
                 "DUNEDAQ_ERS_INFO": ers_info,
                 "DUNEDAQ_ERS_WARNING": ers_warning,
