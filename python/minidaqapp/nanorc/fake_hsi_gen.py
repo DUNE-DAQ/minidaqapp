@@ -96,7 +96,9 @@ def generate(
 
     cmd_data['init'] = app.Init(queues=queue_specs, modules=mod_specs)
 
-    trigger_interval_ticks=math.floor((1/TRIGGER_RATE_HZ) * CLOCK_SPEED_HZ/DATA_RATE_SLOWDOWN_FACTOR)
+    trigger_interval_ticks=0
+    if TRIGGER_RATE_HZ > 0:
+        trigger_interval_ticks=math.floor((1/TRIGGER_RATE_HZ) * CLOCK_SPEED_HZ/DATA_RATE_SLOWDOWN_FACTOR)
     
     cmd_data['conf'] = acmd([
 
