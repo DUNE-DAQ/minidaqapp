@@ -145,17 +145,13 @@ def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowd
         if enable_software_tpg:
             network_endpoints[f"tp_datareq_{idx}"] = "tcp://{host_df}:" + f"{port}"
             port = port + 1
-
-
+            network_endpoints[f'frags_tpset_ds_{idx}'] = "tcp://{host_trigger}:"+str(port)
+            port += 1
+            network_endpoints[f"ds_tp_datareq_{idx}"] = "tcp://{host_df}:" + f"{port}"
+            port += 1
 
     cardid = {}
     host_id_dict = {}
-
-    if enable_software_tpg:
-        network_endpoints['frags_tpset_ds'] = "tcp://{host_trigger}:"+str(port)
-        port += 1
-        network_endpoints[f"ds_tp_datareq_0"] = "tcp://{host_df}:" + f"{port}"
-        port += 1
 
     for hostidx in range(len(host_ru)):
         # Should end up something like 'network_endpoints[timesync_0]:

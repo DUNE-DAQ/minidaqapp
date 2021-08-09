@@ -102,39 +102,45 @@ def generate(
         ] if NUMBER_OF_TPSET_PRODUCERS else []) + [
         app.QueueSpec(inst='trigger_candidate_q', kind='FollyMPMCQueue', capacity=1000),
         app.QueueSpec(inst="hsievent_from_netq", kind='FollyMPMCQueue', capacity=1000),
-        app.QueueSpec(inst="fragment_q", kind='FollySPSCQueue', capacity=1000),
-        app.QueueSpec(inst="data_request_q", kind='FollySPSCQueue', capacity=1000),
         app.QueueSpec(inst="token_from_netq", kind='FollySPSCQueue', capacity=1000),
         app.QueueSpec(inst="trigger_decision_to_netq", kind='FollySPSCQueue', capacity=1000),
-        app.QueueSpec(inst="tpset_q_for_buf", kind='FollySPSCQueue', capacity=1000),
     ]
+
+    for idx in range(NUMBER_OF_TPSET_PRODUCERS):
+        queue_bare_specs.extend([
+            app.QueueSpec(inst=f"fragment_q{idx}", kind='FollySPSCQueue', capacity=1000),
+            app.QueueSpec(inst=f"tpset_q_for_buf{idx}", kind='FollySPSCQueue', capacity=1000),
+            app.QueueSpec(inst=f"data_request_q{idx}", kind='FollySPSCQueue', capacity=1000),
+        ])
 
     # Only needed to reproduce the same order as when using jsonnet
     queue_specs = app.QueueSpecs(sorted(queue_bare_specs, key=lambda x: x.inst))
 
-    mod_specs = [
-            mspec(f"ntoq_data_request", "NetworkToQueue", [
-                app.QueueInfo(name="output", inst="data_request_q", dir="output")
+    mod_specs = []
+
+    for idx in range(NUMBER_OF_TPSET_PRODUCERS):
+        mod_specs.extend([
+            mspec(f"ntoq_data_request{idx}", "NetworkToQueue", [
+                app.QueueInfo(name="output", inst=f"data_request_q{idx}", dir="output")
             ]),
-
-            mspec(f"ntoq_tpset_for_buf", "NetworkToQueue", [
-                app.QueueInfo(name="output", inst="tpset_q_for_buf", dir="output")
+            mspec(f"ntoq_tpset_for_buf{idx}", "NetworkToQueue", [
+                app.QueueInfo(name="output", inst=f"tpset_q_for_buf{idx}", dir="output")
             ]),
-
-
-            mspec(f"qton_fragment", "QueueToNetwork", [
-                app.QueueInfo(name="input", inst="fragment_q", dir="input")
+            mspec(f"tpset_subscriber_{idx}", "NetworkToQueue", [
+                app.QueueInfo(name="output", inst=f"tpsets_from_netq", dir="output")
             ]),
-        ] + ([
+            mspec(f"qton_fragment{idx}", "QueueToNetwork", [
+                app.QueueInfo(name="input", inst=f"fragment_q{idx}", dir="input")
+            ]),
+            mspec(f"buf{idx}", "TPSetBufferCreator", [
+                app.QueueInfo(name="tpset_source", inst=f"tpset_q_for_buf{idx}", dir="input"),
+                app.QueueInfo(name="data_request_source", inst=f"data_request_q{idx}", dir="input"),
+                app.QueueInfo(name="fragment_sink", inst=f"fragment_q{idx}", dir="output"),
+            ])
 
-            ### TPSet input
+        ])
 
-            ] + [
-                mspec(f"tpset_subscriber_{idx}", "NetworkToQueue", [
-                    app.QueueInfo(name="output", inst=f"tpsets_from_netq", dir="output")
-                ]) for idx in range(NUMBER_OF_TPSET_PRODUCERS)
-            ] + [
-
+    mod_specs += ([
             mspec("zip", "TPZipper", [
                 app.QueueInfo(name="input", inst="tpsets_from_netq", dir="input"),
                 app.QueueInfo(name="output", inst="zipped_tpset_q", dir="output"), #FIXME need to fanout this zipped_tpset_q if using multiple algorithms
@@ -152,7 +158,7 @@ def generate(
                 app.QueueInfo(name='output', inst='trigger_candidate_q', dir='output'),
             ])
 
-            ] if NUMBER_OF_TPSET_PRODUCERS else []) + [
+        ] if NUMBER_OF_TPSET_PRODUCERS else []) + [
 
         ### Timing TCs
         mspec("ntoq_hsievent", "NetworkToQueue", [
@@ -180,12 +186,6 @@ def generate(
             app.QueueInfo(name="trigger_candidate_source", inst="trigger_candidate_q", dir="input"),
         ]),
 
-        mspec("buf", "TPSetBufferCreator", [
-            app.QueueInfo(name="tpset_source", inst="tpset_q_for_buf", dir="input"),
-            app.QueueInfo(name="data_request_source", inst="data_request_q", dir="input"),
-            app.QueueInfo(name="fragment_sink", inst="fragment_q", dir="output"),
-        ]),
-
     ]
 
     cmd_data['init'] = app.Init(queues=queue_specs, modules=mod_specs)
@@ -195,29 +195,39 @@ def generate(
     make_moo_record(CANDIDATE_CONFIG,'CandidateConf','temptypes')
     import temptypes
 
-    cmd_data['conf'] = acmd([
-            ("buf", buf.Conf(
-                tpset_buffer_size=10000,
-            )),
-        ### TPSet input
-        ] + [
+    tp_confs = []
+
+    for idx in range(NUMBER_OF_TPSET_PRODUCERS):
+        tp_confs.extend([
+            (f"buf{idx}", buf.Conf(tpset_buffer_size=10000, region=0, element=idx)),
             (f"tpset_subscriber_{idx}", ntoq.Conf(
                 msg_type="dunedaq::trigger::TPSet",
                 msg_module_name="TPSetNQ",
                 receiver_config=nor.Conf(ipm_plugin_type="ZmqSubscriber",
                                          address=NETWORK_ENDPOINTS[f'tpsets_{idx}'],
                                          subscriptions=["TPSets"])
-            ))
-            for idx in range(NUMBER_OF_TPSET_PRODUCERS)
-        ] + [
-
-        ("ntoq_tpset_for_buf", ntoq.Conf(
+            )),
+            (f"ntoq_tpset_for_buf{idx}", ntoq.Conf(
                 msg_type="dunedaq::trigger::TPSet",
                 msg_module_name="TPSetNQ",
                 receiver_config=nor.Conf(ipm_plugin_type="ZmqSubscriber",
-                                         address=NETWORK_ENDPOINTS[f'tpsets_0'],
+                                         address=NETWORK_ENDPOINTS[f'tpsets_{idx}'],
                                          subscriptions=["TPSets"])
-        )),
+            )),
+            (f"ntoq_data_request{idx}", ntoq.Conf(msg_type="dunedaq::dfmessages::DataRequest",
+                                                  msg_module_name="DataRequestNQ",
+                                                  receiver_config=nor.Conf(ipm_plugin_type="ZmqReceiver",
+                                                                           address=NETWORK_ENDPOINTS[f"ds_tp_datareq_{idx}"])
+            )),
+            (f"qton_fragment{idx}", qton.Conf(msg_type="std::unique_ptr<dunedaq::dataformats::Fragment>",
+                                        msg_module_name="FragmentNQ",
+                                        sender_config=nos.Conf(ipm_plugin_type="ZmqSender",
+                                                               address=NETWORK_ENDPOINTS[f"frags_tpset_ds_{idx}"],
+                                                               stype="msgpack"))),
+
+        ])
+
+    cmd_data['conf'] = acmd(tp_confs + [
 
         ("zip", tzip.ConfParams(
              cardinality=NUMBER_OF_TPSET_PRODUCERS,
@@ -262,19 +272,6 @@ def generate(
         ),
 
 
-        ("ntoq_data_request", ntoq.Conf(msg_type="dunedaq::dfmessages::DataRequest",
-                                           msg_module_name="DataRequestNQ",
-                                           receiver_config=nor.Conf(ipm_plugin_type="ZmqReceiver",
-                                                                    address=NETWORK_ENDPOINTS["ds_tp_datareq_0"])
-                                           )
-         ),
-
-        ("qton_fragment", qton.Conf(msg_type="std::unique_ptr<dunedaq::dataformats::Fragment>",
-                                           msg_module_name="FragmentNQ",
-                                           sender_config=nos.Conf(ipm_plugin_type="ZmqSender",
-                                                                  address=NETWORK_ENDPOINTS[f"frags_tpset_ds"],
-                                                                  stype="msgpack"))),
-
         # Module level trigger
         ("ntoq_token", ntoq.Conf(
             msg_type="dunedaq::dfmessages::TriggerDecisionToken",
@@ -296,7 +293,7 @@ def generate(
                 mlt.GeoID(system=SYSTEM_TYPE, region=0, element=idx)
                 for idx in range(NUMBER_OF_RAWDATA_PRODUCERS + NUMBER_OF_TPSET_PRODUCERS)
             ] + [
-                mlt.GeoID(system="DataSelection", region=0, element=0)
+                mlt.GeoID(system="DataSelection", region=0, element=idx) for idx in range(NUMBER_OF_TPSET_PRODUCERS)
                 ],
             initial_token_count=TOKEN_COUNT
         )),
@@ -308,8 +305,8 @@ def generate(
     # can process all of its input then stop, ensuring all data gets
     # processed
     start_order = [
-        "buf",
-        "ntoq_tpset_for_buf",
+        "buf.*",
+        "ntoq_tpset_for_buf.*",
         "mlt",
         "ttcm",
         "ntoq_hsievent",
@@ -322,7 +319,8 @@ def generate(
             "tcm",
             "tam",
             "zip",
-            "tpset_subscriber_.*"
+            "tpset_subscriber_.*",
+            "ntoq_data_request.*"
         ]
 
     stop_order = start_order[::-1]
