@@ -53,7 +53,7 @@ QUEUE_POP_WAIT_MS = 100
 
 def generate(NETWORK_ENDPOINTS,
         NUMBER_OF_DATA_PRODUCERS=2,
-        RUN_NUMBER=333, 
+        RUN_NUMBER=333,
         OUTPUT_PATH=".",
         TOKEN_COUNT=0,
         SYSTEM_TYPE="TPC",
@@ -142,7 +142,7 @@ def generate(NETWORK_ENDPOINTS,
                                            sender_config=nos.Conf(ipm_plugin_type="ZmqSender",
                                                                   address=NETWORK_ENDPOINTS["triginh"],
                                                                   stype="msgpack"))),
-        
+
                 ("trb", trb.ConfParams( general_queue_timeout=QUEUE_POP_WAIT_MS,
                                         map=trb.mapgeoidqueue([
                                                 trb.geoidinst(region=0, element=idx, system=SYSTEM_TYPE, queueinstance=f"data_requests_{idx}")  for idx in range(NUMBER_OF_DATA_PRODUCERS)
@@ -172,7 +172,7 @@ def generate(NETWORK_ENDPOINTS,
                                            msg_module_name="DataRequestNQ",
                                            sender_config=nos.Conf(ipm_plugin_type="ZmqSender",
                                                                   address=NETWORK_ENDPOINTS[f"datareq_{idx}"],
-                                                                  stype="msgpack"))) 
+                                                                  stype="msgpack")))
                  for idx in range(NUMBER_OF_DATA_PRODUCERS)
             ] + [
                 (f"qton_tp_datareq_{idx}", qton.Conf(msg_type="dunedaq::dfmessages::DataRequest",
@@ -181,7 +181,7 @@ def generate(NETWORK_ENDPOINTS,
                                                                     address=NETWORK_ENDPOINTS[f"tp_datareq_{idx}"],
                                                                     stype="msgpack")))
                 for idx in range(NUMBER_OF_RAW_TP_PRODUCERS)
-                
+
             ] + [
                 (f"qton_ds_tp_datareq_{idx}", qton.Conf(msg_type="dunedaq::dfmessages::DataRequest",
                                                         msg_module_name="DataRequestNQ",
@@ -189,7 +189,7 @@ def generate(NETWORK_ENDPOINTS,
                                                                                address=NETWORK_ENDPOINTS[f"ds_tp_datareq_{idx}"],
                                                                                stype="msgpack")))
                 for idx in range(NUMBER_OF_RAW_TP_PRODUCERS)
-                
+
             ] + [
                 (f"ntoq_fragments_{idx}", ntoq.Conf(msg_type="std::unique_ptr<dunedaq::dataformats::Fragment>",
                                            msg_module_name="FragmentNQ",

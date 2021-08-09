@@ -67,20 +67,20 @@ def make_moo_record(conf_dict,name,path='temptypes'):
             raise Exception(f'Invalid config argument type: {type(value)}')
         fields.append(dict(name=pname,item=typename))
     moo.otypes.make_type(schema='record', fields=fields, name=name, path=path)
-    
+
 #===============================================================================
 def generate(
         NETWORK_ENDPOINTS: list,
-        
+
         NUMBER_OF_RAWDATA_PRODUCERS: int = 2,
         NUMBER_OF_TPSET_PRODUCERS: int = 2,
-        
+
         ACTIVITY_PLUGIN: str = 'TriggerActivityMakerPrescalePlugin',
         ACTIVITY_CONFIG: dict = dict(prescale=10000),
-        
+
         CANDIDATE_PLUGIN: str = 'TriggerCandidateMakerPrescalePlugin',
         CANDIDATE_CONFIG: int = dict(prescale=10),
-        
+
         TOKEN_COUNT: int = 10,
         SYSTEM_TYPE = 'wib',
         TTCM_S1: int = 1,
@@ -104,7 +104,7 @@ def generate(
         app.QueueSpec(inst="hsievent_from_netq", kind='FollyMPMCQueue', capacity=1000),
         app.QueueSpec(inst="fragment_q", kind='FollySPSCQueue', capacity=1000),
         app.QueueSpec(inst="data_request_q", kind='FollySPSCQueue', capacity=1000),
-        app.QueueSpec(inst="token_from_netq", kind='FollySPSCQueue', capacity=1000),        
+        app.QueueSpec(inst="token_from_netq", kind='FollySPSCQueue', capacity=1000),
         app.QueueSpec(inst="trigger_decision_to_netq", kind='FollySPSCQueue', capacity=1000),
         app.QueueSpec(inst="tpset_q_for_buf", kind='FollySPSCQueue', capacity=1000),
     ]
@@ -125,35 +125,35 @@ def generate(
             mspec(f"qton_fragment", "QueueToNetwork", [
                 app.QueueInfo(name="input", inst="fragment_q", dir="input")
             ]),
-        ] + ([        
-            
+        ] + ([
+
             ### TPSet input
-        
+
             ] + [
-                mspec(f"tpset_subscriber_{idx}", "NetworkToQueue", [ 
+                mspec(f"tpset_subscriber_{idx}", "NetworkToQueue", [
                     app.QueueInfo(name="output", inst=f"tpsets_from_netq", dir="output")
                 ]) for idx in range(NUMBER_OF_TPSET_PRODUCERS)
             ] + [
-            
+
             mspec("zip", "TPZipper", [
                 app.QueueInfo(name="input", inst="tpsets_from_netq", dir="input"),
                 app.QueueInfo(name="output", inst="zipped_tpset_q", dir="output"), #FIXME need to fanout this zipped_tpset_q if using multiple algorithms
             ]),
-            
+
             ### Algorithm(s)
-            
+
             mspec('tam', 'TriggerActivityMaker', [ # TPSet -> TASet
                 app.QueueInfo(name='input', inst='zipped_tpset_q', dir='input'),
                 app.QueueInfo(name='output', inst='taset_q', dir='output'),
             ]),
-            
+
             mspec('tcm', 'TriggerCandidateMaker', [ # TASet -> TC
                 app.QueueInfo(name='input', inst='taset_q', dir='input'),
                 app.QueueInfo(name='output', inst='trigger_candidate_q', dir='output'),
             ])
-            
+
             ] if NUMBER_OF_TPSET_PRODUCERS else []) + [
-        
+
         ### Timing TCs
         mspec("ntoq_hsievent", "NetworkToQueue", [
             app.QueueInfo(name="output", inst="hsievent_from_netq", dir="output")
@@ -163,7 +163,7 @@ def generate(
             app.QueueInfo(name="input", inst="hsievent_from_netq", dir="input"),
             app.QueueInfo(name="output", inst="trigger_candidate_q", dir="output"),
         ]),
-        
+
         ### Module level trigger
 
         mspec("ntoq_token", "NetworkToQueue", [
@@ -189,12 +189,12 @@ def generate(
     ]
 
     cmd_data['init'] = app.Init(queues=queue_specs, modules=mod_specs)
-    
+
     # Generate schema for the maker plugins on the fly in the temptypes module
     make_moo_record(ACTIVITY_CONFIG,'ActivityConf','temptypes')
     make_moo_record(CANDIDATE_CONFIG,'CandidateConf','temptypes')
     import temptypes
-    
+
     cmd_data['conf'] = acmd([
             ("buf", buf.Conf(
                 tpset_buffer_size=10000,
@@ -225,9 +225,9 @@ def generate(
              region_id=0, # Fake placeholder
              element_id=0 # Fake placeholder
         )),
-        
+
         ### Algorithms
-        
+
         ('tam', tam.Conf(
             activity_maker=ACTIVITY_PLUGIN,
             geoid_region=0, # Fake placeholder
@@ -236,21 +236,21 @@ def generate(
             buffer_time=625000, # 10ms in 62.5 MHz ticks
             activity_maker_config=temptypes.ActivityConf(**ACTIVITY_CONFIG)
         )),
-        
+
         ('tcm', tcm.Conf(
             candidate_maker=CANDIDATE_PLUGIN,
             candidate_maker_config=temptypes.CandidateConf(**CANDIDATE_CONFIG)
         )),
-        
+
         ### Timing TCs
-        
+
         ("ntoq_hsievent", ntoq.Conf(
             msg_type="dunedaq::dfmessages::HSIEvent",
             msg_module_name="HSIEventNQ",
             receiver_config=nor.Conf(ipm_plugin_type="ZmqReceiver",
                                      address=NETWORK_ENDPOINTS["hsievent"])
         )),
-                
+
         ("ttcm", ttcm.Conf(
             s1=ttcm.map_t(signal_type=TTCM_S1,
                           time_before=TRIGGER_WINDOW_BEFORE_TICKS,
@@ -282,14 +282,14 @@ def generate(
             receiver_config=nor.Conf(ipm_plugin_type="ZmqReceiver",
                                      address=NETWORK_ENDPOINTS["triginh"])
         )),
-        
+
         ("qton_trigdec", qton.Conf(
             msg_type="dunedaq::dfmessages::TriggerDecision",
             msg_module_name="TriggerDecisionNQ",
             sender_config=nos.Conf(ipm_plugin_type="ZmqSender",
                                    address=NETWORK_ENDPOINTS["trigdec"])
         )),
-        
+
         ("mlt", mlt.ConfParams(
             # This line requests the raw data from upstream DAQ _and_ the raw TPs from upstream DAQ
             links=[
@@ -298,7 +298,7 @@ def generate(
             ] + [
                 mlt.GeoID(system="DataSelection", region=0, element=0)
                 ],
-            initial_token_count=TOKEN_COUNT                    
+            initial_token_count=TOKEN_COUNT
         )),
     ])
 
