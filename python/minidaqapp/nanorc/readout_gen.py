@@ -61,6 +61,7 @@ def generate(NETWORK_ENDPOINTS,
         FRONTEND_TYPE='wib',
         SYSTEM_TYPE='TPC',
         DQM_ENABLED=False,
+        DQM_KAFKA_ADDRESS='',
         SOFTWARE_TPG_ENABLED=False):
     """Generate the json configuration for the readout and DF process"""
 
@@ -310,14 +311,16 @@ def generate(NETWORK_ENDPOINTS,
                 ("trb_dqm", trb.ConfParams(
                         general_queue_timeout=QUEUE_POP_WAIT_MS,
                         map=trb.mapgeoidqueue([
-                                trb.geoidinst(region=0, element=idx, system="TPC", queueinstance=f"data_requests_dqm_{idx+MIN_LINK}") for idx in range(NUMBER_OF_DATA_PRODUCERS)
+                                trb.geoidinst(region=0, element=idx, system="TPC", queueinstance=f"data_requests_dqm_{idx}") for idx in range(MIN_LINK, MAX_LINK)
                             ]),
                         ))
             ] + [
                 ('dqmprocessor', dqmprocessor.Conf(
                         mode='normal', # normal or debug
                         sdqm=[1, 1, 1],
-                        kafka_address="dqmbroadcast:9092",
+                        kafka_address=DQM_KAFKA_ADDRESS,
+                        link_idx=list(range(MIN_LINK, MAX_LINK)),
+                        clock_frequency=CLOCK_SPEED_HZ,
                         ))
             ] + [
                 ("timesync_to_network", qton.Conf(msg_type="dunedaq::dfmessages::TimeSync",
