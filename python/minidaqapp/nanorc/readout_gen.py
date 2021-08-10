@@ -382,7 +382,7 @@ def generate(NETWORK_ENDPOINTS,
                         ])
 
     if USE_FAKE_DATA_PRODUCERS:
-        conf_list.extend(+ [
+        conf_list.extend([
             (f"fakedataprod_{idx}", fdp.Conf(
                 system_type = SYSTEM_TYPE,
                 apa_number = 0,
@@ -390,7 +390,7 @@ def generate(NETWORK_ENDPOINTS,
                 time_tick_diff = 25,
                 frame_size = 464,
                 response_delay = 0,
-                fragment_type = "kTPCData")) for idx in range(MIN_LINK,MAX_LINK)
+                fragment_type = "FakeData")) for idx in range(MIN_LINK,MAX_LINK)
         ])
 
     cmd_data['conf'] = acmd(conf_list)
