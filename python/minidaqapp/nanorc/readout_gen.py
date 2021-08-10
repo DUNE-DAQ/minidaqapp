@@ -19,6 +19,7 @@ moo.otypes.load_types('readout/fakecardreader.jsonnet')
 moo.otypes.load_types('readout/datalinkhandler.jsonnet')
 moo.otypes.load_types('readout/datarecorder.jsonnet')
 moo.otypes.load_types('dqm/dqmprocessor.jsonnet')
+moo.otypes.load_types('dfmodules/fakedataprod.jsonnet')
 
 # Import new types
 import dunedaq.cmdlib.cmd as basecmd # AddressedCmd,
@@ -35,6 +36,7 @@ import dunedaq.readout.datalinkhandler as dlh
 import dunedaq.readout.datarecorder as dr
 import dunedaq.dfmodules.triggerrecordbuilder as trb
 import dunedaq.dqm.dqmprocessor as dqmprocessor
+import dunedaq.dfmodules.fakedataprod as fdp
 
 from appfwk.utils import acmd, mcmd, mrccmd, mspec
 
@@ -62,7 +64,8 @@ def generate(NETWORK_ENDPOINTS,
         SYSTEM_TYPE='TPC',
         DQM_ENABLED=False,
         DQM_KAFKA_ADDRESS='',
-        SOFTWARE_TPG_ENABLED=False):
+        SOFTWARE_TPG_ENABLED=False,
+        USE_FAKE_DATA_PRODUCERS=False):
     """Generate the json configuration for the readout and DF process"""
 
     cmd_data = {}
@@ -86,9 +89,12 @@ def generate(NETWORK_ENDPOINTS,
         ] + [
             app.QueueSpec(inst=f"data_requests_{idx}", kind='FollySPSCQueue', capacity=100)
                 for idx in range(MIN_LINK,MAX_LINK)
-        ] + [
+        ]
+
+    if not USE_FAKE_DATA_PRODUCERS:
+        queue_bare_specs += [
             app.QueueSpec(inst=f"{FRONTEND_TYPE}_link_{idx}", kind='FollySPSCQueue', capacity=100000)
-                for idx in range(NUMBER_OF_DATA_PRODUCERS)
+            for idx in range(NUMBER_OF_DATA_PRODUCERS)
         ]
 
     if RAW_RECORDING_ENABLED:
@@ -156,32 +162,41 @@ def generate(NETWORK_ENDPOINTS,
     # is the closest way to the blocks that are being used here
 
     for idx in range(NUMBER_OF_DATA_PRODUCERS):
-        ls = [
-                app.QueueInfo(name="raw_input", inst=f"{FRONTEND_TYPE}_link_{idx}", dir="input"),
-                app.QueueInfo(name="timesync", inst="time_sync_q", dir="output"),
-                app.QueueInfo(name="data_requests_0", inst=f"data_requests_{idx + MIN_LINK}", dir="input"),
-                app.QueueInfo(name="data_response_0", inst="data_fragments_q", dir="output"),
+        if USE_FAKE_DATA_PRODUCERS:
+            mod_specs = mod_specs + [
+                mspec(f"fakedataprod_{idx + MIN_LINK}", "FakeDataProd", [
+                    app.QueueInfo(name="timesync_output_queue", inst="time_sync_q", dir="output"),
+                    app.QueueInfo(name="data_request_input_queue", inst=f"data_requests_{idx + MIN_LINK}", dir="input"),
+                    app.QueueInfo(name="data_fragment_output_queue", inst="data_fragments_q", dir="output")
+                ])
             ]
-
-        if RAW_RECORDING_ENABLED:
-            ls.append(app.QueueInfo(name="raw_recording", inst=f"{FRONTEND_TYPE}_recording_link_{idx}", dir="output"))
         else:
-            # This else can be removed once readout doesn't always check for the raw_recording queue
-            # At the moment it is needed or it won't find the queue and crash
-            ls.append(app.QueueInfo(name="raw_recording", inst=f"{FRONTEND_TYPE}_recording_link_{idx}", dir="output"))
+            ls = [
+                    app.QueueInfo(name="raw_input", inst=f"{FRONTEND_TYPE}_link_{idx}", dir="input"),
+                    app.QueueInfo(name="timesync", inst="time_sync_q", dir="output"),
+                    app.QueueInfo(name="data_requests_0", inst=f"data_requests_{idx + MIN_LINK}", dir="input"),
+                    app.QueueInfo(name="data_response_0", inst="data_fragments_q", dir="output"),
+                ]
 
-        if DQM_ENABLED:
-            ls.extend([
-            app.QueueInfo(name="data_requests_1", inst=f"data_requests_dqm_{idx+MIN_LINK}", dir="input"),
-            app.QueueInfo(name="data_response_1", inst="data_fragments_q_dqm", dir="output")])
+            if RAW_RECORDING_ENABLED:
+                ls.append(app.QueueInfo(name="raw_recording", inst=f"{FRONTEND_TYPE}_recording_link_{idx}", dir="output"))
+            else:
+                # This else can be removed once readout doesn't always check for the raw_recording queue
+                # At the moment it is needed or it won't find the queue and crash
+                ls.append(app.QueueInfo(name="raw_recording", inst=f"{FRONTEND_TYPE}_recording_link_{idx}", dir="output"))
 
-        if SOFTWARE_TPG_ENABLED:
-            ls.extend([
-                app.QueueInfo(name="tp_out", inst=f"tp_link_{idx+MIN_LINK}", dir="output"),
-                app.QueueInfo(name="tpset_out", inst=f"tpset_queue_{idx+MIN_LINK}", dir="output")
-            ])
+            if DQM_ENABLED:
+                ls.extend([
+                app.QueueInfo(name="data_requests_1", inst=f"data_requests_dqm_{idx+MIN_LINK}", dir="input"),
+                app.QueueInfo(name="data_response_1", inst="data_fragments_q_dqm", dir="output")])
 
-        mod_specs += [mspec(f"datahandler_{idx + MIN_LINK}", "DataLinkHandler", ls)]
+            if SOFTWARE_TPG_ENABLED:
+                ls.extend([
+                    app.QueueInfo(name="tp_out", inst=f"tp_link_{idx+MIN_LINK}", dir="output"),
+                    app.QueueInfo(name="tpset_out", inst=f"tpset_queue_{idx+MIN_LINK}", dir="output")
+                ])
+
+            mod_specs += [mspec(f"datahandler_{idx + MIN_LINK}", "DataLinkHandler", ls)]
 
     if RAW_RECORDING_ENABLED:
         mod_specs += [
@@ -217,21 +232,23 @@ def generate(NETWORK_ENDPOINTS,
         mod_specs += [mspec("dqm_subscriber", "NetworkToQueue",
                 [app.QueueInfo(name="output", inst="time_sync_dqm_q", dir="output")]
                 )]
-    if FLX_INPUT:
-        mod_specs.append(mspec("flxcard_0", "FelixCardReader", [
-                        app.QueueInfo(name=f"output_{idx}", inst=f"{FRONTEND_TYPE}_link_{idx}", dir="output")
-                            for idx in range(min(5, NUMBER_OF_DATA_PRODUCERS))
-                        ]))
-        if NUMBER_OF_DATA_PRODUCERS > 5 :
-            mod_specs.append(mspec("flxcard_1", "FelixCardReader", [
+
+    if not USE_FAKE_DATA_PRODUCERS:
+        if FLX_INPUT:
+            mod_specs.append(mspec("flxcard_0", "FelixCardReader", [
                             app.QueueInfo(name=f"output_{idx}", inst=f"{FRONTEND_TYPE}_link_{idx}", dir="output")
-                                for idx in range(5, NUMBER_OF_DATA_PRODUCERS)
+                                for idx in range(min(5, NUMBER_OF_DATA_PRODUCERS))
                             ]))
-    else:
-        mod_specs.append(mspec("fake_source", "FakeCardReader", [
-                        app.QueueInfo(name=f"output_{idx}", inst=f"{FRONTEND_TYPE}_link_{idx}", dir="output")
-                            for idx in range(NUMBER_OF_DATA_PRODUCERS)
-                        ]))
+            if NUMBER_OF_DATA_PRODUCERS > 5 :
+                mod_specs.append(mspec("flxcard_1", "FelixCardReader", [
+                                app.QueueInfo(name=f"output_{idx}", inst=f"{FRONTEND_TYPE}_link_{idx}", dir="output")
+                                    for idx in range(5, NUMBER_OF_DATA_PRODUCERS)
+                                ]))
+        else:
+            mod_specs.append(mspec("fake_source", "FakeCardReader", [
+                            app.QueueInfo(name=f"output_{idx}", inst=f"{FRONTEND_TYPE}_link_{idx}", dir="output")
+                                for idx in range(NUMBER_OF_DATA_PRODUCERS)
+                            ]))
 
     cmd_data['init'] = app.Init(queues=queue_specs, modules=mod_specs)
 
@@ -364,6 +381,18 @@ def generate(NETWORK_ENDPOINTS,
                                                                                         stype="msgpack"))) for idx in range(MIN_LINK, MAX_LINK)
                         ])
 
+    if USE_FAKE_DATA_PRODUCERS:
+        conf_list.extend(+ [
+            (f"fakedataprod_{idx}", fdp.Conf(
+                system_type = SYSTEM_TYPE,
+                apa_number = 0,
+                link_number = idx,
+                time_tick_diff = 25,
+                frame_size = 464,
+                response_delay = 0,
+                fragment_type = "kTPCData")) for idx in range(MIN_LINK,MAX_LINK)
+        ])
+
     cmd_data['conf'] = acmd(conf_list)
 
 
@@ -381,7 +410,8 @@ def generate(NETWORK_ENDPOINTS,
             ("qton_tp_fragments", startpars),
             (f"ntoq_tp_datarequests_.*", startpars),
             (f"tp_datahandler_.*", startpars),
-            (f"tpset_publisher_.*", startpars)])
+            (f"tpset_publisher_.*", startpars),
+            ("fakedataprod_.*", startpars)])
 
     cmd_data['stop'] = acmd([("ntoq_trigdec", None),
             ("ntoq_datareq_.*", None),
@@ -393,10 +423,11 @@ def generate(NETWORK_ENDPOINTS,
             ("qton_fragments", None),
             ("trb_dqm", None),
             ("dqmprocessor", None),
-            ("qton_tp_fragments", startpars),
-            (f"ntoq_tp_datarequests_.*", startpars),
-            (f"tp_datahandler_.*", startpars),
-            (f"tpset_publisher_.*", startpars)])
+            ("qton_tp_fragments", None),
+            (f"ntoq_tp_datarequests_.*", None),
+            (f"tp_datahandler_.*", None),
+            (f"tpset_publisher_.*", None),
+            ("fakedataprod_.*", None)])
 
     cmd_data['pause'] = acmd([("", None)])
 
