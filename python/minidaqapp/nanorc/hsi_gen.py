@@ -56,7 +56,7 @@ def generate(
         READOUT_PERIOD_US: int = 1e3,
         HSI_ENDPOINT_ADDRESS = 1,
         HSI_ENDPOINT_PARTITION = 0,
-        HSI_RE_MASK = 4096,
+        HSI_RE_MASK = 0x20000,
         HSI_FE_MASK = 0,
         HSI_INV_MASK = 0,
         HSI_SOURCE = 1,

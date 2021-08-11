@@ -39,6 +39,13 @@ import click
 # hsi readout options
 @click.option('--hsi-device-name', default="BOREAS_TLU", help='Real HSI hardware only: device name of HSI hw')
 @click.option('--hsi-readout-period', default=1e3, help='Real HSI hardware only: Period between HSI hardware polling [us]')
+# hw hsi options
+@click.option('--hsi-endpoint-address', default=1)
+@click.option('--hsi-endpoint-partition', default=0)
+@click.option('--hsi-re-mask', default=0x20000)
+@click.option('--hsi-fe-mask', default=0x0)
+@click.option('--hsi-inv-mask', default=0x0)
+@click.option('--hsi-source', default=0x1)
 # fake hsi options
 @click.option('--use-hsi-hw', is_flag=True, default=False, help='Flag to control whether fake or real hardware HSI config is generated. Default is fake')
 @click.option('--hsi-device-id', default=0, help='Fake HSI only: device ID of fake HSIEvents')
@@ -66,7 +73,8 @@ import click
 
 def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowdown_factor, run_number, trigger_rate_hz, trigger_window_before_ticks, trigger_window_after_ticks,
         token_count, data_file, output_path, disable_trace, use_felix, host_df, host_ru, host_trigger, host_hsi, host_timing_hw, use_timing_hw,
-        hsi_device_name, hsi_readout_period, use_hsi_hw, hsi_device_id, mean_hsi_signal_multiplicity, hsi_signal_emulation_mode, enabled_hsi_signals,
+        hsi_device_name, hsi_readout_period, hsi_endpoint_address, hsi_endpoint_partition, hsi_re_mask, hsi_fe_mask, hsi_inv_mask, hsi_source,
+        use_hsi_hw, hsi_device_id, mean_hsi_signal_multiplicity, hsi_signal_emulation_mode, enabled_hsi_signals,
         ttcm_s1, ttcm_s2, trigger_activity_plugin, trigger_activity_config, trigger_candidate_plugin, trigger_candidate_config,
         enable_raw_recording, raw_recording_output_dir, frontend_type, opmon_impl, enable_dqm, ers_impl, dqm_impl, pocket_url, enable_software_tpg, json_dir):
     """
@@ -193,7 +201,13 @@ def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowd
         cmd_data_hsi = hsi_gen.generate(network_endpoints,
             RUN_NUMBER = run_number,
             READOUT_PERIOD_US = hsi_readout_period,
-            HSI_DEVICE_NAME = hsi_device_name,)
+            HSI_DEVICE_NAME = hsi_device_name,
+            HSI_ENDPOINT_ADDRESS = hsi_endpoint_address,
+            HSI_ENDPOINT_PARTITION = hsi_endpoint_partition,
+            HSI_RE_MASK=hsi_re_mask,
+            HSI_FE_MASK=hsi_fe_mask,
+            HSI_INV_MASK=hsi_inv_mask,
+            HSI_SOURCE=hsi_source,)
     else:
         cmd_data_hsi = fake_hsi_gen.generate(
             network_endpoints,
@@ -303,11 +317,11 @@ def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowd
             if c in [ 'conf']:
                 cfg[f'order'] = start_order
             elif c == 'start':
-                cfg[f'order'] = start_order
+                cfg['order'] = start_order
                 if use_timing_hw:
                     del cfg['apps'][app_thi]
             elif c == 'stop':
-                cfg[f'order'] = start_order[::-1]
+                cfg['order'] = start_order[::-1]
                 if use_timing_hw:
                     del cfg['apps'][app_thi]
             elif c in ('resume', 'pause'):
