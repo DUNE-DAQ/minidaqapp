@@ -53,6 +53,8 @@ from pprint import pprint
 def generate(
         NETWORK_ENDPOINTS: list,
         RUN_NUMBER = 333,
+        CONTROL_HSI_HARDWARE = False,
+        NETWORK_QUEUE_CONTROL_MESSAGE_TIMEOUT: int =1e3,
         READOUT_PERIOD_US: int = 1e3,
         HSI_ENDPOINT_ADDRESS = 1,
         HSI_ENDPOINT_PARTITION = 0,
@@ -68,15 +70,20 @@ def generate(
     """
     cmd_data = {}
 
-    required_eps = {'hsievent', 'timing_cmds'}
+    required_eps = {'hsievent'}
+    if CONTROL_HSI_HARDWARE:
+        required_eps.add('hsicmds')
+
     if not required_eps.issubset(NETWORK_ENDPOINTS):
         raise RuntimeError(f"ERROR: not all the required endpoints ({', '.join(required_eps)}) found in list of endpoints {' '.join(NETWORK_ENDPOINTS.keys())}")
 
     # Define modules and queues
     queue_bare_specs = [
             app.QueueSpec(inst="hsievent_q_to_net", kind='FollySPSCQueue', capacity=100),
-            app.QueueSpec(inst="hw_cmds_q_to_net", kind='FollySPSCQueue', capacity=100),
-                       ]
+    ]
+    
+    if CONTROL_HSI_HARDWARE:
+        queue_bare_specs.extend([app.QueueSpec(inst="hw_cmds_q_to_net", kind='FollySPSCQueue', capacity=100)])
 
     # Only needed to reproduce the same order as when using jsonnet
     queue_specs = app.QueueSpecs(sorted(queue_bare_specs, key=lambda x: x.inst))
@@ -89,55 +96,65 @@ def generate(
         mspec("qton_hsievent", "QueueToNetwork", [
                         app.QueueInfo(name="input", inst="hsievent_q_to_net", dir="input")
                     ]),
-        mspec("qton_hw_cmds", "QueueToNetwork", [
-                        app.QueueInfo(name="input", inst="hw_cmds_q_to_net", dir="input")
-                    ]),
+
         mspec("hsir", "HSIReadout", [
                                     app.QueueInfo(name="hsievent_sink", inst="hsievent_q_to_net", dir="output"),
                                 ]),
-        app.ModSpec(inst="hsic", plugin="HSIController", data=hsi_controller_init_data)
         ]
+    
+    if CONTROL_HSI_HARDWARE:
+        hsi_controller_init_data = hsic.InitParams(
+                                                  qinfos=app.QueueInfos([app.QueueInfo(name="hardware_commands_out", inst="hw_cmds_q_to_net", dir="output")]),
+                                                  device=HSI_DEVICE_NAME,
+                                                 )
+        mod_specs.extend ( [
+            mspec("qton_hw_cmds", "QueueToNetwork", [
+                        app.QueueInfo(name="input", inst="hw_cmds_q_to_net", dir="input")
+                    ]),
+            app.ModSpec(inst="hsic", plugin="HSIController", data=hsi_controller_init_data)
+        ])
 
     cmd_data['init'] = app.Init(queues=queue_specs, modules=mod_specs)
-
-    cmd_data['conf'] = acmd([
-
-                
-                ("qton_hsievent", qton.Conf(msg_type="dunedaq::dfmessages::HSIEvent",
+    
+    conf_cmds = [
+        ("qton_hsievent", qton.Conf(msg_type="dunedaq::dfmessages::HSIEvent",
                                            msg_module_name="HSIEventNQ",
                                            sender_config=nos.Conf(ipm_plugin_type="ZmqSender",
                                                                   address=NETWORK_ENDPOINTS["hsievent"],
                                                                   stype="msgpack")
                                            )
                 ),
-
-                ("qton_hw_cmds", qton.Conf(msg_type="dunedaq::timinglibs::timingcmd::TimingHwCmd",
-                                           msg_module_name="TimingHwCmdNQ",
-                                           sender_config=nos.Conf(ipm_plugin_type="ZmqSender",
-                                                                  address=NETWORK_ENDPOINTS["timing_cmds"],
-                                                                  stype="msgpack")
-                                           )
-                ),
-
-                ("hsir", hsi.ConfParams(
+                        ("hsir", hsi.ConfParams(
                         connections_file="${TIMING_SHARE}/config/etc/connections.xml",
                         readout_period=READOUT_PERIOD_US,
                         hsi_device_name=HSI_DEVICE_NAME,
                         uhal_log_level=UHAL_LOG_LEVEL
                         )),
-
-                ("hsic", hsic.ConfParams(
+    ]
+    
+    if CONTROL_HSI_HARDWARE:
+        conf_cmds.extend([
+            ("qton_hw_cmds", qton.Conf(msg_type="dunedaq::timinglibs::timingcmd::TimingHwCmd",
+                                           msg_module_name="TimingHwCmdNQ",
+                                           sender_config=nos.Conf(ipm_plugin_type="ZmqSender",
+                                                                  address=NETWORK_ENDPOINTS["hsicmds"],
+                                                                  stype="msgpack",
+                                                                  control_timeout=NETWORK_QUEUE_CONTROL_MESSAGE_TIMEOUT)
+                                           )
+                ),
+            ("hsic", hsic.ConfParams(
                                 address=HSI_ENDPOINT_ADDRESS,
                                 partition=HSI_ENDPOINT_PARTITION,
-                                rising_edge_mask=HSI_RE_MASK,                   
+                                rising_edge_mask=HSI_RE_MASK,
                                 falling_edge_mask=HSI_FE_MASK,
                                 invert_edge_mask=HSI_INV_MASK,
                                 data_source=HSI_SOURCE,
                                 )),
-    ])
- 
+        ])
+    cmd_data['conf'] = acmd(conf_cmds)
 
     startpars = rccmd.StartParams(run=RUN_NUMBER)
+
     cmd_data['start'] = acmd([
             ("hsi.*", startpars),
             ("qton_.*", startpars)

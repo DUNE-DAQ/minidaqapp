@@ -49,7 +49,9 @@ from pprint import pprint
 
 #===============================================================================
 def generate(
+        RUN_NUMBER: int,
         NETWORK_ENDPOINTS: list,
+        TIMING_CMD_NETWORK_ENDPOINTS: set,
         GATHER_INTERVAL=1e6,
         GATHER_INTERVAL_DEBUG=10e6,
         HSI_DEVICE_NAME="",
@@ -60,13 +62,13 @@ def generate(
     """
     cmd_data = {}
 
-    required_eps = {'timing_cmds'}
+    required_eps = TIMING_CMD_NETWORK_ENDPOINTS
     if not required_eps.issubset(NETWORK_ENDPOINTS):
         raise RuntimeError(f"ERROR: not all the required endpoints ({', '.join(required_eps)}) found in list of endpoints {' '.join(NETWORK_ENDPOINTS.keys())}")
 
     # Define modules and queues
     queue_bare_specs = [
-            app.QueueSpec(inst="ntoq_timing_cmds", kind='FollySPSCQueue', capacity=100),
+            app.QueueSpec(inst="ntoq_timing_cmds", kind='FollyMPMCQueue', capacity=100),
                        ]
 
     # Only needed to reproduce the same order as when using jsonnet
@@ -85,30 +87,35 @@ def generate(
                                   )
 
     mod_specs = [
-    
-                    mspec("ntoq_timing_cmds", "NetworkToQueue", [
-                                    app.QueueInfo(name="output", inst="ntoq_timing_cmds", dir="output")
-                                ]),
-
                     app.ModSpec(inst="thi", plugin="TimingHardwareManagerPDI", data=thi_init_data),
                 ]
-
+    for cmd_nw_endpoint in TIMING_CMD_NETWORK_ENDPOINTS:
+        mod_specs.extend( [
+            mspec(f'ntoq_{cmd_nw_endpoint}', "NetworkToQueue", [
+            app.QueueInfo(name="output", inst="ntoq_timing_cmds", dir="output")
+            ]),
+        ])
+            
     cmd_data['init'] = app.Init(queues=queue_specs, modules=mod_specs)
+    
 
-    cmd_data['conf'] = acmd([
-
-                ("ntoq_timing_cmds", ntoq.Conf(msg_type="dunedaq::timinglibs::timingcmd::TimingHwCmd",
+    conf_cmds = []
+    for cmd_nw_endpoint in TIMING_CMD_NETWORK_ENDPOINTS:
+        conf_cmds.extend( [
+                (f'ntoq_{cmd_nw_endpoint}', ntoq.Conf(msg_type="dunedaq::timinglibs::timingcmd::TimingHwCmd",
                                                msg_module_name="TimingHwCmdNQ",
                                                receiver_config=nor.Conf(ipm_plugin_type="ZmqReceiver",
-                                                                        address=NETWORK_ENDPOINTS["timing_cmds"]
+                                                                        address=NETWORK_ENDPOINTS[cmd_nw_endpoint]
                                                                         )
                                               )
                 ),
-    ])
+        ])
+    cmd_data['conf'] = acmd(conf_cmds)
  
+    startpars = rccmd.StartParams(run=RUN_NUMBER)
 
     cmd_data['start'] = acmd([
-            ("", None),
+            ("", startpars),
         ])
 
     cmd_data['stop'] = acmd([
