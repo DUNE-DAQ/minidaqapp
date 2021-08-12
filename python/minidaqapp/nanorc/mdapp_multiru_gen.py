@@ -40,12 +40,12 @@ import click
 @click.option('--hsi-device-name', default="BOREAS_TLU", help='Real HSI hardware only: device name of HSI hw')
 @click.option('--hsi-readout-period', default=1e3, help='Real HSI hardware only: Period between HSI hardware polling [us]')
 # hw hsi options
-@click.option('--hsi-endpoint-address', default=1)
-@click.option('--hsi-endpoint-partition', default=0)
-@click.option('--hsi-re-mask', default=0x20000)
-@click.option('--hsi-fe-mask', default=0x0)
-@click.option('--hsi-inv-mask', default=0x0)
-@click.option('--hsi-source', default=0x1)
+@click.option('--hsi-endpoint-address', default=1, help='Timing address of HSI endpoint')
+@click.option('--hsi-endpoint-partition', default=0, help='Timing partition of HSI endpoint')
+@click.option('--hsi-re-mask', default=0x20000, help='Rising-edge trigger mask')
+@click.option('--hsi-fe-mask', default=0x0, help='Falling-edge trigger mask')
+@click.option('--hsi-inv-mask', default=0x0, help='Invert-edge mask')
+@click.option('--hsi-source', default=0x1, help='HSI signal source; 0 - hardware, 1 - emulation (trigger timestamp bits)')
 # fake hsi options
 @click.option('--use-hsi-hw', is_flag=True, default=False, help='Flag to control whether fake or real hardware HSI config is generated. Default is fake')
 @click.option('--hsi-device-id', default=0, help='Fake HSI only: device ID of fake HSIEvents')
