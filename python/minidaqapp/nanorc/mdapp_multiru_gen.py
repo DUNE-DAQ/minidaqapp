@@ -35,7 +35,6 @@ import click
 @click.option('--host-trigger', default='localhost', help='Host to run the trigger app on')
 @click.option('--host-hsi', default='localhost', help='Host to run the HSI app on')
 @click.option('--host-timing-hw', default='np04-srv-012.cern.ch', help='Host to run the timing hardware interface app on')
-@click.option('--nwq-control-message-timeout', type=int, default=1000, help='Timeout for successful send of control message over Q2N on conf command [us].')
 @click.option('--control-timing-hw', is_flag=True, default=False, help='Flag to control whether we are controlling timing hardware')
 # hsi readout options
 @click.option('--hsi-device-name', default="BOREAS_TLU", help='Real HSI hardware only: device name of HSI hw')
@@ -202,7 +201,6 @@ def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowd
         cmd_data_hsi = hsi_gen.generate(network_endpoints,
             RUN_NUMBER = run_number,
             CONTROL_HSI_HARDWARE=control_timing_hw,
-            NETWORK_QUEUE_CONTROL_MESSAGE_TIMEOUT=nwq_control_message_timeout,
             READOUT_PERIOD_US = hsi_readout_period,
             HSI_DEVICE_NAME = hsi_device_name,
             HSI_ENDPOINT_ADDRESS = hsi_endpoint_address,

@@ -54,7 +54,6 @@ def generate(
         NETWORK_ENDPOINTS: list,
         RUN_NUMBER = 333,
         CONTROL_HSI_HARDWARE = False,
-        NETWORK_QUEUE_CONTROL_MESSAGE_TIMEOUT: int =1e3,
         READOUT_PERIOD_US: int = 1e3,
         HSI_ENDPOINT_ADDRESS = 1,
         HSI_ENDPOINT_PARTITION = 0,
@@ -138,10 +137,8 @@ def generate(
                                            msg_module_name="TimingHwCmdNQ",
                                            sender_config=nos.Conf(ipm_plugin_type="ZmqSender",
                                                                   address=NETWORK_ENDPOINTS["hsicmds"],
-                                                                  stype="msgpack",
-                                                                  control_timeout=NETWORK_QUEUE_CONTROL_MESSAGE_TIMEOUT)
-                                           )
-                ),
+                                                                  stype="msgpack")
+                                           )),
             ("hsic", hsic.ConfParams(
                                 address=HSI_ENDPOINT_ADDRESS,
                                 partition=HSI_ENDPOINT_PARTITION,
