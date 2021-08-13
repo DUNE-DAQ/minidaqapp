@@ -143,21 +143,21 @@ def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowd
     if ers_impl == 'cern':
         use_kafka = True
         ers_info = "erstrace,throttle,lstdout,erskafka(dqmbroadcast:9092)"
-        ers_warning = "erstrace,throttle,lstderr,erskafka(dqmbroadcast:9092)"
-        ers_error = "erstrace,throttle,lstderr,erskafka(dqmbroadcast:9092)"
-        ers_fatal = "erstrace,lstderr,erskafka(dqmbroadcast:9092)"
+        ers_warning = "erstrace,throttle,lstdout,erskafka(dqmbroadcast:9092)"
+        ers_error = "erstrace,throttle,lstdout,erskafka(dqmbroadcast:9092)"
+        ers_fatal = "erstrace,lstdout,erskafka(dqmbroadcast:9092)"
     elif ers_impl == 'pocket':
         use_kafka = True
         ers_info = "erstrace,throttle,lstdout,erskafka(" + pocket_url + ":30092)"
-        ers_warning = "erstrace,throttle,lstderr,erskafka(" + pocket_url + ":30092)"
-        ers_error = "erstrace,throttle,lstderr,erskafka(" + pocket_url + ":30092)"
-        ers_fatal = "erstrace,lstderr,erskafka(" + pocket_url + ":30092)"
+        ers_warning = "erstrace,throttle,lstdout,erskafka(" + pocket_url + ":30092)"
+        ers_error = "erstrace,throttle,lstdout,erskafka(" + pocket_url + ":30092)"
+        ers_fatal = "erstrace,lstdout,erskafka(" + pocket_url + ":30092)"
     else:
         use_kafka = False
         ers_info = "erstrace,throttle,lstdout"
-        ers_warning = "erstrace,throttle,lstderr"
-        ers_error = "erstrace,throttle,lstderr"
-        ers_fatal = "erstrace,lstderr"
+        ers_warning = "erstrace,throttle,lstdout"
+        ers_error = "erstrace,throttle,lstdout"
+        ers_fatal = "erstrace,lstdout"
 
     dqm_kafka_address = "dqmbroadcast:9092" if dqm_impl == 'cern' else pocket_url + ":30092" if dqm_impl == 'pocket' else ''
 
