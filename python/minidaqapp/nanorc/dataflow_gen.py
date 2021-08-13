@@ -56,13 +56,19 @@ def generate(NETWORK_ENDPOINTS,
         OUTPUT_PATH=".",
         TOKEN_COUNT=0,
         SYSTEM_TYPE="TPC",
-        SOFTWARE_TPG_ENABLED=False):
+        SOFTWARE_TPG_ENABLED=False,
+        TPSET_WRITING_ENABLED=False):
     """Generate the json configuration for the readout and DF process"""
 
     if SOFTWARE_TPG_ENABLED:
         NUMBER_OF_TP_PRODUCERS = NUMBER_OF_DATA_PRODUCERS
     else:
         NUMBER_OF_TP_PRODUCERS = 0
+
+    if TPSET_WRITING_ENABLED:
+        NUMBER_OF_TP_SUBSCRIBERS = NUMBER_OF_DATA_PRODUCERS
+    else:
+        NUMBER_OF_TP_SUBSCRIBERS = 0
 
     cmd_data = {}
 
@@ -86,7 +92,7 @@ def generate(NETWORK_ENDPOINTS,
                 for idx in range(NUMBER_OF_TP_PRODUCERS)
             ] + ([
             app.QueueSpec(inst="tpsets_from_netq", kind='FollyMPMCQueue', capacity=1000),
-            ] if SOFTWARE_TPG_ENABLED else [])
+            ] if TPSET_WRITING_ENABLED else [])
 
     # Only needed to reproduce the same order as when using jsonnet
     queue_specs = app.QueueSpecs(sorted(queue_bare_specs, key=lambda x: x.inst))
@@ -118,10 +124,10 @@ def generate(NETWORK_ENDPOINTS,
     ] + [
         mspec(f"qton_tp_datareq_{idx}", "QueueToNetwork", [app.QueueInfo(name="input", inst=f"tp_data_requests_{idx}", dir="input")])  for idx in range(NUMBER_OF_TP_PRODUCERS)
     ] + ([        
-        mspec(f"tpset_subscriber_{idx}", "NetworkToQueue", [app.QueueInfo(name="output", inst=f"tpsets_from_netq", dir="output")])  for idx in range(NUMBER_OF_TP_PRODUCERS)
+        mspec(f"tpset_subscriber_{idx}", "NetworkToQueue", [app.QueueInfo(name="output", inst=f"tpsets_from_netq", dir="output")])  for idx in range(NUMBER_OF_TP_SUBSCRIBERS)
     ]) + ([
         mspec("tpswriter", "TPSetWriter", [app.QueueInfo(name="tpset_source", inst="tpsets_from_netq", dir="input")])
-    ] if SOFTWARE_TPG_ENABLED else [])
+    ] if TPSET_WRITING_ENABLED else [])
 
     cmd_data['init'] = app.Init(queues=queue_specs, modules=mod_specs)
 
@@ -189,18 +195,18 @@ def generate(NETWORK_ENDPOINTS,
                                              address=NETWORK_ENDPOINTS[f'tpsets_{idx}'],
                                              subscriptions=["TPSets"])
                 ))
-                for idx in range(NUMBER_OF_TP_PRODUCERS)
+                for idx in range(NUMBER_OF_TP_SUBSCRIBERS)
             ] + ([
                 ("tpswriter", tpsw.ConfParams(
                     max_file_size_bytes=1000000000,
-                ))] if SOFTWARE_TPG_ENABLED else [])
+                ))] if TPSET_WRITING_ENABLED else [])
             )
 
     startpars = rccmd.StartParams(run=RUN_NUMBER)
     cmd_data['start'] = acmd([] +
             ([("tpswriter", startpars),
               ("tpset_subscriber_.*", startpars)
-            ] if SOFTWARE_TPG_ENABLED else [])
+            ] if TPSET_WRITING_ENABLED else [])
             + [
             ("qton_token", startpars),
             ("datawriter", startpars),
@@ -220,7 +226,7 @@ def generate(NETWORK_ENDPOINTS,
             ] + ([
               ("tpset_subscriber_.*", None),
               ("tpswriter", None)
-              ] if SOFTWARE_TPG_ENABLED else [])
+              ] if TPSET_WRITING_ENABLED else [])
             )
 
     cmd_data['pause'] = acmd([("", None)])
