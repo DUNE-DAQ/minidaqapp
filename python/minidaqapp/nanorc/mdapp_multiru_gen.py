@@ -69,6 +69,7 @@ import click
 @click.option('--dqm-impl', type=click.Choice(['local','cern','pocket'], case_sensitive=False), default='local', help="DQM destination (Kafka used for cern and pocket)")
 @click.option('--pocket-url', default='127.0.0.1', help="URL for connecting to Pocket services")
 @click.option('--enable-software-tpg', is_flag=True, default=False, help="Enable software TPG")
+@click.option('--enable-tpset-writing', is_flag=True, default=False, help="Enable the writing of TPSets to disk (only works with --enable-software-tpg")
 @click.option('--use-fake-data-producers', is_flag=True, default=False, help="Use fake data producers that respond with empty fragments immediately instead of (fake) cards and DLHs")
 @click.argument('json_dir', type=click.Path())
 
@@ -77,7 +78,7 @@ def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowd
         hsi_device_name, hsi_readout_period, hsi_endpoint_address, hsi_endpoint_partition, hsi_re_mask, hsi_fe_mask, hsi_inv_mask, hsi_source,
         use_hsi_hw, hsi_device_id, mean_hsi_signal_multiplicity, hsi_signal_emulation_mode, enabled_hsi_signals,
         ttcm_s1, ttcm_s2, trigger_activity_plugin, trigger_activity_config, trigger_candidate_plugin, trigger_candidate_config,
-        enable_raw_recording, raw_recording_output_dir, frontend_type, opmon_impl, enable_dqm, ers_impl, dqm_impl, pocket_url, enable_software_tpg, use_fake_data_producers, json_dir):
+        enable_raw_recording, raw_recording_output_dir, frontend_type, opmon_impl, enable_dqm, ers_impl, dqm_impl, pocket_url, enable_software_tpg, enable_tpset_writing, use_fake_data_producers, json_dir):
     """
       JSON_DIR: Json file output folder
     """
@@ -113,6 +114,9 @@ def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowd
 
     if use_fake_data_producers and enable_dqm:
         raise Exception("DQM can't be used with fake data producers")
+
+    if enable_tpset_writing and not enable_software_tpg:
+        raise Exception("TPSet writing can only be used when software TPG is enabled")
 
     if token_count > 0:
         df_token_count = 0
@@ -253,7 +257,8 @@ def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowd
         OUTPUT_PATH = output_path,
         TOKEN_COUNT = df_token_count,
         SYSTEM_TYPE = system_type,
-        SOFTWARE_TPG_ENABLED = enable_software_tpg)
+        SOFTWARE_TPG_ENABLED = enable_software_tpg,
+        TPSET_WRITING_ENABLED = enable_tpset_writing)
     console.log("dataflow cmd data:", cmd_data_dataflow)
 
     cmd_data_readout = [ readout_gen.generate(network_endpoints,

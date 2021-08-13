@@ -10,11 +10,10 @@ moo.otypes.load_types('rcif/cmd.jsonnet')
 moo.otypes.load_types('appfwk/cmd.jsonnet')
 moo.otypes.load_types('appfwk/app.jsonnet')
 
-#moo.otypes.load_types('trigemu/faketimesyncsource.jsonnet')
 moo.otypes.load_types('dfmodules/triggerrecordbuilder.jsonnet')
 moo.otypes.load_types('dfmodules/datawriter.jsonnet')
 moo.otypes.load_types('dfmodules/hdf5datastore.jsonnet')
-#moo.otypes.load_types('dfmodules/fakedataprod.jsonnet')
+moo.otypes.load_types('dfmodules/tpsetwriter.jsonnet')
 moo.otypes.load_types('nwqueueadapters/queuetonetwork.jsonnet')
 moo.otypes.load_types('nwqueueadapters/networktoqueue.jsonnet')
 moo.otypes.load_types('nwqueueadapters/networkobjectreceiver.jsonnet')
@@ -32,7 +31,7 @@ import dunedaq.appfwk.app as app # AddressedCmd,
 import dunedaq.dfmodules.triggerrecordbuilder as trb
 import dunedaq.dfmodules.datawriter as dw
 import dunedaq.dfmodules.hdf5datastore as hdf5ds
-#import dunedaq.dfmodules.fakedataprod as fdp
+import dunedaq.dfmodules.tpsetwriter as tpsw
 import dunedaq.nwqueueadapters.networktoqueue as ntoq
 import dunedaq.nwqueueadapters.queuetonetwork as qton
 import dunedaq.nwqueueadapters.networkobjectreceiver as nor
@@ -57,13 +56,19 @@ def generate(NETWORK_ENDPOINTS,
         OUTPUT_PATH=".",
         TOKEN_COUNT=0,
         SYSTEM_TYPE="TPC",
-        SOFTWARE_TPG_ENABLED=False):
+        SOFTWARE_TPG_ENABLED=False,
+        TPSET_WRITING_ENABLED=False):
     """Generate the json configuration for the readout and DF process"""
 
     if SOFTWARE_TPG_ENABLED:
         NUMBER_OF_TP_PRODUCERS = NUMBER_OF_DATA_PRODUCERS
     else:
         NUMBER_OF_TP_PRODUCERS = 0
+
+    if TPSET_WRITING_ENABLED:
+        NUMBER_OF_TP_SUBSCRIBERS = NUMBER_OF_DATA_PRODUCERS
+    else:
+        NUMBER_OF_TP_SUBSCRIBERS = 0
 
     cmd_data = {}
 
@@ -78,13 +83,16 @@ def generate(NETWORK_ENDPOINTS,
             app.QueueSpec(inst="trigger_decision_q", kind='FollySPSCQueue', capacity=100),
             app.QueueSpec(inst="trigger_decision_from_netq", kind='FollySPSCQueue', capacity=100),
             app.QueueSpec(inst="trigger_record_q", kind='FollySPSCQueue', capacity=100),
-            app.QueueSpec(inst="data_fragments_q", kind='FollyMPMCQueue', capacity=1000),] + [
+            app.QueueSpec(inst="data_fragments_q", kind='FollyMPMCQueue', capacity=1000),
+            ] + [
             app.QueueSpec(inst=f"data_requests_{idx}", kind='FollySPSCQueue', capacity=100)
                 for idx in range(NUMBER_OF_DATA_PRODUCERS)
             ] + [
             app.QueueSpec(inst=f"tp_data_requests_{idx}", kind='FollySPSCQueue', capacity=100)
                 for idx in range(NUMBER_OF_TP_PRODUCERS)
-        ]
+            ] + ([
+            app.QueueSpec(inst="tpsets_from_netq", kind='FollyMPMCQueue', capacity=1000),
+            ] if TPSET_WRITING_ENABLED else [])
 
     # Only needed to reproduce the same order as when using jsonnet
     queue_specs = app.QueueSpecs(sorted(queue_bare_specs, key=lambda x: x.inst))
@@ -115,7 +123,11 @@ def generate(NETWORK_ENDPOINTS,
         mspec(f"qton_datareq_{idx}", "QueueToNetwork", [app.QueueInfo(name="input", inst=f"data_requests_{idx}", dir="input")])  for idx in range(NUMBER_OF_DATA_PRODUCERS)
     ] + [
         mspec(f"qton_tp_datareq_{idx}", "QueueToNetwork", [app.QueueInfo(name="input", inst=f"tp_data_requests_{idx}", dir="input")])  for idx in range(NUMBER_OF_TP_PRODUCERS)
-    ]
+    ] + ([        
+        mspec(f"tpset_subscriber_{idx}", "NetworkToQueue", [app.QueueInfo(name="output", inst=f"tpsets_from_netq", dir="output")])  for idx in range(NUMBER_OF_TP_SUBSCRIBERS)
+    ]) + ([
+        mspec("tpswriter", "TPSetWriter", [app.QueueInfo(name="tpset_source", inst="tpsets_from_netq", dir="input")])
+    ] if TPSET_WRITING_ENABLED else [])
 
     cmd_data['init'] = app.Init(queues=queue_specs, modules=mod_specs)
 
@@ -174,15 +186,29 @@ def generate(NETWORK_ENDPOINTS,
                                            receiver_config=nor.Conf(ipm_plugin_type="ZmqReceiver",
                                                                     address=NETWORK_ENDPOINTS[inst])))
                 for idx, inst in enumerate(NETWORK_ENDPOINTS) if "frags" in inst
-            ])
 
-
-
-
-
+            ] + [
+                (f"tpset_subscriber_{idx}", ntoq.Conf(
+                    msg_type="dunedaq::trigger::TPSet",
+                    msg_module_name="TPSetNQ",
+                    receiver_config=nor.Conf(ipm_plugin_type="ZmqSubscriber",
+                                             address=NETWORK_ENDPOINTS[f'tpsets_{idx}'],
+                                             subscriptions=["TPSets"])
+                ))
+                for idx in range(NUMBER_OF_TP_SUBSCRIBERS)
+            ] + ([
+                ("tpswriter", tpsw.ConfParams(
+                    max_file_size_bytes=1000000000,
+                ))] if TPSET_WRITING_ENABLED else [])
+            )
 
     startpars = rccmd.StartParams(run=RUN_NUMBER)
-    cmd_data['start'] = acmd([("qton_token", startpars),
+    cmd_data['start'] = acmd([] +
+            ([("tpswriter", startpars),
+              ("tpset_subscriber_.*", startpars)
+            ] if TPSET_WRITING_ENABLED else [])
+            + [
+            ("qton_token", startpars),
             ("datawriter", startpars),
             ("ntoq_fragments_.*", startpars),
             ("qton_datareq_.*", startpars),
@@ -196,7 +222,12 @@ def generate(NETWORK_ENDPOINTS,
             ("ntoq_fragments_.*", None),
             ("datawriter", None),
             ("qton_token", None),
-            ("qton_tp_datareq_.*", None)])
+            ("qton_tp_datareq_.*", None)
+            ] + ([
+              ("tpset_subscriber_.*", None),
+              ("tpswriter", None)
+              ] if TPSET_WRITING_ENABLED else [])
+            )
 
     cmd_data['pause'] = acmd([("", None)])
 
