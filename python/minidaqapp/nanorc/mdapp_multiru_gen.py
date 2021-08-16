@@ -22,7 +22,7 @@ import click
 @click.option('-e', '--emulator-mode', is_flag=True, help="If active, timestamps of data frames are overwritten when processed by the readout. This is necessary if the felix card does not set correct timestamps.")
 @click.option('-s', '--data-rate-slowdown-factor', default=1)
 @click.option('-r', '--run-number', default=333)
-@click.option('-t', '--trigger-rate-hz', default=1.0, help='Fake HSI only: rate at which fake HSIEvents are sent (this option provides an alternative way to specify the trigger rate compared to --hsi-event-period, however these two options should not be used together!)')
+@click.option('-t', '--trigger-rate-hz', default=1.0, help='Fake HSI only: rate at which fake HSIEvents are sent. 0 - disable HSIEvent generation.')
 @click.option('-b', '--trigger-window-before-ticks', default=1000)
 @click.option('-a', '--trigger-window-after-ticks', default=1000)
 @click.option('-c', '--token-count', default=10)
@@ -34,9 +34,18 @@ import click
 @click.option('--host-ru', multiple=True, default=['localhost'], help="This option is repeatable, with each repetition adding an additional ru process.")
 @click.option('--host-trigger', default='localhost', help='Host to run the trigger app on')
 @click.option('--host-hsi', default='localhost', help='Host to run the HSI app on')
+@click.option('--host-timing-hw', default='np04-srv-012.cern.ch', help='Host to run the timing hardware interface app on')
+@click.option('--control-timing-hw', is_flag=True, default=False, help='Flag to control whether we are controlling timing hardware')
 # hsi readout options
 @click.option('--hsi-device-name', default="BOREAS_TLU", help='Real HSI hardware only: device name of HSI hw')
 @click.option('--hsi-readout-period', default=1e3, help='Real HSI hardware only: Period between HSI hardware polling [us]')
+# hw hsi options
+@click.option('--hsi-endpoint-address', default=1, help='Timing address of HSI endpoint')
+@click.option('--hsi-endpoint-partition', default=0, help='Timing partition of HSI endpoint')
+@click.option('--hsi-re-mask', default=0x20000, help='Rising-edge trigger mask')
+@click.option('--hsi-fe-mask', default=0x0, help='Falling-edge trigger mask')
+@click.option('--hsi-inv-mask', default=0x0, help='Invert-edge mask')
+@click.option('--hsi-source', default=0x1, help='HSI signal source; 0 - hardware, 1 - emulation (trigger timestamp bits)')
 # fake hsi options
 @click.option('--use-hsi-hw', is_flag=True, default=False, help='Flag to control whether fake or real hardware HSI config is generated. Default is fake')
 @click.option('--hsi-device-id', default=0, help='Fake HSI only: device ID of fake HSIEvents')
@@ -57,15 +66,19 @@ import click
 @click.option('--enable-dqm', is_flag=True, help="Enable Data Quality Monitoring")
 @click.option('--opmon-impl', type=click.Choice(['json','cern','pocket'], case_sensitive=False),default='json', help="Info collector service implementation to use")
 @click.option('--ers-impl', type=click.Choice(['local','cern','pocket'], case_sensitive=False), default='local', help="ERS destination (Kafka used for cern and pocket)")
+@click.option('--dqm-impl', type=click.Choice(['local','cern','pocket'], case_sensitive=False), default='local', help="DQM destination (Kafka used for cern and pocket)")
 @click.option('--pocket-url', default='127.0.0.1', help="URL for connecting to Pocket services")
 @click.option('--enable-software-tpg', is_flag=True, default=False, help="Enable software TPG")
+@click.option('--enable-tpset-writing', is_flag=True, default=False, help="Enable the writing of TPSets to disk (only works with --enable-software-tpg")
+@click.option('--use-fake-data-producers', is_flag=True, default=False, help="Use fake data producers that respond with empty fragments immediately instead of (fake) cards and DLHs")
 @click.argument('json_dir', type=click.Path())
 
 def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowdown_factor, run_number, trigger_rate_hz, trigger_window_before_ticks, trigger_window_after_ticks,
-        token_count, data_file, output_path, disable_trace, use_felix, host_df, host_ru, host_trigger, host_hsi,
-        hsi_device_name, hsi_readout_period, use_hsi_hw, hsi_device_id, mean_hsi_signal_multiplicity, hsi_signal_emulation_mode, enabled_hsi_signals,
+        token_count, data_file, output_path, disable_trace, use_felix, host_df, host_ru, host_trigger, host_hsi, host_timing_hw, control_timing_hw,
+        hsi_device_name, hsi_readout_period, hsi_endpoint_address, hsi_endpoint_partition, hsi_re_mask, hsi_fe_mask, hsi_inv_mask, hsi_source,
+        use_hsi_hw, hsi_device_id, mean_hsi_signal_multiplicity, hsi_signal_emulation_mode, enabled_hsi_signals,
         ttcm_s1, ttcm_s2, trigger_activity_plugin, trigger_activity_config, trigger_candidate_plugin, trigger_candidate_config,
-        enable_raw_recording, raw_recording_output_dir, frontend_type, opmon_impl, enable_dqm, ers_impl, pocket_url, enable_software_tpg, json_dir):
+        enable_raw_recording, raw_recording_output_dir, frontend_type, opmon_impl, enable_dqm, ers_impl, dqm_impl, pocket_url, enable_software_tpg, enable_tpset_writing, use_fake_data_producers, json_dir):
     """
       JSON_DIR: Json file output folder
     """
@@ -79,6 +92,8 @@ def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowd
     from . import hsi_gen
     console.log("Loading fake hsi config generator")
     from . import fake_hsi_gen
+    console.log("Loading timing hardware config generator")
+    from . import thi_gen
     console.log(f"Generating configs for hosts trigger={host_trigger} dataflow={host_df} readout={host_ru} hsi={host_hsi}")
 
     total_number_of_data_producers = 0
@@ -94,6 +109,15 @@ def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowd
     if enable_software_tpg and frontend_type != 'wib':
         raise Exception("Software TPG is only available for the wib at the moment!")
 
+    if enable_software_tpg and use_fake_data_producers:
+        raise Exception("Fake data producers don't support software tpg")
+
+    if use_fake_data_producers and enable_dqm:
+        raise Exception("DQM can't be used with fake data producers")
+
+    if enable_tpset_writing and not enable_software_tpg:
+        raise Exception("TPSet writing can only be used when software TPG is enabled")
+
     if token_count > 0:
         df_token_count = 0
         trigemu_token_count = token_count
@@ -105,6 +129,7 @@ def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowd
         "hsievent" : "tcp://{host_hsi}:12344",
         "trigdec" : "tcp://{host_trigger}:12345",
         "triginh" : "tcp://{host_df}:12346",
+        "hsicmds":  "tcp://{host_hsi}:12347",
     }
 
     if frontend_type == 'wib' or frontend_type == 'wib2':
@@ -122,24 +147,26 @@ def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowd
     if ers_impl == 'cern':
         use_kafka = True
         ers_info = "erstrace,throttle,lstdout,erskafka(dqmbroadcast:9092)"
-        ers_warning = "erstrace,throttle,lstderr,erskafka(dqmbroadcast:9092)"
-        ers_error = "erstrace,throttle,lstderr,erskafka(dqmbroadcast:9092)"
-        ers_fatal = "erstrace,lstderr,erskafka(dqmbroadcast:9092)"
+        ers_warning = "erstrace,throttle,lstdout,erskafka(dqmbroadcast:9092)"
+        ers_error = "erstrace,throttle,lstdout,erskafka(dqmbroadcast:9092)"
+        ers_fatal = "erstrace,lstdout,erskafka(dqmbroadcast:9092)"
     elif ers_impl == 'pocket':
         use_kafka = True
         ers_info = "erstrace,throttle,lstdout,erskafka(" + pocket_url + ":30092)"
-        ers_warning = "erstrace,throttle,lstderr,erskafka(" + pocket_url + ":30092)"
-        ers_error = "erstrace,throttle,lstderr,erskafka(" + pocket_url + ":30092)"
-        ers_fatal = "erstrace,lstderr,erskafka(" + pocket_url + ":30092)"
+        ers_warning = "erstrace,throttle,lstdout,erskafka(" + pocket_url + ":30092)"
+        ers_error = "erstrace,throttle,lstdout,erskafka(" + pocket_url + ":30092)"
+        ers_fatal = "erstrace,lstdout,erskafka(" + pocket_url + ":30092)"
     else:
         use_kafka = False
         ers_info = "erstrace,throttle,lstdout"
-        ers_warning = "erstrace,throttle,lstderr"
-        ers_error = "erstrace,throttle,lstderr"
-        ers_fatal = "erstrace,lstderr"
+        ers_warning = "erstrace,throttle,lstdout"
+        ers_error = "erstrace,throttle,lstdout"
+        ers_fatal = "erstrace,lstdout"
 
-    port = 12347
-    for idx in range(total_number_of_data_producers+1):
+    dqm_kafka_address = "dqmbroadcast:9092" if dqm_impl == 'cern' else pocket_url + ":30092" if dqm_impl == 'pocket' else ''
+
+    port = 12348
+    for idx in range(total_number_of_data_producers):
         network_endpoints[f"datareq_{idx}"] = "tcp://{host_df}:" + f"{port}"
         port = port + 1
         if enable_software_tpg:
@@ -174,12 +201,31 @@ def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowd
             cardid[hostidx] = 0
             host_id_dict[host_ru[hostidx]] = 0
         hostidx = hostidx + 1
+    
+    if control_timing_hw:
+        timing_cmd_network_endpoints=set()
+        if use_hsi_hw:
+            timing_cmd_network_endpoints.add('hsicmds')
+        cmd_data_thi = thi_gen.generate(
+            RUN_NUMBER = run_number,
+            NETWORK_ENDPOINTS=network_endpoints,
+            TIMING_CMD_NETWORK_ENDPOINTS=timing_cmd_network_endpoints,
+            HSI_DEVICE_NAME=hsi_device_name,
+        )
+        console.log("thi cmd data:", cmd_data_thi)
 
     if use_hsi_hw:
         cmd_data_hsi = hsi_gen.generate(network_endpoints,
             RUN_NUMBER = run_number,
+            CONTROL_HSI_HARDWARE=control_timing_hw,
             READOUT_PERIOD_US = hsi_readout_period,
-            HSI_DEVICE_NAME = hsi_device_name,)
+            HSI_DEVICE_NAME = hsi_device_name,
+            HSI_ENDPOINT_ADDRESS = hsi_endpoint_address,
+            HSI_ENDPOINT_PARTITION = hsi_endpoint_partition,
+            HSI_RE_MASK=hsi_re_mask,
+            HSI_FE_MASK=hsi_fe_mask,
+            HSI_INV_MASK=hsi_inv_mask,
+            HSI_SOURCE=hsi_source,)
     else:
         cmd_data_hsi = fake_hsi_gen.generate(
             network_endpoints,
@@ -217,7 +263,8 @@ def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowd
         OUTPUT_PATH = output_path,
         TOKEN_COUNT = df_token_count,
         SYSTEM_TYPE = system_type,
-        SOFTWARE_TPG_ENABLED = enable_software_tpg)
+        SOFTWARE_TPG_ENABLED = enable_software_tpg,
+        TPSET_WRITING_ENABLED = enable_tpset_writing)
     console.log("dataflow cmd data:", cmd_data_dataflow)
 
     cmd_data_readout = [ readout_gen.generate(network_endpoints,
@@ -236,7 +283,9 @@ def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowd
             FRONTEND_TYPE = frontend_type,
             SYSTEM_TYPE = system_type,
             DQM_ENABLED=enable_dqm,
-            SOFTWARE_TPG_ENABLED= enable_software_tpg
+            DQM_KAFKA_ADDRESS=dqm_kafka_address,
+            SOFTWARE_TPG_ENABLED = enable_software_tpg,
+            USE_FAKE_DATA_PRODUCERS = use_fake_data_producers
             ) for hostidx in range(len(host_ru))]
     console.log("readout cmd data:", cmd_data_readout)
 
@@ -246,6 +295,7 @@ def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowd
     data_dir = join(json_dir, 'data')
     os.makedirs(data_dir)
 
+    app_thi="thi"
     app_hsi = "hsi"
     app_trigger = "trigger"
     app_df = "dataflow"
@@ -255,9 +305,18 @@ def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowd
     jf_trigemu = join(data_dir, app_trigger)
     jf_df = join(data_dir, app_df)
     jf_ru = [join(data_dir, app_ru[idx]) for idx in range(len(host_ru))]
+    if control_timing_hw:
+        jf_thi=join(data_dir, app_thi)
 
     cmd_set = ["init", "conf", "start", "stop", "pause", "resume", "scrap", "record"]
-    for app,data in [(app_hsi, cmd_data_hsi), (app_trigger, cmd_data_trigger), (app_df, cmd_data_dataflow)] + list(zip(app_ru, cmd_data_readout)):
+    
+    apps =  [app_hsi, app_trigger, app_df] + app_ru
+    cmds_data =  [cmd_data_hsi, cmd_data_trigger, cmd_data_dataflow] + cmd_data_readout
+    if control_timing_hw:
+        apps.append(app_thi)
+        cmds_data.append(cmd_data_thi)
+
+    for app,data in zip(apps, cmds_data):
         console.log(f"Generating {app} command data json files")
         for c in cmd_set:
             with open(f'{join(data_dir, app)}_{c}.json', 'w') as f:
@@ -265,22 +324,42 @@ def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowd
 
 
     console.log(f"Generating top-level command json files")
+
     start_order = [app_df] + [app_trigger] + app_ru + [app_hsi]
+    resume_order = [app_trigger]
+    if not use_hsi_hw:
+        resume_order=[app_hsi]+resume_order
+
     for c in cmd_set:
         with open(join(json_dir,f'{c}.json'), 'w') as f:
             cfg = {
-                "apps": { app: f'data/{app}_{c}' for app in [app_trigger, app_df, app_hsi] + app_ru }
+                "apps": { app: f'data/{app}_{c}' for app in apps }
             }
-            if c == 'start':
+            if c in [ 'conf']:
+                conf_order=start_order
+                if control_timing_hw:
+                    conf_order=[app_thi]+conf_order
+                cfg[f'order'] = conf_order
+            elif c == 'start':
                 cfg['order'] = start_order
+                if control_timing_hw:
+                    del cfg['apps'][app_thi]
             elif c == 'stop':
                 cfg['order'] = start_order[::-1]
+                if control_timing_hw:
+                    del cfg['apps'][app_thi]
             elif c in ('resume', 'pause'):
                 del cfg['apps'][app_df]
+                if control_timing_hw:
+                    del cfg['apps'][app_thi]
                 if use_hsi_hw:
                     del cfg['apps'][app_hsi]
                 for ruapp in app_ru:
                     del cfg['apps'][ruapp]
+                if c == 'resume':
+                    cfg['order'] = resume_order
+                elif c == 'pause':
+                    cfg['order'] = resume_order[::-1]
 
             json.dump(cfg, f, indent=4, sort_keys=True)
 
@@ -371,6 +450,14 @@ def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowd
                     "host": f"host_ru{hostidx}",
                     "port": appport }
             appport = appport + 1
+        
+        if control_timing_hw:
+            cfg["hosts"][f"host_timing_hw"] = host_timing_hw
+            cfg["apps"][app_thi] = {
+                    "exec": "daq_application",
+                    "host": "host_timing_hw",
+                    "port": appport+len(host_ru) }
+
         json.dump(cfg, f, indent=4, sort_keys=True)
     console.log(f"MDAapp config generated in {json_dir}")
 
