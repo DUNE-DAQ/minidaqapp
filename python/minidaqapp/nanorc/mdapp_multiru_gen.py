@@ -172,9 +172,14 @@ def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowd
         if enable_software_tpg:
             network_endpoints[f"tp_datareq_{idx}"] = "tcp://{host_df}:" + f"{port}"
             port = port + 1
+            network_endpoints[f'frags_tpset_ds_{idx}'] = "tcp://{host_trigger}:"+str(port)
+            port += 1
+            network_endpoints[f"ds_tp_datareq_{idx}"] = "tcp://{host_df}:" + f"{port}"
+            port += 1
 
     cardid = {}
     host_id_dict = {}
+
     for hostidx in range(len(host_ru)):
         # Should end up something like 'network_endpoints[timesync_0]:
         # "tcp://{host_ru0}:12347"'
@@ -182,6 +187,7 @@ def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowd
         port = port + 1
         network_endpoints[f"frags_{hostidx}"] = "tcp://{host_ru" + f"{hostidx}" + "}:" + f"{port}"
         port = port + 1
+
         if enable_software_tpg:
             network_endpoints[f"tp_frags_{hostidx}"] = "tcp://{host_ru" + f"{hostidx}" + "}:" + f"{port}"
             port = port + 1
@@ -231,7 +237,7 @@ def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowd
             MEAN_SIGNAL_MULTIPLICITY = mean_hsi_signal_multiplicity,
             SIGNAL_EMULATION_MODE = hsi_signal_emulation_mode,
             ENABLED_SIGNALS =  enabled_hsi_signals,)
-    
+
     console.log("hsi cmd data:", cmd_data_hsi)
 
     cmd_data_trigger = trigger_gen.generate(network_endpoints,
@@ -253,7 +259,7 @@ def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowd
 
     cmd_data_dataflow = dataflow_gen.generate(network_endpoints,
         NUMBER_OF_DATA_PRODUCERS = total_number_of_data_producers,
-        RUN_NUMBER = run_number, 
+        RUN_NUMBER = run_number,
         OUTPUT_PATH = output_path,
         TOKEN_COUNT = df_token_count,
         SYSTEM_TYPE = system_type,
@@ -266,7 +272,7 @@ def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowd
             TOTAL_NUMBER_OF_DATA_PRODUCERS=total_number_of_data_producers,
             EMULATOR_MODE = emulator_mode,
             DATA_RATE_SLOWDOWN_FACTOR = data_rate_slowdown_factor,
-            RUN_NUMBER = run_number, 
+            RUN_NUMBER = run_number,
             DATA_FILE = data_file,
             FLX_INPUT = use_felix,
             CLOCK_SPEED_HZ = CLOCK_SPEED_HZ,
@@ -397,7 +403,7 @@ def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowd
 
         cfg = {
             "env" : {
-                "DUNEDAQ_ERS_VERBOSITY_LEVEL": 1,
+                "DUNEDAQ_ERS_VERBOSITY_LEVEL": "getenv:1",
                 "DUNEDAQ_PARTITION": partition_name,
                 "DUNEDAQ_ERS_INFO": ers_info,
                 "DUNEDAQ_ERS_WARNING": ers_warning,

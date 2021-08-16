@@ -52,7 +52,7 @@ QUEUE_POP_WAIT_MS = 100
 
 def generate(NETWORK_ENDPOINTS,
         NUMBER_OF_DATA_PRODUCERS=2,
-        RUN_NUMBER=333, 
+        RUN_NUMBER=333,
         OUTPUT_PATH=".",
         TOKEN_COUNT=0,
         SYSTEM_TYPE="TPC",
@@ -61,9 +61,11 @@ def generate(NETWORK_ENDPOINTS,
     """Generate the json configuration for the readout and DF process"""
 
     if SOFTWARE_TPG_ENABLED:
-        NUMBER_OF_TP_PRODUCERS = NUMBER_OF_DATA_PRODUCERS
+        NUMBER_OF_RAW_TP_PRODUCERS = NUMBER_OF_DATA_PRODUCERS
+        NUMBER_OF_DS_TP_PRODUCERS = NUMBER_OF_DATA_PRODUCERS
     else:
-        NUMBER_OF_TP_PRODUCERS = 0
+        NUMBER_OF_RAW_TP_PRODUCERS = 0
+        NUMBER_OF_DS_TP_PRODUCERS = 0
 
     if TPSET_WRITING_ENABLED:
         NUMBER_OF_TP_SUBSCRIBERS = NUMBER_OF_DATA_PRODUCERS
@@ -89,7 +91,10 @@ def generate(NETWORK_ENDPOINTS,
                 for idx in range(NUMBER_OF_DATA_PRODUCERS)
             ] + [
             app.QueueSpec(inst=f"tp_data_requests_{idx}", kind='FollySPSCQueue', capacity=100)
-                for idx in range(NUMBER_OF_TP_PRODUCERS)
+                for idx in range(NUMBER_OF_RAW_TP_PRODUCERS)
+            ] + [
+                app.QueueSpec(inst=f"ds_tp_data_requests_{idx}", kind='FollySPSCQueue', capacity=100)
+                for idx in range(NUMBER_OF_DS_TP_PRODUCERS)
             ] + ([
             app.QueueSpec(inst="tpsets_from_netq", kind='FollyMPMCQueue', capacity=1000),
             ] if TPSET_WRITING_ENABLED else [])
@@ -111,7 +116,10 @@ def generate(NETWORK_ENDPOINTS,
                                                     for idx in range(NUMBER_OF_DATA_PRODUCERS)
                                              ] + [
                                                 app.QueueInfo(name=f"data_request_{NUMBER_OF_DATA_PRODUCERS + idx}_output_queue", inst=f"tp_data_requests_{idx}", dir="output")
-                                                    for idx in range(NUMBER_OF_TP_PRODUCERS)
+                                                    for idx in range(NUMBER_OF_RAW_TP_PRODUCERS)
+                                             ] + [
+                                                app.QueueInfo(name=f"data_request_{NUMBER_OF_DATA_PRODUCERS + NUMBER_OF_RAW_TP_PRODUCERS + idx}_output_queue", inst=f"ds_tp_data_requests_{idx}", dir="output")
+                                                    for idx in range(NUMBER_OF_DS_TP_PRODUCERS)
                                              ]),
 
         mspec("datawriter", "DataWriter", [ app.QueueInfo(name="trigger_record_input_queue", inst="trigger_record_q", dir="input"),
@@ -122,7 +130,9 @@ def generate(NETWORK_ENDPOINTS,
     ] + [
         mspec(f"qton_datareq_{idx}", "QueueToNetwork", [app.QueueInfo(name="input", inst=f"data_requests_{idx}", dir="input")])  for idx in range(NUMBER_OF_DATA_PRODUCERS)
     ] + [
-        mspec(f"qton_tp_datareq_{idx}", "QueueToNetwork", [app.QueueInfo(name="input", inst=f"tp_data_requests_{idx}", dir="input")])  for idx in range(NUMBER_OF_TP_PRODUCERS)
+        mspec(f"qton_tp_datareq_{idx}", "QueueToNetwork", [app.QueueInfo(name="input", inst=f"tp_data_requests_{idx}", dir="input")])  for idx in range(NUMBER_OF_RAW_TP_PRODUCERS)
+    ] + [
+        mspec(f"qton_ds_tp_datareq_{idx}", "QueueToNetwork", [app.QueueInfo(name="input", inst=f"ds_tp_data_requests_{idx}", dir="input")])  for idx in range(NUMBER_OF_DS_TP_PRODUCERS)
     ] + ([        
         mspec(f"tpset_subscriber_{idx}", "NetworkToQueue", [app.QueueInfo(name="output", inst=f"tpsets_from_netq", dir="output")])  for idx in range(NUMBER_OF_TP_SUBSCRIBERS)
     ]) + ([
@@ -144,12 +154,15 @@ def generate(NETWORK_ENDPOINTS,
                                            sender_config=nos.Conf(ipm_plugin_type="ZmqSender",
                                                                   address=NETWORK_ENDPOINTS["triginh"],
                                                                   stype="msgpack"))),
-        
+
                 ("trb", trb.ConfParams( general_queue_timeout=QUEUE_POP_WAIT_MS,
                                         map=trb.mapgeoidqueue([
-                                                trb.geoidinst(region=0, element=idx, system=SYSTEM_TYPE, queueinstance=f"data_requests_{idx}")  for idx in range(NUMBER_OF_DATA_PRODUCERS) ]
-                                            + [
-                                                trb.geoidinst(region=0, element=NUMBER_OF_DATA_PRODUCERS + idx, system=SYSTEM_TYPE, queueinstance=f"tp_data_requests_{idx}")  for idx in range(NUMBER_OF_TP_PRODUCERS) ]
+                                                trb.geoidinst(region=0, element=idx, system=SYSTEM_TYPE, queueinstance=f"data_requests_{idx}")  for idx in range(NUMBER_OF_DATA_PRODUCERS)
+                                        ] + [
+                                            trb.geoidinst(region=0, element=NUMBER_OF_DATA_PRODUCERS + idx, system=SYSTEM_TYPE, queueinstance=f"tp_data_requests_{idx}")  for idx in range(NUMBER_OF_RAW_TP_PRODUCERS)
+                                        ] + [
+                                            trb.geoidinst(region=0, element=idx, system="DataSelection", queueinstance=f"ds_tp_data_requests_{idx}")  for idx in range(NUMBER_OF_DS_TP_PRODUCERS)
+                                        ]
                                                               ))),
                 ("datawriter", dw.ConfParams(initial_token_count=TOKEN_COUNT,
                             data_store_parameters=hdf5ds.ConfParams(name="data_store",
@@ -171,7 +184,7 @@ def generate(NETWORK_ENDPOINTS,
                                            msg_module_name="DataRequestNQ",
                                            sender_config=nos.Conf(ipm_plugin_type="ZmqSender",
                                                                   address=NETWORK_ENDPOINTS[f"datareq_{idx}"],
-                                                                  stype="msgpack"))) 
+                                                                  stype="msgpack")))
                  for idx in range(NUMBER_OF_DATA_PRODUCERS)
             ] + [
                 (f"qton_tp_datareq_{idx}", qton.Conf(msg_type="dunedaq::dfmessages::DataRequest",
@@ -179,7 +192,16 @@ def generate(NETWORK_ENDPOINTS,
                                             sender_config=nos.Conf(ipm_plugin_type="ZmqSender",
                                                                     address=NETWORK_ENDPOINTS[f"tp_datareq_{idx}"],
                                                                     stype="msgpack")))
-                for idx in range(NUMBER_OF_TP_PRODUCERS)
+                for idx in range(NUMBER_OF_RAW_TP_PRODUCERS)
+
+            ] + [
+                (f"qton_ds_tp_datareq_{idx}", qton.Conf(msg_type="dunedaq::dfmessages::DataRequest",
+                                                        msg_module_name="DataRequestNQ",
+                                                        sender_config=nos.Conf(ipm_plugin_type="ZmqSender",
+                                                                               address=NETWORK_ENDPOINTS[f"ds_tp_datareq_{idx}"],
+                                                                               stype="msgpack")))
+                for idx in range(NUMBER_OF_RAW_TP_PRODUCERS)
+
             ] + [
                 (f"ntoq_fragments_{idx}", ntoq.Conf(msg_type="std::unique_ptr<dunedaq::dataformats::Fragment>",
                                            msg_module_name="FragmentNQ",
@@ -214,7 +236,8 @@ def generate(NETWORK_ENDPOINTS,
             ("qton_datareq_.*", startpars),
             ("trb", startpars),
             ("ntoq_trigdec", startpars),
-            ("qton_tp_datareq_.*", startpars)])
+            ("qton_tp_datareq_.*", startpars),
+            ("qton_ds_tp_datareq_.*", startpars)])
 
     cmd_data['stop'] = acmd([("ntoq_trigdec", None),
             ("trb", None),
@@ -222,7 +245,8 @@ def generate(NETWORK_ENDPOINTS,
             ("ntoq_fragments_.*", None),
             ("datawriter", None),
             ("qton_token", None),
-            ("qton_tp_datareq_.*", None)
+            ("qton_tp_datareq_.*", None),
+            ("qton_ds_tp_datareq_.*", None),
             ] + ([
               ("tpset_subscriber_.*", None),
               ("tpswriter", None)
