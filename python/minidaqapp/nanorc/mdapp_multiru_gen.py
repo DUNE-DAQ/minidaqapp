@@ -403,7 +403,7 @@ def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowd
 
         cfg = {
             "env" : {
-                "DUNEDAQ_ERS_VERBOSITY_LEVEL": "getenv:-1",
+                "DUNEDAQ_ERS_VERBOSITY_LEVEL": "getenv:1",
                 "DUNEDAQ_PARTITION": partition_name,
                 "DUNEDAQ_ERS_INFO": ers_info,
                 "DUNEDAQ_ERS_WARNING": ers_warning,
