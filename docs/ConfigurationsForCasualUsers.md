@@ -8,8 +8,8 @@ After you have setup the environment and downloaded the fake input data file
 3. `setup_dbt dunedaq-v2.8.0`
 4. `dbt-workarea-env`
 5. download a raw data file, either by running 
-   "`curl -o frames.bin -O https://cernbox.cern.ch/index.php/s/VAqNtn7bwuQtff3/download`"
-   or clicking on the [CERNBox link](https://cernbox.cern.ch/index.php/s/VAqNtn7bwuQtff3/download)) and put it into `<work_dir>`
+   "`curl -o frames.bin -O https://cernbox.cern.ch/index.php/s/7qNnuxD8igDOVJT/download`"
+   or clicking on the [CERNBox link](https://cernbox.cern.ch/index.php/s/7qNnuxD8igDOVJT/download)) and put it into `<work_dir>`
 
 
 Now we generate some sample system configurations and use _[nanorc](https://dune-daq-sw.readthedocs.io/en/latest/packages/nanorc/)_ to run MiniDAQ app with them.
@@ -22,7 +22,7 @@ The configurations can be run interactively with `nanorc mdapp_fake` from the `<
 1) In order to get the full set of configuration options and their `help` , run :  
 `python -m minidaqapp.nanorc.mdapp_multiru_gen -h`
 
-2) The data `Input` and `Output` system configuration options allow the user to change the input data file location and the output data directory path as needed. To specify an input `frames.bin` file from the current directory, a user would use `-d ./frames.bin`. This file contains data frames that are replayed by fake cards in the current system, and as mentioned above, this file can be downloaded with "`curl -o frames.bin -O https://cernbox.cern.ch/index.php/s/VAqNtn7bwuQtff3/download`". The output data path option `-o` can be used to specify the directory where output data files are written.  To write the output data files to the current directory, one would use `-o .`
+2) The data `Input` and `Output` system configuration options allow the user to change the input data file location and the output data directory path as needed. To specify an input `frames.bin` file from the current directory, a user would use `-d ./frames.bin`. This file contains data frames that are replayed by fake cards in the current system, and as mentioned above, this file can be downloaded with "`curl -o frames.bin -O https://cernbox.cern.ch/index.php/s/7qNnuxD8igDOVJT/download`". The output data path option `-o` can be used to specify the directory where output data files are written.  To write the output data files to the current directory, one would use `-o .`
 The `Input` and `Output` data system options can be used in the following way 
 
 `python -m minidaqapp.nanorc.mdapp_multiru_gen -d ./frames.bin -o .  mdapp_fake`
