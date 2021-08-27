@@ -1,16 +1,13 @@
 The intention of this page is to provide a few simple instructions that new or casual users can use to quickly demonstrate the operation of a small MiniDAQ system that uses emulators instead of real electronics.
 
-The steps fall into a few general categories, and they draw on more detailed instructions from other repositories, for example, _[daq-buildtools](https://dune-daq-sw.readthedocs.io/en/latest/packages/daq-buildtools/)_ and _[nanorc](https://dune-daq-sw.readthedocs.io/en/latest/packages/nanorc/)_.
-1. setup the environment 
-2. generate the sample system configuration
-3. use _nanorc_ to run the sample system
+The steps fall into a few general categories (setup the environment, generate the sample system configuration, and use _nanorc_ to run the sample system), and they draw on more detailed instructions from other repositories, for example, _[daq-buildtools](https://dune-daq-sw.readthedocs.io/en/latest/packages/daq-buildtools/)_ and _[nanorc](https://dune-daq-sw.readthedocs.io/en/latest/packages/nanorc/)_.
 
 Here are the steps that should be used when you first create your local software working area (i.e. `<work_dir>`):
 
 1. log into a system that has access to `/cvmfs/dunedaq.opensciencegrid.org/`
 2. `source /cvmfs/dunedaq.opensciencegrid.org/setup_dunedaq.sh`
-3. `setup_dbt dunedaq-v2.6.0`
-4. `dbt-create.sh dunedaq-v2.6.0 <work_dir>`
+3. `setup_dbt dunedaq-v2.8.0`
+4. `dbt-create.sh dunedaq-v2.8.0 <work_dir>`
 5. `cd <work_dir>`
 6. `dbt-workarea-env`
 9. download a raw data file, either by running 
@@ -27,7 +24,7 @@ When you return to this work area (for example, after logging out and back in), 
 
 1. `cd <work_dir>`
 2. `source /cvmfs/dunedaq.opensciencegrid.org/setup_dunedaq.sh`
-3. `setup_dbt dunedaq-v2.6.0`
+3. `setup_dbt dunedaq-v2.8.0`
 4. `dbt-workarea-env`
 7. `nanorc mdapp_fake boot init conf start 102 wait 2 resume wait 60 pause wait 2 stop scrap terminate`
 

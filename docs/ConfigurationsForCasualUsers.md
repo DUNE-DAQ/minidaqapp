@@ -5,7 +5,7 @@ After you have successfully followed the steps described in [Instructions for ca
 After you have setup the environment and downloaded the fake input data file 
 1. `cd <work_dir>`
 2. `source /cvmfs/dunedaq.opensciencegrid.org/setup_dunedaq.sh`
-3. `setup_dbt dunedaq-v2.6.0`
+3. `setup_dbt dunedaq-v2.8.0`
 4. `dbt-workarea-env`
 5. download a raw data file, either by running 
    "`curl -o frames.bin -O https://cernbox.cern.ch/index.php/s/VAqNtn7bwuQtff3/download`"
