@@ -30,3 +30,17 @@ When you return to this work area (for example, after logging out and back in), 
 
 
 More detailed explanations on how to create different configurations can be found in [Instructions for different configurations for first-time users](ConfigurationsForCasualUsers.md)
+
+If and when you are ready to start looking at existing code and possibly modifying it, you can use steps like the following:
+
+1. `cd <work_dir>`
+2. `source /cvmfs/dunedaq.opensciencegrid.org/setup_dunedaq.sh`
+3. `setup_dbt dunedaq-v2.8.0`
+4. `dbt-workarea-env`
+5. `cd sourcecode`
+6. `git clone https://github.com/DUNE-DAQ/<package_name>.git -b develop` 
+   * e.g. `git clone https://github.com/DUNE-DAQ/dfmodules.git -b develop`
+   * the full list of available repository is [here](https://github.com/orgs/DUNE-DAQ/repositories)
+8. `cd ..`
+9. `dbt-build.sh`
+10. continue as described above...
