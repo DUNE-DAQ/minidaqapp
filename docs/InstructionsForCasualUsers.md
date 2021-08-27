@@ -43,4 +43,5 @@ If and when you are ready to start looking at existing code and possibly modifyi
    * the full list of available repository is [here](https://github.com/orgs/DUNE-DAQ/repositories)
 8. `cd ..`
 9. `dbt-build.sh`
+4. `dbt-workarea-env --refresh`
 10. continue as described above...
