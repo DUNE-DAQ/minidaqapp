@@ -60,9 +60,11 @@ for example using the following fake IP addresses for the different hosts :  127
 
 `python -m minidaqapp.nanorc.mdapp_multiru_gen -d ./frames.bin -o . --host-df 127.0.0.1 --host-ru 127.0.0.2 --host-trigger 127.0.0.3 --host-hsi 127.0.0.4  mdapp_fake`
 
-the default for all the host options will be `localhost`
+the default for all the host options will be `localhost`.
 
-8) Running _nanorc_ can be done in interactively or in batch mode, for the later you can specify a sequence of commands to drive MiniDAQ app, for example run :
+8) If you wish to use a grafana dashboard to visualise operational monitoring data, you can do so by starting a [pocket](https://github.com/DUNE-DAQ/pocket) instance. In that case, you can use the options `--opmon-impl pocket` and `--pocket-url <host name>` for the configuration generation. You may also collect ERS messages and visualise them in grafana, by adding the option `--ers-impl pocket`.
+
+9) Running _nanorc_ can be done in interactively or in batch mode, for the later you can specify a sequence of commands to drive MiniDAQ app, for example run :
 
  `nanorc mdapp_fake boot init conf start 102 wait 2 resume wait 60 pause wait 2 stop scrap terminate`
 
@@ -70,7 +72,7 @@ Where the `start <run_number>` command overrides the run_number value to be used
 Any meaningful combination of commands is allowed. Note that the triggers will be issue only after the `resume` command is sent. 
 
 
-9) examine the contents of the HDf5 file with commands like the following:
+10) examine the contents of the HDf5 file with commands like the following:
    * `h5dump-shared -H -A swtest_run000101_0000_*.hdf5`
    * and
    * `python3 $DFMODULES_FQ_DIR/dfmodules/bin/hdf5dump/hdf5_dump.py -p both -f swtest_run000101_0000_*.hdf5`
