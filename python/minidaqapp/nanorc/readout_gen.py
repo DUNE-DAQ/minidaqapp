@@ -39,6 +39,7 @@ import dunedaq.dqm.dqmprocessor as dqmprocessor
 import dunedaq.dfmodules.fakedataprod as fdp
 
 from appfwk.utils import acmd, mcmd, mrccmd, mspec
+from os import path
 
 import json
 import math
@@ -94,12 +95,6 @@ def generate(NETWORK_ENDPOINTS,
     if not USE_FAKE_DATA_PRODUCERS:
         queue_bare_specs += [
             app.QueueSpec(inst=f"{FRONTEND_TYPE}_link_{idx}", kind='FollySPSCQueue', capacity=100000)
-            for idx in range(NUMBER_OF_DATA_PRODUCERS)
-        ]
-
-    if RAW_RECORDING_ENABLED:
-        queue_bare_specs = queue_bare_specs + [
-            app.QueueSpec(inst=f"{FRONTEND_TYPE}_recording_link_{idx}", kind='FollySPSCQueue', capacity=100000)
             for idx in range(NUMBER_OF_DATA_PRODUCERS)
         ]
 
@@ -198,12 +193,6 @@ def generate(NETWORK_ENDPOINTS,
 
             mod_specs += [mspec(f"datahandler_{idx + MIN_LINK}", "DataLinkHandler", ls)]
 
-    if RAW_RECORDING_ENABLED:
-        mod_specs += [
-            mspec(f"data_recorder_{idx}", "DataRecorder", [
-                app.QueueInfo(name="raw_recording", inst=f"{FRONTEND_TYPE}_recording_link_{idx}", dir="input")
-            ]) for idx in range(NUMBER_OF_DATA_PRODUCERS)
-        ]
 
     mod_specs += [mspec("timesync_to_network", "QueueToNetwork",
               [app.QueueInfo(name="input", inst="time_sync_q", dir="input")]
@@ -318,12 +307,11 @@ def generate(NETWORK_ENDPOINTS,
                         pop_limit_pct = 0.8,
                         pop_size_pct = 0.1,
                         apa_number = 0,
-                        link_number = idx)) for idx in range(MIN_LINK,MAX_LINK)
-            ] + [
-                (f"data_recorder_{idx}", dr.Conf(
-                        output_file = f"output_{idx + MIN_LINK}.out",
+                        link_number = idx,
+                        enable_raw_recording = RAW_RECORDING_ENABLED,
+                        output_file = path.join(RAW_RECORDING_OUTPUT_DIR, f"output_{idx}.out"),
                         compression_algorithm = "None",
-                        stream_buffer_size = 8388608)) for idx in range(NUMBER_OF_DATA_PRODUCERS)
+                        stream_buffer_size = 8388608)) for idx in range(MIN_LINK,MAX_LINK)
             ] + [
                 ("trb_dqm", trb.ConfParams(
                         general_queue_timeout=QUEUE_POP_WAIT_MS,
