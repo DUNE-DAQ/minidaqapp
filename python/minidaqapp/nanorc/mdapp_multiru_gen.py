@@ -173,9 +173,9 @@ def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowd
 
     if dqm_impl == 'cern':
         dqm_kafka_address = "dqmbroadcast:9092"
-    elif ers_impl == 'pocket':
+    elif dqm_impl == 'pocket':
         dqm_kafka_address = pocket_url + ":30092"
-    elif ers_impl == 'pocket-daq':
+    elif dqm_impl == 'pocket-daq':
         raise RuntimeError('DQM pocket daq is not supported yet')
     else:
         dqm_kafka_address = ''
