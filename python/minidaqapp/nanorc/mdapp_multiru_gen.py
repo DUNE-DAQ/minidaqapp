@@ -125,10 +125,12 @@ def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowd
         df_token_count = -1 * token_count
         trigemu_token_count = 0
 
+    ru_app_names=[f"ruflx{idx}" if use_felix else f"ruemu{idx}" for idx in range(len(host_ru))]
+    
     network_endpoints = {
         "hsievent" : "tcp://{host_hsi}:12344",
         "trigdec" : "tcp://{host_trigger}:12345",
-        "triginh" : "tcp://{host_df}:12346",
+        "triginh" : "tcp://{host_dataflow}:12346",
         "hsicmds":  "tcp://{host_hsi}:12347",
     }
 
@@ -144,37 +146,39 @@ def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowd
     else:
         info_svc_uri = "file://info_${APP_NAME}_${APP_PORT}.json"
 
+    ers_settings=dict()
+    
     if ers_impl == 'cern':
         use_kafka = True
-        ers_info = "erstrace,throttle,lstdout,erskafka(dqmbroadcast:9092)"
-        ers_warning = "erstrace,throttle,lstdout,erskafka(dqmbroadcast:9092)"
-        ers_error = "erstrace,throttle,lstdout,erskafka(dqmbroadcast:9092)"
-        ers_fatal = "erstrace,lstdout,erskafka(dqmbroadcast:9092)"
+        ers_settings["INFO"] =    "erstrace,throttle,lstdout,erskafka(dqmbroadcast:9092)"
+        ers_settings["WARNING"] = "erstrace,throttle,lstdout,erskafka(dqmbroadcast:9092)"
+        ers_settings["ERROR"] =   "erstrace,throttle,lstdout,erskafka(dqmbroadcast:9092)"
+        ers_settings["FATAL"] =   "erstrace,lstdout,erskafka(dqmbroadcast:9092)"
     elif ers_impl == 'pocket':
         use_kafka = True
-        ers_info = "erstrace,throttle,lstdout,erskafka(" + pocket_url + ":30092)"
-        ers_warning = "erstrace,throttle,lstdout,erskafka(" + pocket_url + ":30092)"
-        ers_error = "erstrace,throttle,lstdout,erskafka(" + pocket_url + ":30092)"
-        ers_fatal = "erstrace,lstdout,erskafka(" + pocket_url + ":30092)"
+        ers_settings["INFO"] =    "erstrace,throttle,lstdout,erskafka(" + pocket_url + ":30092)"
+        ers_settings["WARNING"] = "erstrace,throttle,lstdout,erskafka(" + pocket_url + ":30092)"
+        ers_settings["ERROR"] =   "erstrace,throttle,lstdout,erskafka(" + pocket_url + ":30092)"
+        ers_settings["FATAL"] =   "erstrace,lstdout,erskafka(" + pocket_url + ":30092)"
     else:
         use_kafka = False
-        ers_info = "erstrace,throttle,lstdout"
-        ers_warning = "erstrace,throttle,lstdout"
-        ers_error = "erstrace,throttle,lstdout"
-        ers_fatal = "erstrace,lstdout"
+        ers_settings["INFO"] =    "erstrace,throttle,lstdout"
+        ers_settings["WARNING"] = "erstrace,throttle,lstdout"
+        ers_settings["ERROR"] =   "erstrace,throttle,lstdout"
+        ers_settings["FATAL"] =   "erstrace,lstdout"
 
     dqm_kafka_address = "dqmbroadcast:9092" if dqm_impl == 'cern' else pocket_url + ":30092" if dqm_impl == 'pocket' else ''
 
     port = 12348
     for idx in range(total_number_of_data_producers):
-        network_endpoints[f"datareq_{idx}"] = "tcp://{host_df}:" + f"{port}"
+        network_endpoints[f"datareq_{idx}"] = "tcp://{host_dataflow}:" + f"{port}"
         port = port + 1
         if enable_software_tpg:
-            network_endpoints[f"tp_datareq_{idx}"] = "tcp://{host_df}:" + f"{port}"
+            network_endpoints[f"tp_datareq_{idx}"] = "tcp://{host_dataflow}:" + f"{port}"
             port = port + 1
             network_endpoints[f'frags_tpset_ds_{idx}'] = "tcp://{host_trigger}:"+str(port)
             port += 1
-            network_endpoints[f"ds_tp_datareq_{idx}"] = "tcp://{host_df}:" + f"{port}"
+            network_endpoints[f"ds_tp_datareq_{idx}"] = "tcp://{host_dataflow}:" + f"{port}"
             port += 1
 
     cardid = {}
@@ -183,16 +187,17 @@ def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowd
     for hostidx in range(len(host_ru)):
         # Should end up something like 'network_endpoints[timesync_0]:
         # "tcp://{host_ru0}:12347"'
-        network_endpoints[f"timesync_{hostidx}"] = "tcp://{host_ru" + f"{hostidx}" + "}:" + f"{port}"
+        # Use the fact that "{{" and "}}" in f-strings evaluate to literal "{" and "}" respectively
+        network_endpoints[f"timesync_{hostidx}"] = f"tcp://{{host_{ru_app_names[hostidx]}}}:{port}"
         port = port + 1
-        network_endpoints[f"frags_{hostidx}"] = "tcp://{host_ru" + f"{hostidx}" + "}:" + f"{port}"
+        network_endpoints[f"frags_{hostidx}"] =  f"tcp://{{host_{ru_app_names[hostidx]}}}:{port}"
         port = port + 1
 
         if enable_software_tpg:
-            network_endpoints[f"tp_frags_{hostidx}"] = "tcp://{host_ru" + f"{hostidx}" + "}:" + f"{port}"
+            network_endpoints[f"tp_frags_{hostidx}"] =  f"tcp://{{host_{ru_app_names[hostidx]}}}:{port}"
             port = port + 1
             for idx in range(number_of_data_producers):
-                network_endpoints[f"tpsets_{hostidx*number_of_data_producers+idx}"] = "tcp://{host_ru" + f"{hostidx}" + "}:" + f"{port}"
+                network_endpoints[f"tpsets_{hostidx*number_of_data_producers+idx}"] =  f"tcp://{{host_{ru_app_names[hostidx]}}}:{port}"
                 port = port + 1
         if host_ru[hostidx] in host_id_dict:
             host_id_dict[host_ru[hostidx]] = host_id_dict[host_ru[hostidx]] + 1
@@ -289,176 +294,69 @@ def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowd
             ) for hostidx in range(len(host_ru))]
     console.log("readout cmd data:", cmd_data_readout)
 
-    if exists(json_dir):
-        raise RuntimeError(f"Directory {json_dir} already exists")
+    ##################################################################################
 
-    data_dir = join(json_dir, 'data')
-    os.makedirs(data_dir)
-
-    app_thi="thi"
-    app_hsi = "hsi"
-    app_trigger = "trigger"
-    app_df = "dataflow"
-    app_ru = [f"ruflx{idx}" if use_felix else f"ruemu{idx}" for idx in range(len(host_ru))]
-
-    jf_hsi = join(data_dir, app_hsi)
-    jf_trigemu = join(data_dir, app_trigger)
-    jf_df = join(data_dir, app_df)
-    jf_ru = [join(data_dir, app_ru[idx]) for idx in range(len(host_ru))]
-    if control_timing_hw:
-        jf_thi=join(data_dir, app_thi)
-
-    cmd_set = ["init", "conf", "start", "stop", "pause", "resume", "scrap", "record"]
+    # Make dummy system data
     
-    apps =  [app_hsi, app_trigger, app_df] + app_ru
-    cmds_data =  [cmd_data_hsi, cmd_data_trigger, cmd_data_dataflow] + cmd_data_readout
+    from . import util
+    apps = {
+        "hsi":      util.App(),
+        "trigger":  util.App(),
+        "dataflow": util.App(),
+    }
+
+    apps.update({ru_name: util.App() for ru_name in ru_app_names})
+    
     if control_timing_hw:
-        apps.append(app_thi)
-        cmds_data.append(cmd_data_thi)
-
-    for app,data in zip(apps, cmds_data):
-        console.log(f"Generating {app} command data json files")
-        for c in cmd_set:
-            with open(f'{join(data_dir, app)}_{c}.json', 'w') as f:
-                json.dump(data[c].pod(), f, indent=4, sort_keys=True)
-
-
-    console.log(f"Generating top-level command json files")
-
-    start_order = [app_df] + [app_trigger] + app_ru + [app_hsi]
-    resume_order = [app_trigger]
-    if not use_hsi_hw:
-        resume_order=[app_hsi]+resume_order
-
-    for c in cmd_set:
-        with open(join(json_dir,f'{c}.json'), 'w') as f:
-            cfg = {
-                "apps": { app: f'data/{app}_{c}' for app in apps }
-            }
-            if c in [ 'conf']:
-                conf_order=start_order
-                if control_timing_hw:
-                    conf_order=[app_thi]+conf_order
-                cfg[f'order'] = conf_order
-            elif c == 'start':
-                cfg['order'] = start_order
-                if control_timing_hw:
-                    del cfg['apps'][app_thi]
-            elif c == 'stop':
-                cfg['order'] = start_order[::-1]
-                if control_timing_hw:
-                    del cfg['apps'][app_thi]
-            elif c in ('resume', 'pause'):
-                del cfg['apps'][app_df]
-                if control_timing_hw:
-                    del cfg['apps'][app_thi]
-                if use_hsi_hw:
-                    del cfg['apps'][app_hsi]
-                for ruapp in app_ru:
-                    del cfg['apps'][ruapp]
-                if c == 'resume':
-                    cfg['order'] = resume_order
-                elif c == 'pause':
-                    cfg['order'] = resume_order[::-1]
-
-            json.dump(cfg, f, indent=4, sort_keys=True)
-
-
-    console.log(f"Generating boot json file")
-    with open(join(json_dir,'boot.json'), 'w') as f:
-        daq_app_specs = {
-            "daq_application_ups" : {
-                "comment": "Application profile based on a full dbt runtime environment",
-                "env": {
-                "DBT_AREA_ROOT": "getenv"
-                },
-                "cmd": ["CMD_FAC=rest://localhost:${APP_PORT}",
-                    "INFO_SVC=" + info_svc_uri,
-                    "cd ${DBT_AREA_ROOT}",
-                    "source dbt-env.sh",
-                    "dbt-workarea-env",
-                    "cd ${APP_WD}",
-                    "daq_application --name ${APP_NAME} -c ${CMD_FAC} -i ${INFO_SVC}"]
-            },
-            "daq_application" : {
-                "comment": "Application profile using  PATH variables (lower start time)",
-                "env":{
-                    "CET_PLUGIN_PATH": "getenv",
-                    "DUNEDAQ_SHARE_PATH": "getenv",
-                    "TIMING_SHARE": "getenv",
-                    "LD_LIBRARY_PATH": "getenv",
-                    "PATH": "getenv",
-                    "READOUT_SHARE": "getenv"
-                },
-                "cmd": ["CMD_FAC=rest://localhost:${APP_PORT}",
-                    "INFO_SVC=" + info_svc_uri,
-                    "cd ${APP_WD}",
-                    "daq_application --name ${APP_NAME} -c ${CMD_FAC} -i ${INFO_SVC}"]
-            }
-        }
-
-        if not disable_trace:
-            daq_app_specs["daq_application"]["env"]["TRACE_FILE"] = "getenv:/tmp/trace_buffer_${HOSTNAME}_${USER}"
-            daq_app_specs["daq_application_ups"]["env"]["TRACE_FILE"] = "getenv:/tmp/trace_buffer_${HOSTNAME}_${USER}"
-
-        cfg = {
-            "env" : {
-                "DUNEDAQ_ERS_VERBOSITY_LEVEL": "getenv:1",
-                "DUNEDAQ_PARTITION": partition_name,
-                "DUNEDAQ_ERS_INFO": ers_info,
-                "DUNEDAQ_ERS_WARNING": ers_warning,
-                "DUNEDAQ_ERS_ERROR": ers_error,
-                "DUNEDAQ_ERS_FATAL": ers_fatal,
-                "DUNEDAQ_ERS_DEBUG_LEVEL": "getenv:-1",
-            },
-            "hosts": {
-                "host_df": host_df,
-                "host_trigger": host_trigger,
-                "host_hsi": host_hsi
-            },
-            "apps" : {
-                app_hsi: {
-                    "exec": "daq_application",
-                    "host": "host_hsi",
-                    "port": 3332
-                },
-                app_trigger : {
-                    "exec": "daq_application",
-                    "host": "host_trigger",
-                    "port": 3333
-                },
-                app_df: {
-                    "exec": "daq_application",
-                    "host": "host_df",
-                    "port": 3334
-                },
-            },
-            "response_listener": {
-                "port": 56789
-            },
-            "exec": daq_app_specs
-        }
-
-        if use_kafka:
-            cfg["env"]["DUNEDAQ_ERS_STREAM_LIBS"] = "erskafka"
-
-        appport = 3335
-        for hostidx in range(len(host_ru)):
-            cfg["hosts"][f"host_ru{hostidx}"] = host_ru[hostidx]
-            cfg["apps"][app_ru[hostidx]] = {
-                    "exec": "daq_application",
-                    "host": f"host_ru{hostidx}",
-                    "port": appport }
-            appport = appport + 1
+        apps["thi"] = util.App()
         
-        if control_timing_hw:
-            cfg["hosts"][f"host_timing_hw"] = host_timing_hw
-            cfg["apps"][app_thi] = {
-                    "exec": "daq_application",
-                    "host": "host_timing_hw",
-                    "port": appport+len(host_ru) }
+    the_system = util.System(apps, app_connections=None,
+                             app_start_order=["dataflow"]+ru_app_names+["trigger", "hsi"])
 
-        json.dump(cfg, f, indent=4, sort_keys=True)
+    # Arrange per-app command data into the format used by util.write_json_files()
+    app_command_datas = {
+        "hsi": cmd_data_hsi,
+        "trigger": cmd_data_trigger,
+        "dataflow": cmd_data_dataflow,
+    }
+    for name, cmd_data in zip(ru_app_names, cmd_data_readout):
+        app_command_datas[name]=cmd_data
+    
+    if control_timing_hw:
+        app_command_datas["thi"] = cmd_data_thi
+
+    ##################################################################################
+
+    # Make boot.json config
+
+    system_command_datas = util.make_system_command_datas(the_system)
+    # Override the default boot.json with the one from minidaqapp
+    boot = util.generate_boot(the_system.apps, partition_name=partition_name, ers_settings=ers_settings, info_svc_uri=info_svc_uri)
+    
+    if disable_trace:
+        del boot["exec"]["daq_application"]["env"]["TRACE_FILE"]
+        del boot["exec"]["daq_application_ups"]["env"]["TRACE_FILE"]
+
+    if use_kafka:
+        boot["env"]["DUNEDAQ_ERS_STREAM_LIBS"] = "erskafka"
+
+    # PAR 2021-09-29 HACK
+    #
+    # Not all apps give us a cmd_data with all of the commands, so to
+    # be consistent, we have to remove the relevant app/command pair
+    # from the system command data, otherwise nanorc barfs. We have to
+    # find a way to modify the commands received by an app in util
+    for c in ('resume', 'pause'):
+        cmd_apps=system_command_datas[c]['apps']
+        for_removal=["dataflow", "thi", "hsi"] + ru_app_names
+        for app in for_removal:
+            if app in cmd_apps:
+                del cmd_apps[app]
+    
+    system_command_datas['boot'] = boot
+    
+    util.write_json_files(app_command_datas, system_command_datas, json_dir)
+    
     console.log(f"MDAapp config generated in {json_dir}")
 
 
