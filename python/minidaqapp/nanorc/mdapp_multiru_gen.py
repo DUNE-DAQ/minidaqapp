@@ -300,12 +300,12 @@ def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowd
     
     from . import util
     apps = {
-        "hsi":      util.App(),
-        "trigger":  util.App(),
-        "dataflow": util.App(),
+        "hsi":      util.App(host=host_hsi),
+        "trigger":  util.App(host=host_trigger),
+        "dataflow": util.App(host=host_df),
     }
 
-    apps.update({ru_name: util.App() for ru_name in ru_app_names})
+    apps.update({ru_name: util.App(host=host_ru[i]) for i,ru_name in enumerate(ru_app_names)})
     
     if control_timing_hw:
         apps["thi"] = util.App()
