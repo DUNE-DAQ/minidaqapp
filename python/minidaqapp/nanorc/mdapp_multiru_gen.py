@@ -4,7 +4,7 @@ import math
 import rich.traceback
 from rich.console import Console
 from os.path import exists, join
-
+from collections import defaultdict
 
 CLOCK_SPEED_HZ = 50000000
 
@@ -12,6 +12,24 @@ CLOCK_SPEED_HZ = 50000000
 CONTEXT_SETTINGS = dict(help_option_names=['-h', '--help'])
 
 console = Console()
+
+# Map from application name to the list of endpoint names that are
+# connected to that application (specifically, which must be assigned
+# on its host)
+app_endpoints = defaultdict(list)
+
+def add_endpoint(endpoint_name, app_name):
+    app_endpoints[app_name].append(endpoint_name)
+
+def assign_endpoints():
+    ret=dict()
+    for app, endpoints in app_endpoints.items():
+        port = 12345
+        for endpoint in endpoints:
+            ret[endpoint] = f"tcp://{{host_{app}}}:{port}"
+            port+=1
+            
+    return ret
 
 
 import click
@@ -82,6 +100,12 @@ def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowd
     """
       JSON_DIR: Json file output folder
     """
+
+
+    ####################################################################
+    # Prologue
+    ####################################################################
+    
     console.log("Loading dataflow config generator")
     from . import dataflow_gen
     console.log("Loading readout config generator")
@@ -127,12 +151,10 @@ def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowd
 
     ru_app_names=[f"ruflx{idx}" if use_felix else f"ruemu{idx}" for idx in range(len(host_ru))]
     
-    network_endpoints = {
-        "hsievent" : "tcp://{host_hsi}:12344",
-        "trigdec" : "tcp://{host_trigger}:12345",
-        "triginh" : "tcp://{host_dataflow}:12346",
-        "hsicmds":  "tcp://{host_hsi}:12347",
-    }
+    add_endpoint("hsievent", "hsi")
+    add_endpoint("trigdec",  "trigger")
+    add_endpoint("triginh",  "dataflow")
+    add_endpoint("hsicmds",  "hsi")
 
     if frontend_type == 'wib' or frontend_type == 'wib2':
         system_type = 'TPC'
@@ -169,36 +191,29 @@ def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowd
 
     dqm_kafka_address = "dqmbroadcast:9092" if dqm_impl == 'cern' else pocket_url + ":30092" if dqm_impl == 'pocket' else ''
 
-    port = 12348
+    ####################################################################
+    # Assigning network endpoints
+    ####################################################################
+
     for idx in range(total_number_of_data_producers):
-        network_endpoints[f"datareq_{idx}"] = "tcp://{host_dataflow}:" + f"{port}"
-        port = port + 1
+        add_endpoint(f"datareq_{idx}", "dataflow")
         if enable_software_tpg:
-            network_endpoints[f"tp_datareq_{idx}"] = "tcp://{host_dataflow}:" + f"{port}"
-            port = port + 1
-            network_endpoints[f'frags_tpset_ds_{idx}'] = "tcp://{host_trigger}:"+str(port)
-            port += 1
-            network_endpoints[f"ds_tp_datareq_{idx}"] = "tcp://{host_dataflow}:" + f"{port}"
-            port += 1
+            add_endpoint(f"tp_datareq_{idx}", "dataflow")
+            add_endpoint(f'frags_tpset_ds_{idx}', "trigger")
+            add_endpoint(f"ds_tp_datareq_{idx}", "dataflow")
 
     cardid = {}
     host_id_dict = {}
 
     for hostidx in range(len(host_ru)):
-        # Should end up something like 'network_endpoints[timesync_0]:
-        # "tcp://{host_ru0}:12347"'
-        # Use the fact that "{{" and "}}" in f-strings evaluate to literal "{" and "}" respectively
-        network_endpoints[f"timesync_{hostidx}"] = f"tcp://{{host_{ru_app_names[hostidx]}}}:{port}"
-        port = port + 1
-        network_endpoints[f"frags_{hostidx}"] =  f"tcp://{{host_{ru_app_names[hostidx]}}}:{port}"
-        port = port + 1
+        add_endpoint(f"timesync_{hostidx}",  ru_app_names[hostidx])
+        add_endpoint(f"frags_{hostidx}",  ru_app_names[hostidx])
 
         if enable_software_tpg:
-            network_endpoints[f"tp_frags_{hostidx}"] =  f"tcp://{{host_{ru_app_names[hostidx]}}}:{port}"
-            port = port + 1
+            add_endpoint(f"tp_frags_{hostidx}", ru_app_names[hostidx])
             for idx in range(number_of_data_producers):
-                network_endpoints[f"tpsets_{hostidx*number_of_data_producers+idx}"] =  f"tcp://{{host_{ru_app_names[hostidx]}}}:{port}"
-                port = port + 1
+                add_endpoint(f"tpsets_{hostidx*number_of_data_producers+idx}", ru_app_names[hostidx])
+
         if host_ru[hostidx] in host_id_dict:
             host_id_dict[host_ru[hostidx]] = host_id_dict[host_ru[hostidx]] + 1
             cardid[hostidx] = host_id_dict[host_ru[hostidx]]
@@ -206,7 +221,16 @@ def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowd
             cardid[hostidx] = 0
             host_id_dict[host_ru[hostidx]] = 0
         hostidx = hostidx + 1
+
+
+    network_endpoints = assign_endpoints()
+
+    console.log(network_endpoints)
     
+    ####################################################################
+    # Application command data generation
+    ####################################################################
+
     if control_timing_hw:
         timing_cmd_network_endpoints=set()
         if use_hsi_hw:
@@ -294,7 +318,9 @@ def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowd
             ) for hostidx in range(len(host_ru))]
     console.log("readout cmd data:", cmd_data_readout)
 
-    ##################################################################################
+    ####################################################################
+    # System generation
+    ####################################################################
 
     # Make dummy system data
     
