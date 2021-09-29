@@ -64,9 +64,9 @@ import click
 @click.option('--raw-recording-output-dir', type=click.Path(), default='.', help="Output directory where recorded data is written to. Data for each link is written to a separate file")
 @click.option('--frontend-type', type=click.Choice(['wib', 'wib2', 'pds_queue', 'pds_list']), default='wib', help="Frontend type (wib, wib2 or pds) and latency buffer implementation in case of pds (folly queue or skip list)")
 @click.option('--enable-dqm', is_flag=True, help="Enable Data Quality Monitoring")
-@click.option('--opmon-impl', type=click.Choice(['json','cern','pocket'], case_sensitive=False),default='json', help="Info collector service implementation to use")
-@click.option('--ers-impl', type=click.Choice(['local','cern','pocket'], case_sensitive=False), default='local', help="ERS destination (Kafka used for cern and pocket)")
-@click.option('--dqm-impl', type=click.Choice(['local','cern','pocket'], case_sensitive=False), default='local', help="DQM destination (Kafka used for cern and pocket)")
+@click.option('--opmon-impl', type=click.Choice(['json','cern','pocket', 'pocket-daq'], case_sensitive=False),default='json', help="Info collector service implementation to use")
+@click.option('--ers-impl', type=click.Choice(['local','cern','pocket', 'pocket-daq'], case_sensitive=False), default='local', help="ERS destination (Kafka used for cern and pocket)")
+@click.option('--dqm-impl', type=click.Choice(['local','cern','pocket', 'pocket-daq'], case_sensitive=False), default='local', help="DQM destination (Kafka used for cern and pocket)")
 @click.option('--pocket-url', default='127.0.0.1', help="URL for connecting to Pocket services")
 @click.option('--enable-software-tpg', is_flag=True, default=False, help="Enable software TPG")
 @click.option('--enable-tpset-writing', is_flag=True, default=False, help="Enable the writing of TPSets to disk (only works with --enable-software-tpg")
@@ -141,6 +141,8 @@ def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowd
         info_svc_uri = "influx://188.185.88.195:80/write?db=db1"
     elif opmon_impl == 'pocket':
         info_svc_uri = "influx://" + pocket_url + ":31002/write?db=influxdb"
+    elif opmon_impl == 'pocket-daq':
+        info_svc_uri = "influx://influxdb.monitoring:8086/write?db=influxdb"
     else:
         info_svc_uri = "file://info_${APP_NAME}_${APP_PORT}.json"
 
@@ -156,6 +158,12 @@ def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowd
         ers_warning = "erstrace,throttle,lstdout,erskafka(" + pocket_url + ":30092)"
         ers_error = "erstrace,throttle,lstdout,erskafka(" + pocket_url + ":30092)"
         ers_fatal = "erstrace,lstdout,erskafka(" + pocket_url + ":30092)"
+    elif ers_impl == 'pocket-daq':
+        use_kafka = True
+        ers_info = "erstrace,throttle,lstdout,erskafka(kafka-svc.kafka-kraft:9092)"
+        ers_warning = "erstrace,throttle,lstdout,erskafka(kafka-svc.kafka-kraft:9092)"
+        ers_error = "erstrace,throttle,lstdout,erskafka(kafka-svc.kafka-kraft:9092)"
+        ers_fatal = "erstrace,lstdout,erskafka(kafka-svc.kafka-kraft:9092)"
     else:
         use_kafka = False
         ers_info = "erstrace,throttle,lstdout"
@@ -163,7 +171,14 @@ def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowd
         ers_error = "erstrace,throttle,lstdout"
         ers_fatal = "erstrace,lstdout"
 
-    dqm_kafka_address = "dqmbroadcast:9092" if dqm_impl == 'cern' else pocket_url + ":30092" if dqm_impl == 'pocket' else ''
+    if dqm_impl == 'cern':
+        dqm_kafka_address = "dqmbroadcast:9092"
+    elif ers_impl == 'pocket':
+        dqm_kafka_address = pocket_url + ":30092"
+    elif ers_impl == 'pocket-daq':
+        raise RuntimeError('DQM pocket daq is not supported yet')
+    else:
+        dqm_kafka_address = ''
 
     port = 12348
     for idx in range(total_number_of_data_producers):
