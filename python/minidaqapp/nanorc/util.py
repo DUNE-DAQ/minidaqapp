@@ -375,11 +375,11 @@ def assign_network_endpoints(the_system, verbose=False):
     for conn in the_system.app_connections.keys():
         app = conn.split(".")[0]
         host = the_system.apps[app].host
-        if host == "localhost":
-            host = "127.0.0.1"
+        # if host == "localhost":
+        #     host = "127.0.0.1"
         port = first_port + host_ports[host]
         host_ports[host] += 1
-        endpoints[conn] = f"tcp://{host}:{port}"
+        endpoints[conn] = f"tcp://{{host_{app}}}:{port}"
         if verbose:
             console.log(f"Assigned endpoint {endpoints[conn]} for connection {conn}")
     return endpoints
