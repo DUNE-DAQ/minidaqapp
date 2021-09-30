@@ -28,7 +28,7 @@ def assign_endpoints():
         for endpoint in endpoints:
             ret[endpoint] = f"tcp://{{host_{app}}}:{port}"
             port+=1
-            
+
     return ret
 
 
@@ -105,7 +105,7 @@ def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowd
     ####################################################################
     # Prologue
     ####################################################################
-    
+
     console.log("Loading dataflow config generator")
     from . import dataflow_gen
     console.log("Loading readout config generator")
@@ -150,7 +150,7 @@ def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowd
         trigemu_token_count = 0
 
     ru_app_names=[f"ruflx{idx}" if use_felix else f"ruemu{idx}" for idx in range(len(host_ru))]
-    
+
     add_endpoint("hsievent", "hsi")
     add_endpoint("trigdec",  "trigger")
     add_endpoint("triginh",  "dataflow")
@@ -169,7 +169,7 @@ def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowd
         info_svc_uri = "file://info_${APP_NAME}_${APP_PORT}.json"
 
     ers_settings=dict()
-    
+
     if ers_impl == 'cern':
         use_kafka = True
         ers_settings["INFO"] =    "erstrace,throttle,lstdout,erskafka(dqmbroadcast:9092)"
@@ -226,7 +226,7 @@ def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowd
     network_endpoints = assign_endpoints()
 
     console.log(network_endpoints)
-    
+
     ####################################################################
     # Application command data generation
     ####################################################################
@@ -269,7 +269,9 @@ def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowd
 
     console.log("hsi cmd data:", cmd_data_hsi)
 
-    cmd_data_trigger = trigger_gen.generate(network_endpoints,
+    console.log(total_number_of_data_producers)
+
+    mgraph_trigger = trigger_gen.generate(
         NUMBER_OF_RAWDATA_PRODUCERS = total_number_of_data_producers,
         NUMBER_OF_TPSET_PRODUCERS = total_number_of_data_producers if enable_software_tpg else 0,
         ACTIVITY_PLUGIN = trigger_activity_plugin,
@@ -284,7 +286,7 @@ def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowd
         TRIGGER_WINDOW_AFTER_TICKS = trigger_window_after_ticks)
 
 
-    console.log("trigger cmd data:", cmd_data_trigger)
+    console.log("trigger module graph:", mgraph_trigger)
 
     cmd_data_dataflow = dataflow_gen.generate(network_endpoints,
         NUMBER_OF_DATA_PRODUCERS = total_number_of_data_producers,
@@ -323,21 +325,32 @@ def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowd
     ####################################################################
 
     # Make dummy system data
-    
+
     from . import util
     apps = {
         "hsi":      util.App(host=host_hsi),
-        "trigger":  util.App(host=host_trigger),
+        "trigger":  util.App(modulegraph=mgraph_trigger, host=host_trigger),
         "dataflow": util.App(host=host_df),
     }
 
     apps.update({ru_name: util.App(host=host_ru[i]) for i,ru_name in enumerate(ru_app_names)})
-    
+
     if control_timing_hw:
         apps["thi"] = util.App()
-        
+
+
+    app_connections = {
+        "tpset_producer.tpsets_out": util.Publisher(msg_type="dunedaq::trigger::TPSet",
+                                                msg_module_name="TPSetNQ",
+                                                subscribers=["tpset_consumer1.tpsets_in",
+                                                             "tpset_consumer2.tpsets_in"])
+    }
+
     the_system = util.System(apps, app_connections=None,
                              app_start_order=["dataflow"]+ru_app_names+["trigger", "hsi"])
+
+    util.add_network("trigger", the_system, verbose=True)
+    cmd_data_trigger = util.make_app_command_data(apps["trigger"], verbose=True)
 
     # Arrange per-app command data into the format used by util.write_json_files()
     app_command_datas = {
@@ -347,7 +360,7 @@ def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowd
     }
     for name, cmd_data in zip(ru_app_names, cmd_data_readout):
         app_command_datas[name]=cmd_data
-    
+
     if control_timing_hw:
         app_command_datas["thi"] = cmd_data_thi
 
@@ -358,7 +371,7 @@ def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowd
     system_command_datas = util.make_system_command_datas(the_system)
     # Override the default boot.json with the one from minidaqapp
     boot = util.generate_boot(the_system.apps, partition_name=partition_name, ers_settings=ers_settings, info_svc_uri=info_svc_uri)
-    
+
     if disable_trace:
         del boot["exec"]["daq_application"]["env"]["TRACE_FILE"]
         del boot["exec"]["daq_application_ups"]["env"]["TRACE_FILE"]
@@ -378,11 +391,11 @@ def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowd
         for app in for_removal:
             if app in cmd_apps:
                 del cmd_apps[app]
-    
+
     system_command_datas['boot'] = boot
-    
+
     util.write_json_files(app_command_datas, system_command_datas, json_dir)
-    
+
     console.log(f"MDAapp config generated in {json_dir}")
 
 
