@@ -15,7 +15,7 @@ moo.otypes.load_types('nwqueueadapters/networktoqueue.jsonnet')
 moo.otypes.load_types('nwqueueadapters/networkobjectreceiver.jsonnet')
 moo.otypes.load_types('nwqueueadapters/networkobjectsender.jsonnet')
 moo.otypes.load_types('flxlibs/felixcardreader.jsonnet')
-moo.otypes.load_types('readout/fakecardreader.jsonnet')
+moo.otypes.load_types('readout/sourceemulatorconfig.jsonnet')
 moo.otypes.load_types('readout/datalinkhandler.jsonnet')
 moo.otypes.load_types('readout/datarecorder.jsonnet')
 moo.otypes.load_types('dqm/dqmprocessor.jsonnet')
@@ -30,7 +30,7 @@ import dunedaq.nwqueueadapters.networktoqueue as ntoq
 import dunedaq.nwqueueadapters.queuetonetwork as qton
 import dunedaq.nwqueueadapters.networkobjectreceiver as nor
 import dunedaq.nwqueueadapters.networkobjectsender as nos
-import dunedaq.readout.fakecardreader as fakecr
+import dunedaq.readout.sourceemulatorconfig as sec
 import dunedaq.flxlibs.felixcardreader as flxcr
 import dunedaq.readout.datalinkhandler as dlh
 import dunedaq.readout.datarecorder as dr
@@ -266,9 +266,9 @@ def generate(NETWORK_ENDPOINTS,
                                                                    address=NETWORK_ENDPOINTS[f"timesync_{HOSTIDX}"],
                                                                    stype="msgpack"))),
         
-                ("fake_source",fakecr.Conf(
-                            link_confs=[fakecr.LinkConfiguration(
-                            geoid=fakecr.GeoID(system=SYSTEM_TYPE, region=0, element=idx),
+                ("fake_source",sec.Conf(
+                            link_confs=[sec.LinkConfiguration(
+                            geoid=sec.GeoID(system=SYSTEM_TYPE, region=0, element=idx),
                                 slowdown=DATA_RATE_SLOWDOWN_FACTOR,
                                 queue_name=f"output_{idx-MIN_LINK}",
                                 data_filename = DATA_FILE
