@@ -85,7 +85,6 @@ def generate(NETWORK_ENDPOINTS,
     # Define modules and queues
     queue_bare_specs = [
             app.QueueSpec(inst="time_sync_q", kind='FollyMPMCQueue', capacity=100),
-            app.QueueSpec(inst="data_fragments_q", kind='FollyMPMCQueue', capacity=1000),
         ] + [
             app.QueueSpec(inst=f"data_requests_{idx}", kind='FollySPSCQueue', capacity=100)
                 for idx in range(MIN_LINK,MAX_LINK)
@@ -132,10 +131,7 @@ def generate(NETWORK_ENDPOINTS,
     queue_specs = app.QueueSpecs(sorted(queue_bare_specs, key=lambda x: x.inst))
 
     mod_specs = [
-        # mspec("qton_timesync", "QueueToNetwork", [app.QueueInfo(name="input", inst="time_sync_q", dir="input")]),
-        mspec("qton_fragments", "QueueToNetwork", [app.QueueInfo(name="input", inst="data_fragments_q", dir="input")]),
-    ] + [
-        mspec(f"ntoq_datareq_{idx}", "NetworkToQueue", [app.QueueInfo(name="output", inst=f"data_requests_{idx}", dir="output")]) for idx in range(MIN_LINK,MAX_LINK)
+        mspec(f"request_receiver", "RequestReceiver", [app.QueueInfo(name="output", inst=f"data_requests_{idx}", dir="output")]) for idx in range(MIN_LINK,MAX_LINK)
     ]
 
     if SOFTWARE_TPG_ENABLED:
@@ -167,7 +163,6 @@ def generate(NETWORK_ENDPOINTS,
                 mspec(f"fakedataprod_{idx + MIN_LINK}", "FakeDataProd", [
                     app.QueueInfo(name="timesync_output_queue", inst="time_sync_q", dir="output"),
                     app.QueueInfo(name="data_request_input_queue", inst=f"data_requests_{idx + MIN_LINK}", dir="input"),
-                    app.QueueInfo(name="data_fragment_output_queue", inst="data_fragments_q", dir="output")
                 ])
             ]
         else:
@@ -175,7 +170,6 @@ def generate(NETWORK_ENDPOINTS,
                     app.QueueInfo(name="raw_input", inst=f"{FRONTEND_TYPE}_link_{idx}", dir="input"),
                     app.QueueInfo(name="timesync", inst="time_sync_q", dir="output"),
                     app.QueueInfo(name="data_requests_0", inst=f"data_requests_{idx + MIN_LINK}", dir="input"),
-                    app.QueueInfo(name="data_response_0", inst="data_fragments_q", dir="output"),
                 ]
 
             if RAW_RECORDING_ENABLED:
@@ -253,19 +247,12 @@ def generate(NETWORK_ENDPOINTS,
     cmd_data['init'] = app.Init(queues=queue_specs, modules=mod_specs)
 
 
-    conf_list = [("qton_fragments", qton.Conf(msg_type="std::unique_ptr<dunedaq::dataformats::Fragment>",
-                                           msg_module_name="FragmentNQ",
-                                           sender_config=nos.Conf(ipm_plugin_type="ZmqSender",
-                                                                  address=NETWORK_ENDPOINTS[f"frags_{HOSTIDX}"],
-                                                                  stype="msgpack"))),
+    conf_list = [("qton_timesync", qton.Conf(msg_type="dunedaq::dfmessages::TimeSync",
+                                             msg_module_name="TimeSyncNQ",
+                                             sender_config=nos.Conf(ipm_plugin_type="ZmqSender",
+                                                                    address=NETWORK_ENDPOINTS[f"timesync_{HOSTIDX}"],
+                                                                    stype="msgpack"))),
 
-
-                ("qton_timesync", qton.Conf(msg_type="dunedaq::dfmessages::TimeSync",
-                                            msg_module_name="TimeSyncNQ",
-                                            sender_config=nos.Conf(ipm_plugin_type="ZmqSender",
-                                                                   address=NETWORK_ENDPOINTS[f"timesync_{HOSTIDX}"],
-                                                                   stype="msgpack"))),
-        
                 ("fake_source",fakecr.Conf(
                             link_confs=[fakecr.LinkConfiguration(
                             geoid=fakecr.GeoID(system=SYSTEM_TYPE, region=0, element=idx),
@@ -291,11 +278,8 @@ def generate(NETWORK_ENDPOINTS,
                             dma_memory_size_gb= 4,
                             numa_id=0,
                             num_links=max(0, NUMBER_OF_DATA_PRODUCERS - 5))),
-            ] + [
-                (f"ntoq_datareq_{idx}", ntoq.Conf(msg_type="dunedaq::dfmessages::DataRequest",
-                                           msg_module_name="DataRequestNQ",
-                                           receiver_config=nor.Conf(ipm_plugin_type="ZmqReceiver",
-                                                                    address=NETWORK_ENDPOINTS[f"datareq_{idx}"]))) for idx in range(MIN_LINK,MAX_LINK)
+           #] + [
+                 # placeholder for request_receiver conf params
             ] + [
                 (f"tp_datahandler_{TOTAL_NUMBER_OF_DATA_PRODUCERS + idx}", dlh.Conf(
                     emulator_mode = False,
@@ -397,14 +381,13 @@ def generate(NETWORK_ENDPOINTS,
 
 
     startpars = rccmd.StartParams(run=RUN_NUMBER)
-    cmd_data['start'] = acmd([("qton_fragments", startpars),
+    cmd_data['start'] = acmd([
             ("qton_timesync", startpars),
             ("datahandler_.*", startpars),
             ("data_recorder_.*", startpars),
             ("fake_source", startpars),
             ("flxcard.*", startpars),
-            ("ntoq_datareq_.*", startpars),
-            ("ntoq_trigdec", startpars),
+            ("request_receiver", startpars),
             ("trb_dqm", startpars),
             ("dqmprocessor", startpars),
             ("qton_tp_fragments", startpars),
@@ -413,14 +396,13 @@ def generate(NETWORK_ENDPOINTS,
             (f"tpset_publisher_.*", startpars),
             ("fakedataprod_.*", startpars)])
 
-    cmd_data['stop'] = acmd([("ntoq_trigdec", None),
-            ("ntoq_datareq_.*", None),
+    cmd_data['stop'] = acmd([
+            ("request_receiver", None),
             ("flxcard.*", None),
             ("fake_source", None),
             ("datahandler_.*", None),
             ("data_recorder_.*", None),
             ("qton_timesync", None),
-            ("qton_fragments", None),
             ("trb_dqm", None),
             ("dqmprocessor", None),
             ("qton_tp_fragments", None),
