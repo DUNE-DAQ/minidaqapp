@@ -291,7 +291,7 @@ def generate(NETWORK_ENDPOINTS,
                 (f"datahandler_{idx}", rconf.Conf(
                         readoutmodelconf= rconf.ReadoutModelConf(
                             source_queue_timeout_ms= QUEUE_POP_WAIT_MS,
-                            fake_trigger_flag=0,
+                            # fake_trigger_flag=0, # default
                             region_id = 0,
                             element_id = idx,
                         ),
@@ -320,7 +320,7 @@ def generate(NETWORK_ENDPOINTS,
                 (f"tp_datahandler_{TOTAL_NUMBER_OF_DATA_PRODUCERS + idx}", rconf.Conf(
                         readoutmodelconf= rconf.ReadoutModelConf(
                             source_queue_timeout_ms= QUEUE_POP_WAIT_MS,
-                            fake_trigger_flag=0,
+                            # fake_trigger_flag=0, default
                             region_id = 0,
                             element_id = TOTAL_NUMBER_OF_DATA_PRODUCERS + idx,
                         ),
