@@ -18,8 +18,6 @@ moo.otypes.load_types('nwqueueadapters/queuetonetwork.jsonnet')
 moo.otypes.load_types('nwqueueadapters/networktoqueue.jsonnet')
 moo.otypes.load_types('nwqueueadapters/networkobjectreceiver.jsonnet')
 moo.otypes.load_types('nwqueueadapters/networkobjectsender.jsonnet')
-moo.otypes.load_types('flxlibs/felixcardreader.jsonnet')
-moo.otypes.load_types('readout/datalinkhandler.jsonnet')
 
 
 # Import new types
@@ -35,8 +33,6 @@ import dunedaq.nwqueueadapters.networktoqueue as ntoq
 import dunedaq.nwqueueadapters.queuetonetwork as qton
 import dunedaq.nwqueueadapters.networkobjectreceiver as nor
 import dunedaq.nwqueueadapters.networkobjectsender as nos
-import dunedaq.flxlibs.felixcardreader as flxcr
-import dunedaq.readout.datalinkhandler as dlh
 
 from appfwk.utils import acmd, mcmd, mrccmd, mspec
 
