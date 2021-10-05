@@ -16,8 +16,7 @@ moo.otypes.load_types('nwqueueadapters/networkobjectreceiver.jsonnet')
 moo.otypes.load_types('nwqueueadapters/networkobjectsender.jsonnet')
 moo.otypes.load_types('flxlibs/felixcardreader.jsonnet')
 moo.otypes.load_types('readout/sourceemulatorconfig.jsonnet')
-moo.otypes.load_types('readout/datalinkhandler.jsonnet')
-moo.otypes.load_types('readout/datarecorder.jsonnet')
+moo.otypes.load_types('readout/readoutconfig.jsonnet')
 moo.otypes.load_types('dqm/dqmprocessor.jsonnet')
 moo.otypes.load_types('dfmodules/fakedataprod.jsonnet')
 
@@ -32,8 +31,7 @@ import dunedaq.nwqueueadapters.networkobjectreceiver as nor
 import dunedaq.nwqueueadapters.networkobjectsender as nos
 import dunedaq.readout.sourceemulatorconfig as sec
 import dunedaq.flxlibs.felixcardreader as flxcr
-import dunedaq.readout.datalinkhandler as dlh
-import dunedaq.readout.datarecorder as dr
+import dunedaq.readout.readoutconfig as rconf
 import dunedaq.dfmodules.triggerrecordbuilder as trb
 import dunedaq.dqm.dqmprocessor as dqmprocessor
 import dunedaq.dfmodules.fakedataprod as fdp
@@ -198,13 +196,6 @@ def generate(NETWORK_ENDPOINTS,
 
             mod_specs += [mspec(f"datahandler_{idx + MIN_LINK}", "DataLinkHandler", ls)]
 
-    if RAW_RECORDING_ENABLED:
-        mod_specs += [
-            mspec(f"data_recorder_{idx}", "DataRecorder", [
-                app.QueueInfo(name="raw_recording", inst=f"{FRONTEND_TYPE}_recording_link_{idx}", dir="input")
-            ]) for idx in range(NUMBER_OF_DATA_PRODUCERS)
-        ]
-
     mod_specs += [mspec("timesync_to_network", "QueueToNetwork",
               [app.QueueInfo(name="input", inst="time_sync_q", dir="input")]
               )]
@@ -297,33 +288,63 @@ def generate(NETWORK_ENDPOINTS,
                                            receiver_config=nor.Conf(ipm_plugin_type="ZmqReceiver",
                                                                     address=NETWORK_ENDPOINTS[f"datareq_{idx}"]))) for idx in range(MIN_LINK,MAX_LINK)
             ] + [
-                (f"tp_datahandler_{TOTAL_NUMBER_OF_DATA_PRODUCERS + idx}", dlh.Conf(
-                    emulator_mode = False,
-                    enable_software_tpg = False,
-                    # fake_trigger_flag=0, # default
-                    source_queue_timeout_ms= QUEUE_POP_WAIT_MS,
-                    latency_buffer_size = LATENCY_BUFFER_SIZE,
-                    pop_limit_pct = 0.8,
-                    pop_size_pct = 0.1,
-                    apa_number = 0,
-                    link_number = TOTAL_NUMBER_OF_DATA_PRODUCERS + idx
-                )) for idx in range(MIN_LINK, MAX_LINK)
+                (f"datahandler_{idx}", rconf.Conf(
+                        readoutmodelconf= rconf.ReadoutModelConf(
+                            source_queue_timeout_ms= QUEUE_POP_WAIT_MS,
+                            fake_trigger_flag=0,
+                            region_id = 0,
+                            element_id = idx,
+                        ),
+                        latencybufferconf= rconf.LatencyBufferConf(
+                            latency_buffer_size = LATENCY_BUFFER_SIZE,
+                            region_id = 0,
+                            element_id = idx,
+                        ),
+                        rawdataprocessorconf= rconf.RawDataProcessorConf(
+                            region_id = 0,
+                            element_id = idx,
+                            enable_software_tpg = SOFTWARE_TPG_ENABLED,
+                        ),
+                        requesthandlerconf= rconf.RequestHandlerConf(
+                            latency_buffer_size = LATENCY_BUFFER_SIZE,
+                            pop_limit_pct = 0.8,
+                            pop_size_pct = 0.1,
+                            region_id = 0,
+                            element_id = idx,
+                            output_file = f"output_{idx + MIN_LINK}.out",
+                            stream_buffer_size = 8388608,
+                            enable_raw_recording = RAW_RECORDING_ENABLED,
+                        )
+                        )) for idx in range(MIN_LINK, MAX_LINK)
             ] + [
-                (f"datahandler_{idx}", dlh.Conf(
-                        emulator_mode = EMULATOR_MODE,
-                        enable_software_tpg = SOFTWARE_TPG_ENABLED,
-                        # fake_trigger_flag=0, # default
-                        source_queue_timeout_ms= QUEUE_POP_WAIT_MS,
-                        latency_buffer_size = LATENCY_BUFFER_SIZE,
-                        pop_limit_pct = 0.8,
-                        pop_size_pct = 0.1,
-                        apa_number = 0,
-                        link_number = idx)) for idx in range(MIN_LINK,MAX_LINK)
-            ] + [
-                (f"data_recorder_{idx}", dr.Conf(
-                        output_file = f"output_{idx + MIN_LINK}.out",
-                        compression_algorithm = "None",
-                        stream_buffer_size = 8388608)) for idx in range(NUMBER_OF_DATA_PRODUCERS)
+                (f"tp_datahandler_{TOTAL_NUMBER_OF_DATA_PRODUCERS + idx}", rconf.Conf(
+                        readoutmodelconf= rconf.ReadoutModelConf(
+                            source_queue_timeout_ms= QUEUE_POP_WAIT_MS,
+                            fake_trigger_flag=0,
+                            region_id = 0,
+                            element_id = TOTAL_NUMBER_OF_DATA_PRODUCERS + idx,
+                        ),
+                        latencybufferconf= rconf.LatencyBufferConf(
+                            latency_buffer_size = LATENCY_BUFFER_SIZE,
+                            region_id = 0,
+                            element_id = TOTAL_NUMBER_OF_DATA_PRODUCERS + idx,
+                        ),
+                        rawdataprocessorconf= rconf.RawDataProcessorConf(
+                            region_id = 0,
+                            element_id = TOTAL_NUMBER_OF_DATA_PRODUCERS + idx,
+                            enable_software_tpg = False,
+                        ),
+                        requesthandlerconf= rconf.RequestHandlerConf(
+                            latency_buffer_size = LATENCY_BUFFER_SIZE,
+                            pop_limit_pct = 0.8,
+                            pop_size_pct = 0.1,
+                            region_id = 0,
+                            element_id = TOTAL_NUMBER_OF_DATA_PRODUCERS + idx,
+                            # output_file = f"output_{idx + MIN_LINK}.out",
+                            # stream_buffer_size = 8388608,
+                            enable_raw_recording = False,
+                        )
+                        )) for idx in range(MIN_LINK, MAX_LINK)
             ] + [
                 ("trb_dqm", trb.ConfParams(
                         general_queue_timeout=QUEUE_POP_WAIT_MS,
@@ -400,7 +421,6 @@ def generate(NETWORK_ENDPOINTS,
     cmd_data['start'] = acmd([("qton_fragments", startpars),
             ("qton_timesync", startpars),
             ("datahandler_.*", startpars),
-            ("data_recorder_.*", startpars),
             ("fake_source", startpars),
             ("flxcard.*", startpars),
             ("ntoq_datareq_.*", startpars),
@@ -418,7 +438,6 @@ def generate(NETWORK_ENDPOINTS,
             ("flxcard.*", None),
             ("fake_source", None),
             ("datahandler_.*", None),
-            ("data_recorder_.*", None),
             ("qton_timesync", None),
             ("qton_fragments", None),
             ("trb_dqm", None),
