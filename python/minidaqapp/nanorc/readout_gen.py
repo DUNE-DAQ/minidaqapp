@@ -37,6 +37,7 @@ import dunedaq.dqm.dqmprocessor as dqmprocessor
 import dunedaq.dfmodules.fakedataprod as fdp
 
 from appfwk.utils import acmd, mcmd, mrccmd, mspec
+from os import path
 
 import json
 import math
@@ -95,12 +96,6 @@ def generate(NETWORK_ENDPOINTS,
             for idx in range(NUMBER_OF_DATA_PRODUCERS)
         ]
 
-    if RAW_RECORDING_ENABLED:
-        queue_bare_specs = queue_bare_specs + [
-            app.QueueSpec(inst=f"{FRONTEND_TYPE}_recording_link_{idx}", kind='FollySPSCQueue', capacity=100000)
-            for idx in range(NUMBER_OF_DATA_PRODUCERS)
-        ]
-
     if DQM_ENABLED:
         queue_bare_specs += [
             app.QueueSpec(inst=f"time_sync_dqm_q", kind='FollyMPMCQueue', capacity=1000),
@@ -146,8 +141,7 @@ def generate(NETWORK_ENDPOINTS,
                 app.QueueInfo(name="raw_input", inst=f"tp_link_{idx}", dir="input"),
                 app.QueueInfo(name="data_requests_0", inst=f"tp_requests_{idx}", dir="input"),
                 app.QueueInfo(name="data_response_0", inst="tp_fragments_q", dir="output"),
-                app.QueueInfo(name="timesync", inst="time_sync_q", dir="output"),
-                app.QueueInfo(name="raw_recording", inst=f"tp_recording_link_{idx}", dir="output")
+                app.QueueInfo(name="timesync", inst="time_sync_q", dir="output")
             ]) for idx in range(MIN_LINK, MAX_LINK)
         ] + [
             mspec(f"tpset_publisher_{idx}", "QueueToNetwork", [
@@ -175,13 +169,6 @@ def generate(NETWORK_ENDPOINTS,
                     app.QueueInfo(name="data_requests_0", inst=f"data_requests_{idx + MIN_LINK}", dir="input"),
                     app.QueueInfo(name="data_response_0", inst="data_fragments_q", dir="output"),
                 ]
-
-            if RAW_RECORDING_ENABLED:
-                ls.append(app.QueueInfo(name="raw_recording", inst=f"{FRONTEND_TYPE}_recording_link_{idx}", dir="output"))
-            else:
-                # This else can be removed once readout doesn't always check for the raw_recording queue
-                # At the moment it is needed or it won't find the queue and crash
-                ls.append(app.QueueInfo(name="raw_recording", inst=f"{FRONTEND_TYPE}_recording_link_{idx}", dir="output"))
 
             if DQM_ENABLED:
                 ls.extend([
