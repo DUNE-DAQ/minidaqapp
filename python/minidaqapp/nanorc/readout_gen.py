@@ -291,6 +291,7 @@ def generate(NETWORK_ENDPOINTS,
                             region_id = 0,
                             element_id = idx,
                             enable_software_tpg = SOFTWARE_TPG_ENABLED,
+                            emulator_mode = EMULATOR_MODE
                         ),
                         requesthandlerconf= rconf.RequestHandlerConf(
                             latency_buffer_size = LATENCY_BUFFER_SIZE,
