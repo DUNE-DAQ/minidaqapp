@@ -132,12 +132,12 @@ def generate(NETWORK_ENDPOINTS,
                                                                   stype="msgpack"))),
 
                 ("trb", trb.ConfParams( general_queue_timeout=QUEUE_POP_WAIT_MS,
-                                        map=trb.mapgeoidqueue([
-                                                trb.geoidinst(region=0, element=idx, system=SYSTEM_TYPE, queueinstance=f"data_requests_{idx}")  for idx in range(NUMBER_OF_DATA_PRODUCERS)
+                                        map=trb.mapgeoidconnections([
+                                                trb.geoidinst(region=0, element=idx, system=SYSTEM_TYPE, connection_name=f"data_requests_{idx}")  for idx in range(NUMBER_OF_DATA_PRODUCERS)
                                         ] + [
-                                            trb.geoidinst(region=0, element=NUMBER_OF_DATA_PRODUCERS + idx, system=SYSTEM_TYPE, queueinstance=f"tp_data_requests_{idx}")  for idx in range(NUMBER_OF_RAW_TP_PRODUCERS)
+                                            trb.geoidinst(region=0, element=NUMBER_OF_DATA_PRODUCERS + idx, system=SYSTEM_TYPE, connection_name=f"tp_data_requests_{idx}")  for idx in range(NUMBER_OF_RAW_TP_PRODUCERS)
                                         ] + [
-                                            trb.geoidinst(region=0, element=idx, system="DataSelection", queueinstance=f"ds_tp_data_requests_{idx}")  for idx in range(NUMBER_OF_DS_TP_PRODUCERS)
+                                            trb.geoidinst(region=0, element=idx, system="DataSelection", connection_name=f"ds_tp_data_requests_{idx}")  for idx in range(NUMBER_OF_DS_TP_PRODUCERS)
                                         ]
                                                               ))),
                 ("datawriter", dw.ConfParams(initial_token_count=TOKEN_COUNT,
