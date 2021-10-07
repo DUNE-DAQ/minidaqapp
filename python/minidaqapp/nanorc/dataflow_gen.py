@@ -74,7 +74,7 @@ def generate(NETWORK_ENDPOINTS,
 
     cmd_data = {}
 
-    required_eps = {'trigdec', 'triginh'}
+    required_eps = {'trigger.trigger_decisions', 'dataflow.tokens'}
     if not required_eps.issubset(NETWORK_ENDPOINTS):
         raise RuntimeError(f"ERROR: not all the required endpoints ({', '.join(required_eps)}) found in list of endpoints {' '.join(NETWORK_ENDPOINTS.keys())}")
 
@@ -146,13 +146,13 @@ def generate(NETWORK_ENDPOINTS,
                 ("ntoq_trigdec", ntoq.Conf(msg_type="dunedaq::dfmessages::TriggerDecision",
                                            msg_module_name="TriggerDecisionNQ",
                                            receiver_config=nor.Conf(ipm_plugin_type="ZmqReceiver",
-                                                                    address=NETWORK_ENDPOINTS["trigdec"]))),
+                                                                    address=NETWORK_ENDPOINTS["trigger.trigger_decisions"]))),
 
 
                 ("qton_token", qton.Conf(msg_type="dunedaq::dfmessages::TriggerDecisionToken",
                                            msg_module_name="TriggerDecisionTokenNQ",
                                            sender_config=nos.Conf(ipm_plugin_type="ZmqSender",
-                                                                  address=NETWORK_ENDPOINTS["triginh"],
+                                                                  address=NETWORK_ENDPOINTS["dataflow.tokens"],
                                                                   stype="msgpack"))),
 
                 ("trb", trb.ConfParams( general_queue_timeout=QUEUE_POP_WAIT_MS,
@@ -183,14 +183,14 @@ def generate(NETWORK_ENDPOINTS,
                 (f"qton_datareq_{idx}", qton.Conf(msg_type="dunedaq::dfmessages::DataRequest",
                                            msg_module_name="DataRequestNQ",
                                            sender_config=nos.Conf(ipm_plugin_type="ZmqSender",
-                                                                  address=NETWORK_ENDPOINTS[f"datareq_{idx}"],
+                                                                  address=NETWORK_ENDPOINTS[f"dataflow.datareq_{idx}"],
                                                                   stype="msgpack")))
                  for idx in range(NUMBER_OF_DATA_PRODUCERS)
             ] + [
                 (f"qton_tp_datareq_{idx}", qton.Conf(msg_type="dunedaq::dfmessages::DataRequest",
                                             msg_module_name="DataRequestNQ",
                                             sender_config=nos.Conf(ipm_plugin_type="ZmqSender",
-                                                                    address=NETWORK_ENDPOINTS[f"tp_datareq_{idx}"],
+                                                                    address=NETWORK_ENDPOINTS[f"dataflow.tp_datareq_{idx}"],
                                                                     stype="msgpack")))
                 for idx in range(NUMBER_OF_RAW_TP_PRODUCERS)
 
@@ -198,7 +198,7 @@ def generate(NETWORK_ENDPOINTS,
                 (f"qton_ds_tp_datareq_{idx}", qton.Conf(msg_type="dunedaq::dfmessages::DataRequest",
                                                         msg_module_name="DataRequestNQ",
                                                         sender_config=nos.Conf(ipm_plugin_type="ZmqSender",
-                                                                               address=NETWORK_ENDPOINTS[f"ds_tp_datareq_{idx}"],
+                                                                               address=NETWORK_ENDPOINTS[f"dataflow.ds_tp_datareq_{idx}"],
                                                                                stype="msgpack")))
                 for idx in range(NUMBER_OF_RAW_TP_PRODUCERS)
 
@@ -214,7 +214,7 @@ def generate(NETWORK_ENDPOINTS,
                     msg_type="dunedaq::trigger::TPSet",
                     msg_module_name="TPSetNQ",
                     receiver_config=nor.Conf(ipm_plugin_type="ZmqSubscriber",
-                                             address=NETWORK_ENDPOINTS[f'tpsets_{idx}'],
+                                             address=NETWORK_ENDPOINTS[f'ruemu{idx}.tpsets_{idx}'],
                                              subscriptions=["TPSets"])
                 ))
                 for idx in range(NUMBER_OF_TP_SUBSCRIBERS)

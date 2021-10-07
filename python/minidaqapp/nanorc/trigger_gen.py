@@ -128,12 +128,13 @@ def generate(
                             connections={})
 
     mgraph = ModuleGraph(modules)
-    mgraph.add_endpoint("tpsets_in_all", "zip.input", Direction.IN)
+    mgraph.add_endpoint("hsievents_in",  "ttcm.input", Direction.IN)
 
     for idx in range(NUMBER_OF_TPSET_PRODUCERS):
-        mgraph.add_endpoint(f"tpsets_in_link{idx}",   f"buf{idx}.input",               Direction.IN)
-        mgraph.add_endpoint(f"tp_data_requests{idx}", f"buf{idx}.data_request_source", Direction.IN)
-        mgraph.add_endpoint(f"tp_fragments{idx}",     f"buf{idx}.fragment_sink",       Direction.OUT)
+        mgraph.add_endpoint(f"tpsets_into_buffer_link{idx}", f"buf{idx}.tpset_source",        Direction.IN)
+        mgraph.add_endpoint(f"tpsets_into_chain_link{idx}",   "zip.input",                    Direction.IN)
+        mgraph.add_endpoint(f"tp_data_requests{idx}",        f"buf{idx}.data_request_source", Direction.IN)
+        mgraph.add_endpoint(f"tp_fragments{idx}",            f"buf{idx}.fragment_sink",       Direction.OUT)
 
     mgraph.add_endpoint("trigger_decisions", "mlt.trigger_decision_sink", Direction.OUT)
     mgraph.add_endpoint("tokens", "mlt.token_source", Direction.IN)

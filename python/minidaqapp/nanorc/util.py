@@ -370,18 +370,19 @@ def assign_network_endpoints(the_system, verbose=False):
 
     """
     endpoints = {}
-    host_ports = defaultdict(int)
-    first_port = 12345
+    #host_ports = defaultdict(int)
+    port = 12345
     for conn in the_system.app_connections.keys():
         app = conn.split(".")[0]
-        host = the_system.apps[app].host
+        #host = the_system.apps[app].host
         # if host == "localhost":
         #     host = "127.0.0.1"
-        port = first_port + host_ports[host]
-        host_ports[host] += 1
+        #port = first_port + host_ports[host]
+        #host_ports[host] += 1
         endpoints[conn] = f"tcp://{{host_{app}}}:{port}"
         if verbose:
             console.log(f"Assigned endpoint {endpoints[conn]} for connection {conn}")
+        port+=1
     return endpoints
 
 
@@ -414,6 +415,9 @@ def add_network(app_name, the_system, verbose=False):
 
     unconnected_endpoints = set(app.modulegraph.endpoints.keys())
 
+    if verbose:
+        console.log(f"Endpoints to connect are: {unconnected_endpoints}")
+        
     for conn_name, conn in the_system.app_connections.items():
         from_app, from_endpoint = conn_name.split(".", maxsplit=1)
 
@@ -439,7 +443,14 @@ def add_network(app_name, the_system, verbose=False):
                 to_app, to_endpoint = to_conn.split(".", maxsplit=1)
 
                 if app_name == to_app:
-                    unconnected_endpoints.remove(to_endpoint)
+                    if verbose:
+                        console.log(f"App {app_name} endpoint {to_endpoint} is being connected")
+
+                    # For pub/sub connections, we might connect
+                    # multiple times to the same endpoint, so it might
+                    # already have been removed from the list
+                    if to_endpoint in unconnected_endpoints:
+                        unconnected_endpoints.remove(to_endpoint)
                     to_endpoint = resolve_endpoint(app, to_endpoint, Direction.IN)
                     ntoq_name = to_conn.replace(".", "_")
                     if verbose:
@@ -459,9 +470,11 @@ def add_network(app_name, the_system, verbose=False):
             # We're a receiver. Add a NetworkToQueue of receiver type
             #
             # TODO: DRY
+            to_app, to_endpoint = conn.receiver.split(".", maxsplit=1)
             unconnected_endpoints.remove(to_endpoint)
             to_endpoint = resolve_endpoint(app, to_endpoint, Direction.IN)
-            ntoq_name = to_conn.replace(".", "_")
+            
+            ntoq_name = conn.receiver.replace(".", "_")
             if verbose:
                 console.log(f"Adding NetworkToQueue named {ntoq_name} connected to {to_endpoint} in app {app_name}")
             modules_with_network[ntoq_name] = Module(plugin="NetworkToQueue",

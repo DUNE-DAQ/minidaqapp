@@ -22,14 +22,32 @@ def add_manual_endpoint(endpoint_name, app_name):
     app_endpoints[app_name].append(endpoint_name)
 
 def assign_manual_endpoints(the_system):
+    # It would seem like we should be able to reuse port numbers for
+    # each app, but {host_app1} and {host_app2} might be the same
+    # physical host, so the ports would collide. We don't have the app
+    # -> physical host mapping here, so just up the port by one each
+    # time for the moment
+    #
+    # This function gets called after util.assign_network_endpoints
+    # has populated the_system.network_endpoints, so we have to check
+    # what ports it has already assigned, and not reuse them
+
+    taken_ports=set()
+    
+    for endpoint in the_system.network_endpoints.values():
+        port=endpoint.rsplit(":", maxsplit=1)[-1]
+        taken_ports.add(int(port))
+
+    candidate_port=12345
     for app, endpoints in app_endpoints.items():
-        port = 12345
         for endpoint in endpoints:
-            candidate = f"tcp://{{host_{app}}}:{port}"
-            while candidate in the_system.network_endpoints.values():
-                port+=1
-                candidate = f"tcp://{{host_{app}}}:{port}"
-            the_system.network_endpoints[endpoint] = candidate
+            name=f"{app}.{endpoint}"
+            if name not in the_system.network_endpoints: # Don't overwrite existing endpoints in map
+                while candidate_port in taken_ports:
+                    candidate_port+=1
+                new_endpoint = f"tcp://{{host_{app}}}:{candidate_port}"
+                the_system.network_endpoints[name] = new_endpoint
+                taken_ports.add(candidate_port)
 
 import click
 
@@ -151,8 +169,7 @@ def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowd
     ru_app_names=[f"ruflx{idx}" if use_felix else f"ruemu{idx}" for idx in range(len(host_ru))]
 
     add_manual_endpoint("hsievent", "hsi")
-    add_manual_endpoint("trigdec",  "trigger")
-    add_manual_endpoint("triginh",  "dataflow")
+    add_manual_endpoint("tokens",  "dataflow")
     add_manual_endpoint("hsicmds",  "hsi")
 
     if frontend_type == 'wib' or frontend_type == 'wib2':
@@ -260,17 +277,41 @@ def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowd
     app_connections = {
         "trigger.trigger_decisions": util.Sender(msg_type="dunedaq::dfmessages::TriggerDecision",
                                                  msg_module_name="TriggerDecisionNQ",
-                                                 receiver="dataflow.trb.trigger_decision_input_queue")
+                                                 receiver="dataflow.trigger_decisions"),
+        "hsi.hsievent":              util.Sender(msg_type="dunedaq::dfmessages::HSIEvent",
+                                                 msg_module_name="HSIEventNQ",
+                                                 receiver="trigger.hsievents_in"),
+        "dataflow.tokens":           util.Sender(msg_type="dunedaq::dfmessages::TriggerDecisionToken",
+                                                 msg_module_name="TriggerDecisionTokenNQ",
+                                                 receiver="trigger.tokens"),
     }
 
+    app_connections.update({ f"ruemu0.tpsets_{idx}": util.Publisher(msg_type="dunedaq::trigger::TPSet",
+                                                                    msg_module_name="TPSetNQ",
+                                                                    subscribers=[f"trigger.tpsets_into_buffer_link{idx}",
+                                                                                 f"trigger.tpsets_into_chain_link{idx}"])
+                             for idx in range(total_number_of_data_producers) })
+
+    app_connections.update({ f"dataflow.ds_tp_datareq_{idx}": util.Sender(msg_type="dunedaq::dfmessages::DataRequest",
+                                                                          msg_module_name="DataRequestNQ",
+                                                                          receiver=f"trigger.tp_data_requests{idx}")
+                             for idx in range(total_number_of_data_producers) })
+    
+    app_connections.update({ f"trigger.tp_fragments{idx}": util.Sender(msg_type="std::unique_ptr<dunedaq::dataformats::Fragment>",
+                                                                       msg_module_name="FragmentNQ",
+                                                                       receiver=f"dataflow.somethingsomething")
+                             for idx in range(total_number_of_data_producers) })
+    
     the_system = util.System(apps, app_connections=app_connections,
-                             app_start_order=["dataflow"]+ru_app_names+["trigger", "hsi"])
+                             app_start_order=["dataflow", "trigger"]+ru_app_names+["hsi"])
 
     util.add_network("trigger", the_system, verbose=True)
 
+    console.log(f"before assign_manual_endpoints(), the_system.network_endpoints = {the_system.network_endpoints}")
+    
     assign_manual_endpoints(the_system)
     
-    console.log(f"the_system.network_endpoints = {the_system.network_endpoints}")
+    console.log(f"after  assign_manual_endpoints(), the_system.network_endpoints = {the_system.network_endpoints}")
 
     ####################################################################
     # Application command data generation

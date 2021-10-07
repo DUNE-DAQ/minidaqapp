@@ -70,7 +70,7 @@ def generate(NETWORK_ENDPOINTS,
 
     cmd_data = {}
 
-    required_eps = {f'timesync_{HOSTIDX}'}
+    required_eps = {f'ruemu{HOSTIDX}.timesync_{HOSTIDX}'}
     if not required_eps.issubset(NETWORK_ENDPOINTS):
         raise RuntimeError(f"ERROR: not all the required endpoints ({', '.join(required_eps)}) found in list of endpoints {' '.join(NETWORK_ENDPOINTS.keys())}")
 
@@ -256,14 +256,14 @@ def generate(NETWORK_ENDPOINTS,
     conf_list = [("qton_fragments", qton.Conf(msg_type="std::unique_ptr<dunedaq::dataformats::Fragment>",
                                            msg_module_name="FragmentNQ",
                                            sender_config=nos.Conf(ipm_plugin_type="ZmqSender",
-                                                                  address=NETWORK_ENDPOINTS[f"frags_{HOSTIDX}"],
+                                                                  address=NETWORK_ENDPOINTS[f"ruemu{HOSTIDX}.frags_{HOSTIDX}"],
                                                                   stype="msgpack"))),
 
 
                 ("qton_timesync", qton.Conf(msg_type="dunedaq::dfmessages::TimeSync",
                                             msg_module_name="TimeSyncNQ",
                                             sender_config=nos.Conf(ipm_plugin_type="ZmqSender",
-                                                                   address=NETWORK_ENDPOINTS[f"timesync_{HOSTIDX}"],
+                                                                   address=NETWORK_ENDPOINTS[f"ruemu{HOSTIDX}.timesync_{HOSTIDX}"],
                                                                    stype="msgpack"))),
         
                 ("fake_source",fakecr.Conf(
@@ -295,7 +295,7 @@ def generate(NETWORK_ENDPOINTS,
                 (f"ntoq_datareq_{idx}", ntoq.Conf(msg_type="dunedaq::dfmessages::DataRequest",
                                            msg_module_name="DataRequestNQ",
                                            receiver_config=nor.Conf(ipm_plugin_type="ZmqReceiver",
-                                                                    address=NETWORK_ENDPOINTS[f"datareq_{idx}"]))) for idx in range(MIN_LINK,MAX_LINK)
+                                                                    address=NETWORK_ENDPOINTS[f"dataflow.datareq_{idx}"]))) for idx in range(MIN_LINK,MAX_LINK)
             ] + [
                 (f"tp_datahandler_{TOTAL_NUMBER_OF_DATA_PRODUCERS + idx}", dlh.Conf(
                     emulator_mode = False,
@@ -343,7 +343,7 @@ def generate(NETWORK_ENDPOINTS,
                 ("timesync_to_network", qton.Conf(msg_type="dunedaq::dfmessages::TimeSync",
                                 msg_module_name="TimeSyncNQ",
                                 sender_config=nos.Conf(ipm_plugin_type="ZmqPublisher",
-                                                        address=NETWORK_ENDPOINTS[f"timesync_{HOSTIDX}"],
+                                                        address=NETWORK_ENDPOINTS[f"ruemu{HOSTIDX}.timesync_{HOSTIDX}"],
                                                         topic="Timesync",
                                                         stype="msgpack")
                                 )
@@ -352,7 +352,7 @@ def generate(NETWORK_ENDPOINTS,
                 ("dqm_subscriber", ntoq.Conf(msg_type="dunedaq::dfmessages::TimeSync",
                                 msg_module_name="TimeSyncNQ",
                                 receiver_config=nor.Conf(ipm_plugin_type="ZmqSubscriber",
-                                                        address=NETWORK_ENDPOINTS[f"timesync_{HOSTIDX}"],
+                                                        address=NETWORK_ENDPOINTS[f"ruemu{HOSTIDX}.timesync_{HOSTIDX}"],
                                                         subscriptions=["Timesync"],
                                                         # stype="msgpack")
                                                          )
@@ -365,19 +365,19 @@ def generate(NETWORK_ENDPOINTS,
                             ("qton_tp_fragments", qton.Conf(msg_type="std::unique_ptr<dunedaq::dataformats::Fragment>",
                                                             msg_module_name="FragmentNQ",
                                                             sender_config=nos.Conf(ipm_plugin_type="ZmqSender",
-                                                                                   address=NETWORK_ENDPOINTS[f"tp_frags_{HOSTIDX}"],
+                                                                                   address=NETWORK_ENDPOINTS[f"ruemu{HOSTIDX}.tp_frags_{HOSTIDX}"],
                                                                                    stype="msgpack")))
                         ] + [
                             (f"ntoq_tp_datarequests_{idx}", ntoq.Conf(msg_type="dunedaq::dfmessages::DataRequest",
                                                                       msg_module_name="DataRequestNQ",
                                                                       receiver_config=nor.Conf(ipm_plugin_type="ZmqReceiver",
-                                                                                               address=NETWORK_ENDPOINTS[f"tp_datareq_{idx}"]))) for idx in range(MIN_LINK,MAX_LINK)
+                                                                                               address=NETWORK_ENDPOINTS[f"dataflow.tp_datareq_{idx}"]))) for idx in range(MIN_LINK,MAX_LINK)
                         ] + [
                             (f"tpset_publisher_{idx}", qton.Conf(msg_type="dunedaq::trigger::TPSet",
                                                                  msg_module_name="TPSetNQ",
                                                                  sender_config=nos.Conf(ipm_plugin_type="ZmqPublisher",
-                                                                                        address=NETWORK_ENDPOINTS[f"tpsets_{idx}"],
-                                                                                        topic="TPSets",
+                                                                                        address=NETWORK_ENDPOINTS[f"ruemu{HOSTIDX}.tpsets_{idx}"],
+                                                                                        topic="foo",
                                                                                         stype="msgpack"))) for idx in range(MIN_LINK, MAX_LINK)
                         ])
 

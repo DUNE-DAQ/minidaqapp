@@ -64,7 +64,7 @@ def generate(
     """
     cmd_data = {}
 
-    required_eps = {'hsievent'}
+    required_eps = {'hsi.hsievent'}
     if not required_eps.issubset(NETWORK_ENDPOINTS):
         raise RuntimeError(f"ERROR: not all the required endpoints ({', '.join(required_eps)}) found in list of endpoints {' '.join(NETWORK_ENDPOINTS.keys())}")
 
@@ -113,7 +113,7 @@ def generate(
                 ("qton_hsievent", qton.Conf(msg_type="dunedaq::dfmessages::HSIEvent",
                                            msg_module_name="HSIEventNQ",
                                            sender_config=nos.Conf(ipm_plugin_type="ZmqSender",
-                                                                  address=NETWORK_ENDPOINTS["hsievent"],
+                                                                  address=NETWORK_ENDPOINTS["hsi.hsievent"],
                                                                   stype="msgpack")
                                            )
                  ),
