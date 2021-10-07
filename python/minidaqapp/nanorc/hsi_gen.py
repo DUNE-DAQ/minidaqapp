@@ -29,6 +29,7 @@ moo.otypes.load_types('nwqueueadapters/queuetonetwork.jsonnet')
 moo.otypes.load_types('nwqueueadapters/networktoqueue.jsonnet')
 moo.otypes.load_types('nwqueueadapters/networkobjectreceiver.jsonnet')
 moo.otypes.load_types('nwqueueadapters/networkobjectsender.jsonnet')
+moo.otypes.load_types('networkmanager/nwmgr.jsonnet')
 
 # Import new types
 import dunedaq.cmdlib.cmd as basecmd # AddressedCmd, 
@@ -41,6 +42,7 @@ import dunedaq.nwqueueadapters.networktoqueue as ntoq
 import dunedaq.nwqueueadapters.queuetonetwork as qton
 import dunedaq.nwqueueadapters.networkobjectreceiver as nor
 import dunedaq.nwqueueadapters.networkobjectsender as nos
+import dunedaq.networkmanager.nwmgr as nwmgr
 
 from appfwk.utils import acmd, mcmd, mrccmd, mspec
 
@@ -63,13 +65,14 @@ def generate(
         HSI_SOURCE = 1,
         HSI_DEVICE_NAME="BOREAS_TLU",
         UHAL_LOG_LEVEL="notice",
+        PARTITION="UNKNOWN"
     ):
     """
     { item_description }
     """
     cmd_data = {}
 
-    required_eps = {'hsievent'}
+    required_eps = {PARTITION+'.hsievent'}
     if CONTROL_HSI_HARDWARE:
         required_eps.add('hsicmds')
 
@@ -113,13 +116,15 @@ def generate(
             app.ModSpec(inst="hsic", plugin="HSIController", data=hsi_controller_init_data)
         ])
 
-    cmd_data['init'] = app.Init(queues=queue_specs, modules=mod_specs)
+    nw_specs = ([nwmgr.Connection(name=f"{epkey}" , type = "Receiver" , address = f"{epval}") for epkey,epval in NETWORK_ENDPOINTS.items()])
+
+    cmd_data['init'] = app.Init(queues=queue_specs, modules=mod_specs, nwconnections=nw_specs)
     
     conf_cmds = [
         ("qton_hsievent", qton.Conf(msg_type="dunedaq::dfmessages::HSIEvent",
                                            msg_module_name="HSIEventNQ",
                                            sender_config=nos.Conf(ipm_plugin_type="ZmqSender",
-                                                                  address=NETWORK_ENDPOINTS["hsievent"],
+                                                                  address=NETWORK_ENDPOINTS[PARTITION+".hsievent"],
                                                                   stype="msgpack")
                                            )
                 ),
@@ -136,7 +141,7 @@ def generate(
             ("qton_hw_cmds", qton.Conf(msg_type="dunedaq::timinglibs::timingcmd::TimingHwCmd",
                                            msg_module_name="TimingHwCmdNQ",
                                            sender_config=nos.Conf(ipm_plugin_type="ZmqSender",
-                                                                  address=NETWORK_ENDPOINTS["hsicmds"],
+                                                                  address=NETWORK_ENDPOINTS[PARTITION+".hsicmds"],
                                                                   stype="msgpack")
                                            )),
             ("hsic", hsic.ConfParams(

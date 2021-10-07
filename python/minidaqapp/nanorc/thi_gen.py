@@ -28,6 +28,7 @@ moo.otypes.load_types('nwqueueadapters/queuetonetwork.jsonnet')
 moo.otypes.load_types('nwqueueadapters/networktoqueue.jsonnet')
 moo.otypes.load_types('nwqueueadapters/networkobjectreceiver.jsonnet')
 moo.otypes.load_types('nwqueueadapters/networkobjectsender.jsonnet')
+moo.otypes.load_types('networkmanager/nwmgr.jsonnet')
 
 # Import new types
 import dunedaq.cmdlib.cmd as basecmd # AddressedCmd, 
@@ -39,6 +40,7 @@ import dunedaq.nwqueueadapters.networktoqueue as ntoq
 import dunedaq.nwqueueadapters.queuetonetwork as qton
 import dunedaq.nwqueueadapters.networkobjectreceiver as nor
 import dunedaq.nwqueueadapters.networkobjectsender as nos
+import dunedaq.networkmanager.nwmgr as nwmgr
 
 from appfwk.utils import acmd, mcmd, mrccmd, mspec
 
@@ -56,6 +58,7 @@ def generate(
         GATHER_INTERVAL_DEBUG=10e6,
         HSI_DEVICE_NAME="",
         UHAL_LOG_LEVEL="notice",
+        PARTITION="UNKNOWN"
     ):
     """
     { item_description }
@@ -95,8 +98,10 @@ def generate(
             app.QueueInfo(name="output", inst="ntoq_timing_cmds", dir="output")
             ]),
         ])
+
+    nw_specs = ([nwmgr.Connection(name=f"{epkey}" , type = "Receiver" , address = f"{epval}") for epkey,epval in NETWORK_ENDPOINTS.items()])
             
-    cmd_data['init'] = app.Init(queues=queue_specs, modules=mod_specs)
+    cmd_data['init'] = app.Init(queues=queue_specs, modules=mod_specs, nwconnections=nw_specs)
     
 
     conf_cmds = []

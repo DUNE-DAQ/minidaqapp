@@ -18,6 +18,7 @@ moo.otypes.load_types('nwqueueadapters/queuetonetwork.jsonnet')
 moo.otypes.load_types('nwqueueadapters/networktoqueue.jsonnet')
 moo.otypes.load_types('nwqueueadapters/networkobjectreceiver.jsonnet')
 moo.otypes.load_types('nwqueueadapters/networkobjectsender.jsonnet')
+moo.otypes.load_types('networkmanager/nwmgr.jsonnet')
 
 
 # Import new types
@@ -33,6 +34,7 @@ import dunedaq.nwqueueadapters.networktoqueue as ntoq
 import dunedaq.nwqueueadapters.queuetonetwork as qton
 import dunedaq.nwqueueadapters.networkobjectreceiver as nor
 import dunedaq.nwqueueadapters.networkobjectsender as nos
+import dunedaq.networkmanager.nwmgr as nwmgr
 
 from appfwk.utils import acmd, mcmd, mrccmd, mspec
 
@@ -51,7 +53,8 @@ def generate(NETWORK_ENDPOINTS,
         TOKEN_COUNT=0,
         SYSTEM_TYPE="TPC",
         SOFTWARE_TPG_ENABLED=False,
-        TPSET_WRITING_ENABLED=False):
+        TPSET_WRITING_ENABLED=False,
+        PARTITION="UNKNOWN"):
     """Generate the json configuration for the readout and DF process"""
 
     if SOFTWARE_TPG_ENABLED:
@@ -68,7 +71,7 @@ def generate(NETWORK_ENDPOINTS,
 
     cmd_data = {}
 
-    required_eps = {'trigdec', 'triginh'}
+    required_eps = {PARTITION+'.trigdec', PARTITION+'.triginh'}
     if not required_eps.issubset(NETWORK_ENDPOINTS):
         raise RuntimeError(f"ERROR: not all the required endpoints ({', '.join(required_eps)}) found in list of endpoints {' '.join(NETWORK_ENDPOINTS.keys())}")
 
@@ -109,29 +112,33 @@ def generate(NETWORK_ENDPOINTS,
         mspec("tpswriter", "TPSetWriter", [app.QueueInfo(name="tpset_source", inst="tpsets_from_netq", dir="input")])
     ] if TPSET_WRITING_ENABLED else [])
 
-    cmd_data['init'] = app.Init(queues=queue_specs, modules=mod_specs)
+
+    # Hack, all connections set as receivers, but probably this should be in the code not in the config
+    nw_specs = ([nwmgr.Connection(name=f"{epkey}" , type = "Receiver" , address = f"{epval}") for epkey,epval in NETWORK_ENDPOINTS.items()])
+
+    cmd_data['init'] = app.Init(queues=queue_specs, modules=mod_specs, nwconnections=nw_specs)
 
 
     cmd_data['conf'] = acmd([
                 ("ntoq_trigdec", ntoq.Conf(msg_type="dunedaq::dfmessages::TriggerDecision",
                                            msg_module_name="TriggerDecisionNQ",
                                            receiver_config=nor.Conf(ipm_plugin_type="ZmqReceiver",
-                                                                    address=NETWORK_ENDPOINTS["trigdec"]))),
+                                                                    address=NETWORK_ENDPOINTS[PARTITION+".trigdec"]))),
 
 
                 ("qton_token", qton.Conf(msg_type="dunedaq::dfmessages::TriggerDecisionToken",
                                            msg_module_name="TriggerDecisionTokenNQ",
                                            sender_config=nos.Conf(ipm_plugin_type="ZmqSender",
-                                                                  address=NETWORK_ENDPOINTS["triginh"],
+                                                                  address=NETWORK_ENDPOINTS[PARTITION+".triginh"],
                                                                   stype="msgpack"))),
 
                 ("trb", trb.ConfParams( general_queue_timeout=QUEUE_POP_WAIT_MS,
                                         map=trb.mapgeoidconnections([
-                                                trb.geoidinst(region=0, element=idx, system=SYSTEM_TYPE, connection_name=f"data_requests_{idx}")  for idx in range(NUMBER_OF_DATA_PRODUCERS)
+                                                trb.geoidinst(region=0, element=idx, system=SYSTEM_TYPE, connection_name=f"{PARTITION}.data_requests_{idx}")  for idx in range(NUMBER_OF_DATA_PRODUCERS)
                                         ] + [
-                                            trb.geoidinst(region=0, element=NUMBER_OF_DATA_PRODUCERS + idx, system=SYSTEM_TYPE, connection_name=f"tp_data_requests_{idx}")  for idx in range(NUMBER_OF_RAW_TP_PRODUCERS)
+                                            trb.geoidinst(region=0, element=NUMBER_OF_DATA_PRODUCERS + idx, system=SYSTEM_TYPE, connection_name=f"{PARTITION}.tp_data_requests_{idx}")  for idx in range(NUMBER_OF_RAW_TP_PRODUCERS)
                                         ] + [
-                                            trb.geoidinst(region=0, element=idx, system="DataSelection", connection_name=f"ds_tp_data_requests_{idx}")  for idx in range(NUMBER_OF_DS_TP_PRODUCERS)
+                                            trb.geoidinst(region=0, element=idx, system="DataSelection", connection_name=f"{PARTITION}.ds_tp_data_requests_{idx}")  for idx in range(NUMBER_OF_DS_TP_PRODUCERS)
                                         ]
                                                               ))),
                 ("datawriter", dw.ConfParams(initial_token_count=TOKEN_COUNT,
@@ -156,7 +163,7 @@ def generate(NETWORK_ENDPOINTS,
                     msg_type="dunedaq::trigger::TPSet",
                     msg_module_name="TPSetNQ",
                     receiver_config=nor.Conf(ipm_plugin_type="ZmqSubscriber",
-                                             address=NETWORK_ENDPOINTS[f'tpsets_{idx}'],
+                                             address=NETWORK_ENDPOINTS[f'{PARTITION}.tpsets_{idx}'],
                                              subscriptions=["TPSets"])
                 ))
                 for idx in range(NUMBER_OF_TP_SUBSCRIBERS)

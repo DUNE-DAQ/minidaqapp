@@ -70,7 +70,7 @@ import click
 @click.option('--pocket-url', default='127.0.0.1', help="URL for connecting to Pocket services")
 @click.option('--enable-software-tpg', is_flag=True, default=False, help="Enable software TPG")
 @click.option('--enable-tpset-writing', is_flag=True, default=False, help="Enable the writing of TPSets to disk (only works with --enable-software-tpg")
-@click.option('--use-fake-data-producers', is_flag=True, default=True, help="Use fake data producers that respond with empty fragments immediately instead of (fake) cards and DLHs")
+@click.option('--use-fake-data-producers', is_flag=True, default=False, help="Use fake data producers that respond with empty fragments immediately instead of (fake) cards and DLHs")
 @click.argument('json_dir', type=click.Path())
 
 def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowdown_factor, run_number, trigger_rate_hz, trigger_window_before_ticks, trigger_window_after_ticks,
@@ -125,12 +125,6 @@ def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowd
         df_token_count = -1 * token_count
         trigemu_token_count = 0
 
-    network_endpoints = {
-        "hsievent" : "tcp://{host_hsi}:12344",
-        "trigdec" : "tcp://{host_trigger}:12345",
-        "triginh" : "tcp://{host_df}:12346",
-        "hsicmds":  "tcp://{host_hsi}:12347",
-    }
 
     if frontend_type == 'wib' or frontend_type == 'wib2':
         system_type = 'TPC'
@@ -165,16 +159,30 @@ def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowd
 
     dqm_kafka_address = "dqmbroadcast:9092" if dqm_impl == 'cern' else pocket_url + ":30092" if dqm_impl == 'pocket' else ''
 
+    # network connections map
+    app_thi="thi"
+    app_hsi = "hsi"
+    app_trigger = "trigger"
+    app_df = "dataflow"
+    app_ru = [f"ruflx{idx}" if use_felix else f"ruemu{idx}" for idx in range(len(host_ru))]
+
+    network_endpoints = {
+        partition_name+".hsievent" : "tcp://{host_hsi}:12344",
+        partition_name+".trigdec" : "tcp://{host_trigger}:12345",
+        partition_name+".triginh" : "tcp://{host_df}:12346",
+        partition_name+".hsicmds":  "tcp://{host_hsi}:12347",
+    }
+
     port = 12348
     for idx in range(total_number_of_data_producers):
-        network_endpoints[f"datareq_{idx}"] = "tcp://{host_df}:" + f"{port}"
+        network_endpoints[f"{partition_name}.datareq_{idx}"] = "tcp://{host_df}:" + f"{port}"
         port = port + 1
         if enable_software_tpg:
-            network_endpoints[f"tp_datareq_{idx}"] = "tcp://{host_df}:" + f"{port}"
+            network_endpoints[f"{partition_name}.tp_datareq_{idx}"] = "tcp://{host_df}:" + f"{port}"
             port = port + 1
-            network_endpoints[f'frags_tpset_ds_{idx}'] = "tcp://{host_trigger}:"+str(port)
+            network_endpoints[f'{partition_name}.frags_tpset_ds_{idx}'] = "tcp://{host_trigger}:"+str(port)
             port += 1
-            network_endpoints[f"ds_tp_datareq_{idx}"] = "tcp://{host_df}:" + f"{port}"
+            network_endpoints[f"{partition_name}.ds_tp_datareq_{idx}"] = "tcp://{host_df}:" + f"{port}"
             port += 1
 
     cardid = {}
@@ -183,16 +191,16 @@ def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowd
     for hostidx in range(len(host_ru)):
         # Should end up something like 'network_endpoints[timesync_0]:
         # "tcp://{host_ru0}:12347"'
-        network_endpoints[f"timesync_{hostidx}"] = "tcp://{host_ru" + f"{hostidx}" + "}:" + f"{port}"
+        network_endpoints[f"{partition_name}.timesync_{hostidx}"] = "tcp://{host_ru" + f"{hostidx}" + "}:" + f"{port}"
         port = port + 1
-        network_endpoints[f"frags_{hostidx}"] = "tcp://{host_ru" + f"{hostidx}" + "}:" + f"{port}"
+        network_endpoints[f"{partition_name}.frags_{hostidx}"] = "tcp://{host_ru" + f"{hostidx}" + "}:" + f"{port}"
         port = port + 1
 
         if enable_software_tpg:
-            network_endpoints[f"tp_frags_{hostidx}"] = "tcp://{host_ru" + f"{hostidx}" + "}:" + f"{port}"
+            network_endpoints[f"{partition_name}.tp_frags_{hostidx}"] = "tcp://{host_ru" + f"{hostidx}" + "}:" + f"{port}"
             port = port + 1
             for idx in range(number_of_data_producers):
-                network_endpoints[f"tpsets_{hostidx*number_of_data_producers+idx}"] = "tcp://{host_ru" + f"{hostidx}" + "}:" + f"{port}"
+                network_endpoints[f"{partition_name}.tpsets_{hostidx*number_of_data_producers+idx}"] = "tcp://{host_ru" + f"{hostidx}" + "}:" + f"{port}"
                 port = port + 1
         if host_ru[hostidx] in host_id_dict:
             host_id_dict[host_ru[hostidx]] = host_id_dict[host_ru[hostidx]] + 1
@@ -205,7 +213,7 @@ def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowd
     if control_timing_hw:
         timing_cmd_network_endpoints=set()
         if use_hsi_hw:
-            timing_cmd_network_endpoints.add('hsicmds')
+            timing_cmd_network_endpoints.add(partition_name+'hsicmds')
         cmd_data_thi = thi_gen.generate(
             RUN_NUMBER = run_number,
             NETWORK_ENDPOINTS=network_endpoints,
@@ -225,7 +233,8 @@ def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowd
             HSI_RE_MASK=hsi_re_mask,
             HSI_FE_MASK=hsi_fe_mask,
             HSI_INV_MASK=hsi_inv_mask,
-            HSI_SOURCE=hsi_source,)
+            HSI_SOURCE=hsi_source,
+            PARTITION=partition_name)
     else:
         cmd_data_hsi = fake_hsi_gen.generate(
             network_endpoints,
@@ -236,7 +245,8 @@ def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowd
             HSI_DEVICE_ID = hsi_device_id,
             MEAN_SIGNAL_MULTIPLICITY = mean_hsi_signal_multiplicity,
             SIGNAL_EMULATION_MODE = hsi_signal_emulation_mode,
-            ENABLED_SIGNALS =  enabled_hsi_signals,)
+            ENABLED_SIGNALS =  enabled_hsi_signals,
+            PARTITION=partition_name)
 
     console.log("hsi cmd data:", cmd_data_hsi)
 
@@ -252,7 +262,8 @@ def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowd
         TTCM_S1=ttcm_s1,
         TTCM_S2=ttcm_s2,
         TRIGGER_WINDOW_BEFORE_TICKS = trigger_window_before_ticks,
-        TRIGGER_WINDOW_AFTER_TICKS = trigger_window_after_ticks)
+        TRIGGER_WINDOW_AFTER_TICKS = trigger_window_after_ticks,
+        PARTITION=partition_name)
 
 
     console.log("trigger cmd data:", cmd_data_trigger)
@@ -264,7 +275,8 @@ def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowd
         TOKEN_COUNT = df_token_count,
         SYSTEM_TYPE = system_type,
         SOFTWARE_TPG_ENABLED = enable_software_tpg,
-        TPSET_WRITING_ENABLED = enable_tpset_writing)
+        TPSET_WRITING_ENABLED = enable_tpset_writing,
+        PARTITION=partition_name)
     console.log("dataflow cmd data:", cmd_data_dataflow)
 
     cmd_data_readout = [ readout_gen.generate(network_endpoints,
@@ -285,7 +297,8 @@ def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowd
             DQM_ENABLED=enable_dqm,
             DQM_KAFKA_ADDRESS=dqm_kafka_address,
             SOFTWARE_TPG_ENABLED = enable_software_tpg,
-            USE_FAKE_DATA_PRODUCERS = use_fake_data_producers
+            USE_FAKE_DATA_PRODUCERS = use_fake_data_producers,
+            PARTITION=partition_name
             ) for hostidx in range(len(host_ru))]
     console.log("readout cmd data:", cmd_data_readout)
 
@@ -294,12 +307,6 @@ def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowd
 
     data_dir = join(json_dir, 'data')
     os.makedirs(data_dir)
-
-    app_thi="thi"
-    app_hsi = "hsi"
-    app_trigger = "trigger"
-    app_df = "dataflow"
-    app_ru = [f"ruflx{idx}" if use_felix else f"ruemu{idx}" for idx in range(len(host_ru))]
 
     jf_hsi = join(data_dir, app_hsi)
     jf_trigemu = join(data_dir, app_trigger)

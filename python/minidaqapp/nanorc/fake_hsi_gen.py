@@ -28,6 +28,7 @@ moo.otypes.load_types('nwqueueadapters/queuetonetwork.jsonnet')
 moo.otypes.load_types('nwqueueadapters/networktoqueue.jsonnet')
 moo.otypes.load_types('nwqueueadapters/networkobjectreceiver.jsonnet')
 moo.otypes.load_types('nwqueueadapters/networkobjectsender.jsonnet')
+moo.otypes.load_types('networkmanager/nwmgr.jsonnet')
 
 # Import new types
 import dunedaq.cmdlib.cmd as basecmd # AddressedCmd, 
@@ -39,6 +40,7 @@ import dunedaq.nwqueueadapters.networktoqueue as ntoq
 import dunedaq.nwqueueadapters.queuetonetwork as qton
 import dunedaq.nwqueueadapters.networkobjectreceiver as nor
 import dunedaq.nwqueueadapters.networkobjectsender as nos
+import dunedaq.networkmanager.nwmgr as nwmgr
 
 from appfwk.utils import acmd, mcmd, mrccmd, mspec
 
@@ -58,13 +60,14 @@ def generate(
         MEAN_SIGNAL_MULTIPLICITY: int = 0,
         SIGNAL_EMULATION_MODE: int = 0,
         ENABLED_SIGNALS: int = 0b00000001,
+        PARTITION = "UNKNOWN"
     ):
     """
     { item_description }
     """
     cmd_data = {}
 
-    required_eps = {'hsievent'}
+    required_eps = {PARTITION+'.hsievent'}
     if not required_eps.issubset(NETWORK_ENDPOINTS):
         raise RuntimeError(f"ERROR: not all the required endpoints ({', '.join(required_eps)}) found in list of endpoints {' '.join(NETWORK_ENDPOINTS.keys())}")
 
@@ -94,7 +97,9 @@ def generate(
                     ]) for idx, inst in enumerate(NETWORK_ENDPOINTS) if "timesync" in inst
         ]
 
-    cmd_data['init'] = app.Init(queues=queue_specs, modules=mod_specs)
+    nw_specs = ([nwmgr.Connection(name=f"{epkey}" , type = "Receiver" , address = f"{epval}") for epkey,epval in NETWORK_ENDPOINTS.items()])
+
+    cmd_data['init'] = app.Init(queues=queue_specs, modules=mod_specs, nwconnections=nw_specs)
 
     trigger_interval_ticks=0
     if TRIGGER_RATE_HZ > 0:
@@ -113,7 +118,7 @@ def generate(
                 ("qton_hsievent", qton.Conf(msg_type="dunedaq::dfmessages::HSIEvent",
                                            msg_module_name="HSIEventNQ",
                                            sender_config=nos.Conf(ipm_plugin_type="ZmqSender",
-                                                                  address=NETWORK_ENDPOINTS["hsievent"],
+                                                                  address=NETWORK_ENDPOINTS[PARTITION+".hsievent"],
                                                                   stype="msgpack")
                                            )
                  ),

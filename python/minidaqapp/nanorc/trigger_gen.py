@@ -22,6 +22,7 @@ moo.otypes.load_types('nwqueueadapters/queuetonetwork.jsonnet')
 moo.otypes.load_types('nwqueueadapters/networktoqueue.jsonnet')
 moo.otypes.load_types('nwqueueadapters/networkobjectreceiver.jsonnet')
 moo.otypes.load_types('nwqueueadapters/networkobjectsender.jsonnet')
+moo.otypes.load_types('networkmanager/nwmgr.jsonnet')
 
 # Import new types
 import dunedaq.cmdlib.cmd as basecmd # AddressedCmd,
@@ -41,6 +42,7 @@ import dunedaq.nwqueueadapters.networktoqueue as ntoq
 import dunedaq.nwqueueadapters.queuetonetwork as qton
 import dunedaq.nwqueueadapters.networkobjectreceiver as nor
 import dunedaq.nwqueueadapters.networkobjectsender as nos
+import dunedaq.networkmanager.nwmgr as nwmgr
 
 from appfwk.utils import acmd, mcmd, mrccmd, mspec
 
@@ -87,6 +89,7 @@ def generate(
         TTCM_S2: int = 2,
         TRIGGER_WINDOW_BEFORE_TICKS: int = 1000,
         TRIGGER_WINDOW_AFTER_TICKS: int = 1000,
+        PARTITION="UNKNOWN"
 ):
     """
     { item_description }
@@ -188,7 +191,9 @@ def generate(
 
     ]
 
-    cmd_data['init'] = app.Init(queues=queue_specs, modules=mod_specs)
+    nw_specs = ([nwmgr.Connection(name=f"{epkey}" , type = "Receiver" , address = f"{epval}") for epkey,epval in NETWORK_ENDPOINTS.items()])
+
+    cmd_data['init'] = app.Init(queues=queue_specs, modules=mod_specs, nwconnections=nw_specs)
 
     # Generate schema for the maker plugins on the fly in the temptypes module
     make_moo_record(ACTIVITY_CONFIG,'ActivityConf','temptypes')
@@ -204,25 +209,25 @@ def generate(
                 msg_type="dunedaq::trigger::TPSet",
                 msg_module_name="TPSetNQ",
                 receiver_config=nor.Conf(ipm_plugin_type="ZmqSubscriber",
-                                         address=NETWORK_ENDPOINTS[f'tpsets_{idx}'],
+                                         address=NETWORK_ENDPOINTS[f'{PARTITION}.tpsets_{idx}'],
                                          subscriptions=["TPSets"])
             )),
             (f"ntoq_tpset_for_buf{idx}", ntoq.Conf(
                 msg_type="dunedaq::trigger::TPSet",
                 msg_module_name="TPSetNQ",
                 receiver_config=nor.Conf(ipm_plugin_type="ZmqSubscriber",
-                                         address=NETWORK_ENDPOINTS[f'tpsets_{idx}'],
+                                         address=NETWORK_ENDPOINTS[f'{PARTITION}.tpsets_{idx}'],
                                          subscriptions=["TPSets"])
             )),
             (f"ntoq_data_request{idx}", ntoq.Conf(msg_type="dunedaq::dfmessages::DataRequest",
                                                   msg_module_name="DataRequestNQ",
                                                   receiver_config=nor.Conf(ipm_plugin_type="ZmqReceiver",
-                                                                           address=NETWORK_ENDPOINTS[f"ds_tp_datareq_{idx}"])
+                                                                           address=NETWORK_ENDPOINTS[f"{PARTITION}.ds_tp_datareq_{idx}"])
             )),
             (f"qton_fragment{idx}", qton.Conf(msg_type="std::unique_ptr<dunedaq::dataformats::Fragment>",
                                         msg_module_name="FragmentNQ",
                                         sender_config=nos.Conf(ipm_plugin_type="ZmqSender",
-                                                               address=NETWORK_ENDPOINTS[f"frags_tpset_ds_{idx}"],
+                                                               address=NETWORK_ENDPOINTS[f"{PARTITION}.frags_tpset_ds_{idx}"],
                                                                stype="msgpack"))),
 
         ])
@@ -258,7 +263,7 @@ def generate(
             msg_type="dunedaq::dfmessages::HSIEvent",
             msg_module_name="HSIEventNQ",
             receiver_config=nor.Conf(ipm_plugin_type="ZmqReceiver",
-                                     address=NETWORK_ENDPOINTS["hsievent"])
+                                     address=NETWORK_ENDPOINTS[PARTITION+".hsievent"])
         )),
 
         ("ttcm", ttcm.Conf(
@@ -277,14 +282,14 @@ def generate(
             msg_type="dunedaq::dfmessages::TriggerDecisionToken",
             msg_module_name="TriggerDecisionTokenNQ",
             receiver_config=nor.Conf(ipm_plugin_type="ZmqReceiver",
-                                     address=NETWORK_ENDPOINTS["triginh"])
+                                     address=NETWORK_ENDPOINTS[PARTITION+".triginh"])
         )),
 
         ("qton_trigdec", qton.Conf(
             msg_type="dunedaq::dfmessages::TriggerDecision",
             msg_module_name="TriggerDecisionNQ",
             sender_config=nos.Conf(ipm_plugin_type="ZmqSender",
-                                   address=NETWORK_ENDPOINTS["trigdec"])
+                                   address=NETWORK_ENDPOINTS[PARTITION+".trigdec"])
         )),
 
         ("mlt", mlt.ConfParams(
