@@ -62,7 +62,7 @@ import click
 
 @click.option('--enable-raw-recording', is_flag=True, help="Add queues and modules necessary for the record command")
 @click.option('--raw-recording-output-dir', type=click.Path(), default='.', help="Output directory where recorded data is written to. Data for each link is written to a separate file")
-@click.option('--frontend-type', type=click.Choice(['wib', 'wib2', 'pds_queue', 'pds_list']), default='wib', help="Frontend type (wib, wib2 or pds) and latency buffer implementation in case of pds (folly queue or skip list)")
+@click.option('--frontend-type', type=click.Choice(['wib', 'wib2', 'pds_queue', 'pds_list', 'pacman']), default='wib', help="Frontend type (wib, wib2 or pds) and latency buffer implementation in case of pds (folly queue or skip list)")
 @click.option('--enable-dqm', is_flag=True, help="Enable Data Quality Monitoring")
 @click.option('--opmon-impl', type=click.Choice(['json','cern','pocket'], case_sensitive=False),default='json', help="Info collector service implementation to use")
 @click.option('--ers-impl', type=click.Choice(['local','cern','pocket'], case_sensitive=False), default='local', help="ERS destination (Kafka used for cern and pocket)")
@@ -134,6 +134,8 @@ def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowd
 
     if frontend_type == 'wib' or frontend_type == 'wib2':
         system_type = 'TPC'
+    elif frontend_type == 'pacman':
+        system_type = 'NDLArTPC'
     else:
         system_type = 'PDS'
 
