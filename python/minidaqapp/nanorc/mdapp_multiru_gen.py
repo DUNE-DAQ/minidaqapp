@@ -5,6 +5,12 @@ import rich.traceback
 from rich.console import Console
 from os.path import exists, join
 
+from dunedaq.env import get_moo_model_path
+import moo.io
+moo.io.default_load_path = get_moo_model_path()
+import moo.otypes
+moo.otypes.load_types("minidaqapp/nanorc/mdapp-multiru-gen.jsonnet")
+from minidaqapp.mdapp_multiru_gen import MdappMultiruGen
 
 CLOCK_SPEED_HZ = 50000000
 
@@ -17,6 +23,7 @@ console = Console()
 import click
 
 @click.command(context_settings=CONTEXT_SETTINGS)
+@click.argument('json_dir', type=click.Path())
 @click.option('-p', '--partition-name', default="${USER}_test", help="Name of the partition to use, for ERS and OPMON")
 @click.option('-n', '--number-of-data-producers', default=2, help="Number of links to use, either per ru (<=10) or total. If total is given, will be adjusted to the closest multiple of the number of rus")
 @click.option('-e', '--emulator-mode', is_flag=True, help="If active, timestamps of data frames are overwritten when processed by the readout. This is necessary if the felix card does not set correct timestamps.")
@@ -71,17 +78,31 @@ import click
 @click.option('--enable-software-tpg', is_flag=True, default=False, help="Enable software TPG")
 @click.option('--enable-tpset-writing', is_flag=True, default=False, help="Enable the writing of TPSets to disk (only works with --enable-software-tpg")
 @click.option('--use-fake-data-producers', is_flag=True, default=False, help="Use fake data producers that respond with empty fragments immediately instead of (fake) cards and DLHs")
-@click.argument('json_dir', type=click.Path())
+def cli(json_dir, **params):
+    """
+      JSON_DIR: Json file output folder
+    """
+    print(f"cli saving to {json_dir}")
+    params['json_dir'] = json_dir
+    gen(params)
 
-def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowdown_factor, run_number, trigger_rate_hz, trigger_window_before_ticks, trigger_window_after_ticks,
+def validate(params):
+    obj = MdappMultiruGen()
+    for k,v in params.items():
+        setattr(obj, k, v)
+    return obj.pod()            # round trip
+
+def gen(params):
+    params = validate(params)
+    body(**params)
+
+def body(partition_name, number_of_data_producers, emulator_mode, data_rate_slowdown_factor, run_number, trigger_rate_hz, trigger_window_before_ticks, trigger_window_after_ticks,
         token_count, data_file, output_path, disable_trace, use_felix, host_df, host_ru, host_trigger, host_hsi, host_timing_hw, control_timing_hw,
         hsi_device_name, hsi_readout_period, hsi_endpoint_address, hsi_endpoint_partition, hsi_re_mask, hsi_fe_mask, hsi_inv_mask, hsi_source,
         use_hsi_hw, hsi_device_id, mean_hsi_signal_multiplicity, hsi_signal_emulation_mode, enabled_hsi_signals,
         ttcm_s1, ttcm_s2, trigger_activity_plugin, trigger_activity_config, trigger_candidate_plugin, trigger_candidate_config,
         enable_raw_recording, raw_recording_output_dir, frontend_type, opmon_impl, enable_dqm, ers_impl, dqm_impl, pocket_url, enable_software_tpg, enable_tpset_writing, use_fake_data_producers, json_dir):
-    """
-      JSON_DIR: Json file output folder
-    """
+
     console.log("Loading dataflow config generator")
     from . import dataflow_gen
     console.log("Loading readout config generator")
