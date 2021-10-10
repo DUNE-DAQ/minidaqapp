@@ -14,6 +14,7 @@ moo.otypes.load_types('dfmodules/triggerrecordbuilder.jsonnet')
 moo.otypes.load_types('dfmodules/datawriter.jsonnet')
 moo.otypes.load_types('dfmodules/hdf5datastore.jsonnet')
 moo.otypes.load_types('dfmodules/tpsetwriter.jsonnet')
+moo.otypes.load_types('dfmodules/fragmentreceiver.jsonnet')
 moo.otypes.load_types('nwqueueadapters/queuetonetwork.jsonnet')
 moo.otypes.load_types('nwqueueadapters/networktoqueue.jsonnet')
 moo.otypes.load_types('nwqueueadapters/networkobjectreceiver.jsonnet')
@@ -30,6 +31,7 @@ import dunedaq.dfmodules.triggerrecordbuilder as trb
 import dunedaq.dfmodules.datawriter as dw
 import dunedaq.dfmodules.hdf5datastore as hdf5ds
 import dunedaq.dfmodules.tpsetwriter as tpsw
+import dunedaq.dfmodules.fragmentreceiver as frcv
 import dunedaq.nwqueueadapters.networktoqueue as ntoq
 import dunedaq.nwqueueadapters.queuetonetwork as qton
 import dunedaq.nwqueueadapters.networkobjectreceiver as nor
@@ -48,6 +50,7 @@ QUEUE_POP_WAIT_MS = 100
 
 def generate(NETWORK_ENDPOINTS,
         NUMBER_OF_DATA_PRODUCERS=2,
+        NUMBER_OF_RU_HOSTS=1,
         RUN_NUMBER=333,
         OUTPUT_PATH=".",
         TOKEN_COUNT=0,
@@ -133,14 +136,15 @@ def generate(NETWORK_ENDPOINTS,
                                                                   stype="msgpack"))),
 
                 ("trb", trb.ConfParams( general_queue_timeout=QUEUE_POP_WAIT_MS,
+                                        reply_connection_name = PARTITION+".frags_0",
                                         map=trb.mapgeoidconnections([
-                                                trb.geoidinst(region=0, element=idx, system=SYSTEM_TYPE, connection_name=f"{PARTITION}.data_requests_{idx}")  for idx in range(NUMBER_OF_DATA_PRODUCERS)
+                                                trb.geoidinst(region=0, element=idy, system=SYSTEM_TYPE, connection_name=f"{PARTITION}.datareq_{idx}")  for idx in range(NUMBER_OF_RU_HOSTS) for idy in range(NUMBER_OF_DATA_PRODUCERS)
                                         ] + [
                                             trb.geoidinst(region=0, element=NUMBER_OF_DATA_PRODUCERS + idx, system=SYSTEM_TYPE, connection_name=f"{PARTITION}.tp_data_requests_{idx}")  for idx in range(NUMBER_OF_RAW_TP_PRODUCERS)
                                         ] + [
                                             trb.geoidinst(region=0, element=idx, system="DataSelection", connection_name=f"{PARTITION}.ds_tp_data_requests_{idx}")  for idx in range(NUMBER_OF_DS_TP_PRODUCERS)
                                         ]
-                                                              ))),
+                                                              ) )),
                 ("datawriter", dw.ConfParams(initial_token_count=TOKEN_COUNT,
                             data_store_parameters=hdf5ds.ConfParams(name="data_store",
                                 # type = "HDF5DataStore", # default
@@ -156,8 +160,12 @@ def generate(NETWORK_ENDPOINTS,
                                     digits_for_trigger_number = 5,
                                     digits_for_apa_number = 3,
                                     digits_for_link_number = 2,)))),
-            #] + [
+            ] + [
                 # placeholder for fragment_receiver conf params
+                ("fragment_receiver", frcv.ConfParams(
+                    general_queue_timeout=QUEUE_POP_WAIT_MS,
+                    connection_name=PARTITION+".frags_0"
+                )), 
             ] + [
                 (f"tpset_subscriber_{idx}", ntoq.Conf(
                     msg_type="dunedaq::trigger::TPSet",

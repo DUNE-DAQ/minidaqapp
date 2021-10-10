@@ -19,6 +19,7 @@ moo.otypes.load_types('readout/sourceemulatorconfig.jsonnet')
 moo.otypes.load_types('readout/readoutconfig.jsonnet')
 moo.otypes.load_types('dqm/dqmprocessor.jsonnet')
 moo.otypes.load_types('dfmodules/fakedataprod.jsonnet')
+moo.otypes.load_types('dfmodules/requestreceiver.jsonnet')
 moo.otypes.load_types('networkmanager/nwmgr.jsonnet')
 
 # Import new types
@@ -36,6 +37,7 @@ import dunedaq.readout.readoutconfig as rconf
 import dunedaq.dfmodules.triggerrecordbuilder as trb
 import dunedaq.dqm.dqmprocessor as dqmprocessor
 import dunedaq.dfmodules.fakedataprod as fdp
+import dunedaq.dfmodules.requestreceiver as rrcv
 import dunedaq.networkmanager.nwmgr as nwmgr
 
 from appfwk.utils import acmd, mcmd, mrccmd, mspec
@@ -229,7 +231,6 @@ def generate(NETWORK_ENDPOINTS,
 
     cmd_data['init'] = app.Init(queues=queue_specs, modules=mod_specs, nwconnections=nw_specs)
 
-
     conf_list = [("qton_timesync", qton.Conf(msg_type="dunedaq::dfmessages::TimeSync",
                                              msg_module_name="TimeSyncNQ",
                                              sender_config=nos.Conf(ipm_plugin_type="ZmqSender",
@@ -261,8 +262,12 @@ def generate(NETWORK_ENDPOINTS,
                             dma_memory_size_gb= 4,
                             numa_id=0,
                             num_links=max(0, NUMBER_OF_DATA_PRODUCERS - 5))),
-           #] + [
-                 # placeholder for request_receiver conf params
+            ] + [
+                 ("request_receiver", rrcv.ConfParams(
+                            map = [rrcv.geoidinst(region=0 , element=idx , system=SYSTEM_TYPE , queueinstance=f"data_requests_{idx}") for idx in range(NUMBER_OF_DATA_PRODUCERS)],
+                            general_queue_timeout = QUEUE_POP_WAIT_MS,
+                            connection_name = f"{PARTITION}.datareq_{HOSTIDX}"
+                 )) 
             ] + [
                 (f"datahandler_{idx}", rconf.Conf(
                         readoutmodelconf= rconf.ReadoutModelConf(

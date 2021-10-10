@@ -174,9 +174,8 @@ def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowd
     }
 
     port = 12348
+
     for idx in range(total_number_of_data_producers):
-        network_endpoints[f"{partition_name}.datareq_{idx}"] = "tcp://{host_df}:" + f"{port}"
-        port = port + 1
         if enable_software_tpg:
             network_endpoints[f"{partition_name}.tp_datareq_{idx}"] = "tcp://{host_df}:" + f"{port}"
             port = port + 1
@@ -189,11 +188,15 @@ def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowd
     host_id_dict = {}
 
     for hostidx in range(len(host_ru)):
+        theho = host_ru[hostidx]
+        network_endpoints[f"{partition_name}.datareq_{hostidx}"] = f"tcp://{host_df}:" + f"{port}"
+        port = port + 1
+
         # Should end up something like 'network_endpoints[timesync_0]:
         # "tcp://{host_ru0}:12347"'
         network_endpoints[f"{partition_name}.timesync_{hostidx}"] = "tcp://{host_ru" + f"{hostidx}" + "}:" + f"{port}"
         port = port + 1
-        network_endpoints[f"{partition_name}.frags_{hostidx}"] = "tcp://{host_ru" + f"{hostidx}" + "}:" + f"{port}"
+        network_endpoints[f"{partition_name}.frags_{hostidx}"] = f"tcp://{theho}:" + f"{port}"
         port = port + 1
 
         if enable_software_tpg:
@@ -270,6 +273,7 @@ def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowd
 
     cmd_data_dataflow = dataflow_gen.generate(network_endpoints,
         NUMBER_OF_DATA_PRODUCERS = total_number_of_data_producers,
+        NUMBER_OF_RU_HOSTS = len(host_ru),
         RUN_NUMBER = run_number,
         OUTPUT_PATH = output_path,
         TOKEN_COUNT = df_token_count,
