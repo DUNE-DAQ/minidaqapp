@@ -76,6 +76,7 @@ def generate(
 
         NUMBER_OF_RAWDATA_PRODUCERS: int = 2,
         NUMBER_OF_TPSET_PRODUCERS: int = 2,
+        NUMBER_OF_REGIONS: int = 1,
 
         ACTIVITY_PLUGIN: str = 'TriggerActivityMakerPrescalePlugin',
         ACTIVITY_CONFIG: dict = dict(prescale=10000),
@@ -295,10 +296,10 @@ def generate(
         ("mlt", mlt.ConfParams(
             # This line requests the raw data from upstream DAQ _and_ the raw TPs from upstream DAQ
             links=[
-                mlt.GeoID(system=SYSTEM_TYPE, region=0, element=idx)
-                for idx in range(NUMBER_OF_RAWDATA_PRODUCERS + NUMBER_OF_TPSET_PRODUCERS)
+                mlt.GeoID(system=SYSTEM_TYPE, region=rdx, element=idx)
+                for idx in range(NUMBER_OF_RAWDATA_PRODUCERS + NUMBER_OF_TPSET_PRODUCERS) for rdx in range(NUMBER_OF_REGIONS)
             ] + [
-                mlt.GeoID(system="DataSelection", region=0, element=idx) for idx in range(NUMBER_OF_TPSET_PRODUCERS)
+                mlt.GeoID(system="DataSelection", region=rdx, element=idx) for idx in range(NUMBER_OF_TPSET_PRODUCERS) for rdx in range(NUMBER_OF_REGIONS)
                 ],
             initial_token_count=TOKEN_COUNT
         )),

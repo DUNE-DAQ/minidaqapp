@@ -138,7 +138,7 @@ def generate(NETWORK_ENDPOINTS,
                 ("trb", trb.ConfParams( general_queue_timeout=QUEUE_POP_WAIT_MS,
                                         reply_connection_name = PARTITION+".frags_0",
                                         map=trb.mapgeoidconnections([
-                                                trb.geoidinst(region=0, element=idy, system=SYSTEM_TYPE, connection_name=f"{PARTITION}.datareq_{idx}")  for idx in range(NUMBER_OF_RU_HOSTS) for idy in range(NUMBER_OF_DATA_PRODUCERS)
+                                                trb.geoidinst(region=idx, element=idy, system=SYSTEM_TYPE, connection_name=f"{PARTITION}.datareq_{idx}")  for idx in range(NUMBER_OF_RU_HOSTS) for idy in range(NUMBER_OF_DATA_PRODUCERS)
                                         ] + [
                                             trb.geoidinst(region=0, element=NUMBER_OF_DATA_PRODUCERS + idx, system=SYSTEM_TYPE, connection_name=f"{PARTITION}.tp_data_requests_{idx}")  for idx in range(NUMBER_OF_RAW_TP_PRODUCERS)
                                         ] + [

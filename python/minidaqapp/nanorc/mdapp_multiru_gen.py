@@ -18,7 +18,7 @@ import click
 
 @click.command(context_settings=CONTEXT_SETTINGS)
 @click.option('-p', '--partition-name', default="${USER}_test", help="Name of the partition to use, for ERS and OPMON")
-@click.option('-n', '--number-of-data-producers', default=1, help="Number of links to use, either per ru (<=10) or total. If total is given, will be adjusted to the closest multiple of the number of rus")
+@click.option('-n', '--number-of-data-producers', default=1, help="Number of links to use for each readout application")
 @click.option('-e', '--emulator-mode', is_flag=True, help="If active, timestamps of data frames are overwritten when processed by the readout. This is necessary if the felix card does not set correct timestamps.")
 @click.option('-s', '--data-rate-slowdown-factor', default=1)
 @click.option('-r', '--run-number', default=333)
@@ -96,15 +96,7 @@ def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowd
     from . import thi_gen
     console.log(f"Generating configs for hosts trigger={host_trigger} dataflow={host_df} readout={host_ru} hsi={host_hsi}")
 
-    total_number_of_data_producers = 0
-    if number_of_data_producers > 10:
-        total_old = number_of_data_producers
-        number_of_data_producers = math.floor(number_of_data_producers / len(host_ru))
-        total_number_of_data_producers = number_of_data_producers * len(host_ru)
-        console.log(f"More than 10 data producers were requested ({total_old}): Will setup {number_of_data_producers} per host, for a total of {total_number_of_data_producers}")
-    else:
-        total_number_of_data_producers = number_of_data_producers * len(host_ru)
-        console.log(f"10 or fewer data producers were requested: Will setup {number_of_data_producers} per host, for a total of {total_number_of_data_producers}")
+    total_number_of_data_producers = number_of_data_producers * len(host_ru)
 
     if enable_software_tpg and frontend_type != 'wib':
         raise Exception("Software TPG is only available for the wib at the moment!")
@@ -175,7 +167,7 @@ def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowd
 
     port = 12348
 
-    for idx in range(total_number_of_data_producers):
+    for idx in range(len(host_ru)):
         if enable_software_tpg:
             network_endpoints[f"{partition_name}.tp_datareq_{idx}"] = "tcp://{host_df}:" + f"{port}"
             port = port + 1
@@ -254,8 +246,9 @@ def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowd
     console.log("hsi cmd data:", cmd_data_hsi)
 
     cmd_data_trigger = trigger_gen.generate(network_endpoints,
-        NUMBER_OF_RAWDATA_PRODUCERS = total_number_of_data_producers,
-        NUMBER_OF_TPSET_PRODUCERS = total_number_of_data_producers if enable_software_tpg else 0,
+        NUMBER_OF_RAWDATA_PRODUCERS = number_of_data_producers,
+        NUMBER_OF_TPSET_PRODUCERS = number_of_data_producers if enable_software_tpg else 0,
+        NUMBER_OF_REGIONS = len(host_ru),
         ACTIVITY_PLUGIN = trigger_activity_plugin,
         ACTIVITY_CONFIG = eval(trigger_activity_config),
         CANDIDATE_PLUGIN = trigger_candidate_plugin,
@@ -272,7 +265,7 @@ def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowd
     console.log("trigger cmd data:", cmd_data_trigger)
 
     cmd_data_dataflow = dataflow_gen.generate(network_endpoints,
-        NUMBER_OF_DATA_PRODUCERS = total_number_of_data_producers,
+        NUMBER_OF_DATA_PRODUCERS = number_of_data_producers,
         NUMBER_OF_RU_HOSTS = len(host_ru),
         RUN_NUMBER = run_number,
         OUTPUT_PATH = output_path,
@@ -285,7 +278,6 @@ def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowd
 
     cmd_data_readout = [ readout_gen.generate(network_endpoints,
             NUMBER_OF_DATA_PRODUCERS = number_of_data_producers,
-            TOTAL_NUMBER_OF_DATA_PRODUCERS=total_number_of_data_producers,
             EMULATOR_MODE = emulator_mode,
             DATA_RATE_SLOWDOWN_FACTOR = data_rate_slowdown_factor,
             RUN_NUMBER = run_number,

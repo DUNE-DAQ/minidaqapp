@@ -53,7 +53,6 @@ QUEUE_POP_WAIT_MS = 100
 
 def generate(NETWORK_ENDPOINTS,
         NUMBER_OF_DATA_PRODUCERS=2,
-        TOTAL_NUMBER_OF_DATA_PRODUCERS=2,
         EMULATOR_MODE=False,
         DATA_RATE_SLOWDOWN_FACTOR=1,
         RUN_NUMBER=333, 
@@ -84,14 +83,14 @@ def generate(NETWORK_ENDPOINTS,
     RATE_KHZ = CLOCK_SPEED_HZ / (25 * 12 * DATA_RATE_SLOWDOWN_FACTOR * 1000)
 
 
-    MIN_LINK = HOSTIDX*NUMBER_OF_DATA_PRODUCERS
-    MAX_LINK = MIN_LINK + NUMBER_OF_DATA_PRODUCERS
+    #MIN_LINK = HOSTIDX*NUMBER_OF_DATA_PRODUCERS
+    #MAX_LINK = MIN_LINK + NUMBER_OF_DATA_PRODUCERS
     # Define modules and queues
     queue_bare_specs = [
             app.QueueSpec(inst="time_sync_q", kind='FollyMPMCQueue', capacity=100),
         ] + [
             app.QueueSpec(inst=f"data_requests_{idx}", kind='FollySPSCQueue', capacity=100)
-                for idx in range(MIN_LINK,MAX_LINK)
+                for idx in range(NUMBER_OF_DATA_PRODUCERS)
         ]
 
     if not USE_FAKE_DATA_PRODUCERS:
@@ -107,47 +106,47 @@ def generate(NETWORK_ENDPOINTS,
             app.QueueSpec(inst="trigger_decision_q_dqm", kind='FollySPSCQueue', capacity=20),
             app.QueueSpec(inst="trigger_record_q_dqm", kind='FollySPSCQueue', capacity=20),
         ] + [
-            app.QueueSpec(inst=f"data_requests_dqm_{idx+MIN_LINK}", kind='FollySPSCQueue', capacity=100)
+            app.QueueSpec(inst=f"data_requests_dqm_{idx}", kind='FollySPSCQueue', capacity=100)
                 for idx in range(NUMBER_OF_DATA_PRODUCERS)
         ]
 
     if SOFTWARE_TPG_ENABLED:
         queue_bare_specs += [
             app.QueueSpec(inst=f"tp_link_{idx}", kind='FollySPSCQueue', capacity=100000)
-                for idx in range(MIN_LINK, MAX_LINK)
+                for idx in range(NUMBER_OF_DATA_PRODUCERS)
         ] + [
             app.QueueSpec(inst=f"tp_fragments_q", kind='FollyMPMCQueue', capacity=100)
         ] + [
             app.QueueSpec(inst=f"tpset_queue_{idx}", kind='FollyMPMCQueue', capacity=10000)
-                for idx in range(MIN_LINK, MAX_LINK)
+                for idx in range(NUMBER_OF_DATA_PRODUCERS)
         ] + [
             app.QueueSpec(inst=f"tp_requests_{idx}", kind='FollySPSCQueue', capacity=100)
-                for idx in range(MIN_LINK, MAX_LINK)
+                for idx in range(NUMBER_OF_DATA_PRODUCERS)
         ]
 
     # Only needed to reproduce the same order as when using jsonnet
     queue_specs = app.QueueSpecs(sorted(queue_bare_specs, key=lambda x: x.inst))
 
     mod_specs = [
-        mspec(f"request_receiver", "RequestReceiver", [app.QueueInfo(name="output", inst=f"data_requests_{idx}", dir="output")]) for idx in range(MIN_LINK,MAX_LINK)
+        mspec(f"request_receiver", "RequestReceiver", [app.QueueInfo(name="output", inst=f"data_requests_{idx}", dir="output")]) for idx in range(NUMBER_OF_DATA_PRODUCERS)
     ]
 
     if SOFTWARE_TPG_ENABLED:
         mod_specs += [
             mspec("qton_tp_fragments", "QueueToNetwork", [app.QueueInfo(name="input", inst="tp_fragments_q", dir="input")])
         ] + [
-            mspec(f"ntoq_tp_datarequests_{idx}", "NetworkToQueue", [app.QueueInfo(name="output", inst=f"tp_requests_{idx}", dir="output")]) for idx in range(MIN_LINK,MAX_LINK)
+            mspec(f"ntoq_tp_datarequests_{idx}", "NetworkToQueue", [app.QueueInfo(name="output", inst=f"tp_requests_{idx}", dir="output")]) for idx in range(NUMBER_OF_DATA_PRODUCERS)
         ] + [
-            mspec(f"tp_datahandler_{TOTAL_NUMBER_OF_DATA_PRODUCERS + idx}", "DataLinkHandler", [
+            mspec(f"tp_datahandler_{idx}", "DataLinkHandler", [
                 app.QueueInfo(name="raw_input", inst=f"tp_link_{idx}", dir="input"),
                 app.QueueInfo(name="data_requests_0", inst=f"tp_requests_{idx}", dir="input"),
                 app.QueueInfo(name="data_response_0", inst="tp_fragments_q", dir="output"),
                 app.QueueInfo(name="timesync", inst="time_sync_q", dir="output")
-            ]) for idx in range(MIN_LINK, MAX_LINK)
+            ]) for idx in range(NUMBER_OF_DATA_PRODUCERS)
         ] + [
             mspec(f"tpset_publisher_{idx}", "QueueToNetwork", [
                 app.QueueInfo(name="input", inst=f"tpset_queue_{idx}", dir="input")
-            ]) for idx in range(MIN_LINK, MAX_LINK)
+            ]) for idx in range(NUMBER_OF_DATA_PRODUCERS)
         ]
 
 
@@ -157,30 +156,30 @@ def generate(NETWORK_ENDPOINTS,
     for idx in range(NUMBER_OF_DATA_PRODUCERS):
         if USE_FAKE_DATA_PRODUCERS:
             mod_specs = mod_specs + [
-                mspec(f"fakedataprod_{idx + MIN_LINK}", "FakeDataProd", [
+                mspec(f"fakedataprod_{idx}", "FakeDataProd", [
                     app.QueueInfo(name="timesync_output_queue", inst="time_sync_q", dir="output"),
-                    app.QueueInfo(name="data_request_input_queue", inst=f"data_requests_{idx + MIN_LINK}", dir="input"),
+                    app.QueueInfo(name="data_request_input_queue", inst=f"data_requests_{idx}", dir="input"),
                 ])
             ]
         else:
             ls = [
                     app.QueueInfo(name="raw_input", inst=f"{FRONTEND_TYPE}_link_{idx}", dir="input"),
                     app.QueueInfo(name="timesync", inst="time_sync_q", dir="output"),
-                    app.QueueInfo(name="data_requests_0", inst=f"data_requests_{idx + MIN_LINK}", dir="input"),
+                    app.QueueInfo(name="data_requests_0", inst=f"data_requests_{idx}", dir="input"),
                 ]
 
             if DQM_ENABLED:
                 ls.extend([
-                app.QueueInfo(name="data_requests_1", inst=f"data_requests_dqm_{idx+MIN_LINK}", dir="input"),
+                app.QueueInfo(name="data_requests_1", inst=f"data_requests_dqm_{idx}", dir="input"),
                 app.QueueInfo(name="data_response_1", inst="data_fragments_q_dqm", dir="output")])
 
             if SOFTWARE_TPG_ENABLED:
                 ls.extend([
-                    app.QueueInfo(name="tp_out", inst=f"tp_link_{idx+MIN_LINK}", dir="output"),
-                    app.QueueInfo(name="tpset_out", inst=f"tpset_queue_{idx+MIN_LINK}", dir="output")
+                    app.QueueInfo(name="tp_out", inst=f"tp_link_{idx}", dir="output"),
+                    app.QueueInfo(name="tpset_out", inst=f"tpset_queue_{idx}", dir="output")
                 ])
 
-            mod_specs += [mspec(f"datahandler_{idx + MIN_LINK}", "DataLinkHandler", ls)]
+            mod_specs += [mspec(f"datahandler_{idx}", "DataLinkHandler", ls)]
 
     mod_specs += [mspec("timesync_to_network", "QueueToNetwork",
               [app.QueueInfo(name="input", inst="time_sync_q", dir="input")]
@@ -192,7 +191,7 @@ def generate(NETWORK_ENDPOINTS,
                         app.QueueInfo(name="trigger_record_output_queue", inst="trigger_record_q_dqm", dir="output"),
                         app.QueueInfo(name="data_fragment_input_queue", inst="data_fragments_q_dqm", dir="input")
                     ] + [
-                        app.QueueInfo(name=f"data_request_{idx}_output_queue", inst=f"data_requests_dqm_{idx+MIN_LINK}", dir="output")
+                        app.QueueInfo(name=f"data_request_{idx}_output_queue", inst=f"data_requests_dqm_{idx}", dir="output")
                             # for idx in range(NUMBER_OF_DATA_PRODUCERS)
                             for idx in range(NUMBER_OF_DATA_PRODUCERS)
                     ]),
@@ -239,11 +238,11 @@ def generate(NETWORK_ENDPOINTS,
 
                 ("fake_source",sec.Conf(
                             link_confs=[sec.LinkConfiguration(
-                            geoid=sec.GeoID(system=SYSTEM_TYPE, region=0, element=idx),
+                            geoid=sec.GeoID(system=SYSTEM_TYPE, region=HOSTIDX, element=idx),
                                 slowdown=DATA_RATE_SLOWDOWN_FACTOR,
-                                queue_name=f"output_{idx-MIN_LINK}",
+                                queue_name=f"output_{idx}",
                                 data_filename = DATA_FILE
-                                ) for idx in range(MIN_LINK,MAX_LINK)],
+                                ) for idx in range(NUMBER_OF_DATA_PRODUCERS)],
                             # input_limit=10485100, # default
                             queue_timeout_ms = QUEUE_POP_WAIT_MS)),
                 ("flxcard_0",flxcr.Conf(card_id=CARDID,
@@ -264,7 +263,7 @@ def generate(NETWORK_ENDPOINTS,
                             num_links=max(0, NUMBER_OF_DATA_PRODUCERS - 5))),
             ] + [
                  ("request_receiver", rrcv.ConfParams(
-                            map = [rrcv.geoidinst(region=0 , element=idx , system=SYSTEM_TYPE , queueinstance=f"data_requests_{idx}") for idx in range(NUMBER_OF_DATA_PRODUCERS)],
+                            map = [rrcv.geoidinst(region=HOSTIDX , element=idx , system=SYSTEM_TYPE , queueinstance=f"data_requests_{idx}") for idx in range(NUMBER_OF_DATA_PRODUCERS)],
                             general_queue_timeout = QUEUE_POP_WAIT_MS,
                             connection_name = f"{PARTITION}.datareq_{HOSTIDX}"
                  )) 
@@ -273,16 +272,16 @@ def generate(NETWORK_ENDPOINTS,
                         readoutmodelconf= rconf.ReadoutModelConf(
                             source_queue_timeout_ms= QUEUE_POP_WAIT_MS,
                             # fake_trigger_flag=0, # default
-                            region_id = 0,
+                            region_id = HOSTIDX,
                             element_id = idx,
                         ),
                         latencybufferconf= rconf.LatencyBufferConf(
                             latency_buffer_size = LATENCY_BUFFER_SIZE,
-                            region_id = 0,
+                            region_id = HOSTIDX,
                             element_id = idx,
                         ),
                         rawdataprocessorconf= rconf.RawDataProcessorConf(
-                            region_id = 0,
+                            region_id = HOSTIDX,
                             element_id = idx,
                             enable_software_tpg = SOFTWARE_TPG_ENABLED,
                             emulator_mode = EMULATOR_MODE
@@ -291,47 +290,47 @@ def generate(NETWORK_ENDPOINTS,
                             latency_buffer_size = LATENCY_BUFFER_SIZE,
                             pop_limit_pct = 0.8,
                             pop_size_pct = 0.1,
-                            region_id = 0,
+                            region_id = HOSTIDX,
                             element_id = idx,
-                            output_file = f"output_{idx + MIN_LINK}.out",
+                            output_file = f"output_{HOSTIDX}_{idx}.out",
                             stream_buffer_size = 8388608,
                             enable_raw_recording = RAW_RECORDING_ENABLED,
                         )
-                        )) for idx in range(MIN_LINK, MAX_LINK)
+                        )) for idx in range(NUMBER_OF_DATA_PRODUCERS)
             ] + [
-                (f"tp_datahandler_{TOTAL_NUMBER_OF_DATA_PRODUCERS + idx}", rconf.Conf(
+                (f"tp_datahandler_{idx}", rconf.Conf(
                         readoutmodelconf= rconf.ReadoutModelConf(
                             source_queue_timeout_ms= QUEUE_POP_WAIT_MS,
                             # fake_trigger_flag=0, default
-                            region_id = 0,
-                            element_id = TOTAL_NUMBER_OF_DATA_PRODUCERS + idx,
+                            region_id = HOSTIDX,
+                            element_id = idx,
                         ),
                         latencybufferconf= rconf.LatencyBufferConf(
                             latency_buffer_size = LATENCY_BUFFER_SIZE,
-                            region_id = 0,
-                            element_id = TOTAL_NUMBER_OF_DATA_PRODUCERS + idx,
+                            region_id = HOSTIDX,
+                            element_id = idx,
                         ),
                         rawdataprocessorconf= rconf.RawDataProcessorConf(
-                            region_id = 0,
-                            element_id = TOTAL_NUMBER_OF_DATA_PRODUCERS + idx,
+                            region_id = HOSTIDX,
+                            element_id = idx,
                             enable_software_tpg = False,
                         ),
                         requesthandlerconf= rconf.RequestHandlerConf(
                             latency_buffer_size = LATENCY_BUFFER_SIZE,
                             pop_limit_pct = 0.8,
                             pop_size_pct = 0.1,
-                            region_id = 0,
-                            element_id = TOTAL_NUMBER_OF_DATA_PRODUCERS + idx,
+                            region_id = HOSTIDX,
+                            element_id = idx,
                             # output_file = f"output_{idx + MIN_LINK}.out",
                             # stream_buffer_size = 8388608,
                             enable_raw_recording = False,
                         )
-                        )) for idx in range(MIN_LINK, MAX_LINK)
+                        )) for idx in range(NUMBER_OF_DATA_PRODUCERS)
             ] + [
                 ("trb_dqm", trb.ConfParams(
                         general_queue_timeout=QUEUE_POP_WAIT_MS,
                         map=trb.mapgeoidconnections([
-                                trb.geoidinst(region=0, element=idx, system="TPC", connection_name=f"data_requests_dqm_{idx}") for idx in range(MIN_LINK, MAX_LINK)
+                                trb.geoidinst(region=HOSTIDX, element=idx, system="TPC", connection_name=f"data_requests_dqm_{idx}") for idx in range(NUMBER_OF_DATA_PRODUCERS)
                             ]),
                         ))
             ] + [
@@ -339,7 +338,7 @@ def generate(NETWORK_ENDPOINTS,
                         mode='normal', # normal or debug
                         sdqm=[1, 1, 1],
                         kafka_address=DQM_KAFKA_ADDRESS,
-                        link_idx=list(range(MIN_LINK, MAX_LINK)),
+                        link_idx=list(range(NUMBER_OF_DATA_PRODUCERS)),
                         clock_frequency=CLOCK_SPEED_HZ,
                         ))
             ] + [
@@ -374,14 +373,14 @@ def generate(NETWORK_ENDPOINTS,
                             (f"ntoq_tp_datarequests_{idx}", ntoq.Conf(msg_type="dunedaq::dfmessages::DataRequest",
                                                                       msg_module_name="DataRequestNQ",
                                                                       receiver_config=nor.Conf(ipm_plugin_type="ZmqReceiver",
-                                                                                               address=NETWORK_ENDPOINTS[f"{PARTITION}.tp_datareq_{idx}"]))) for idx in range(MIN_LINK,MAX_LINK)
+                                                                                               address=NETWORK_ENDPOINTS[f"{PARTITION}.tp_datareq_{idx}"]))) for idx in range(NUMBER_OF_DATA_PRODUCERS)
                         ] + [
                             (f"tpset_publisher_{idx}", qton.Conf(msg_type="dunedaq::trigger::TPSet",
                                                                  msg_module_name="TPSetNQ",
                                                                  sender_config=nos.Conf(ipm_plugin_type="ZmqPublisher",
                                                                                         address=NETWORK_ENDPOINTS[f"{PARTITION}.tpsets_{idx}"],
                                                                                         topic="TPSets",
-                                                                                        stype="msgpack"))) for idx in range(MIN_LINK, MAX_LINK)
+                                                                                        stype="msgpack"))) for idx in range(NUMBER_OF_DATA_PRODUCERS)
                         ])
 
     if USE_FAKE_DATA_PRODUCERS:
@@ -393,7 +392,7 @@ def generate(NETWORK_ENDPOINTS,
                 time_tick_diff = 25,
                 frame_size = 464,
                 response_delay = 0,
-                fragment_type = "FakeData")) for idx in range(MIN_LINK,MAX_LINK)
+                fragment_type = "FakeData")) for idx in range(NUMBER_OF_DATA_PRODUCERS)
         ])
 
     cmd_data['conf'] = acmd(conf_list)
