@@ -180,15 +180,14 @@ def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowd
     host_id_dict = {}
 
     for hostidx in range(len(host_ru)):
-        theho = host_ru[hostidx]
-        network_endpoints[f"{partition_name}.datareq_{hostidx}"] = f"tcp://{host_df}:" + f"{port}"
+        network_endpoints[f"{partition_name}.datareq_{hostidx}"] = "tcp://{host_df}:" + f"{port}"
         port = port + 1
 
         # Should end up something like 'network_endpoints[timesync_0]:
         # "tcp://{host_ru0}:12347"'
         network_endpoints[f"{partition_name}.timesync_{hostidx}"] = "tcp://{host_ru" + f"{hostidx}" + "}:" + f"{port}"
         port = port + 1
-        network_endpoints[f"{partition_name}.frags_{hostidx}"] = f"tcp://{theho}:" + f"{port}"
+        network_endpoints[f"{partition_name}.frags_{hostidx}"] =  "tcp://{host_ru" + f"{hostidx}" + "}:" + f"{port}"
         port = port + 1
 
         if enable_software_tpg:
