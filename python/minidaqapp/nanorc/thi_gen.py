@@ -55,6 +55,7 @@ def generate(
         GATHER_INTERVAL=1e6,
         GATHER_INTERVAL_DEBUG=10e6,
         HSI_DEVICE_NAME="",
+        CONNECTIONS_FILE="${TIMING_SHARE}/config/etc/connections.xml",
         UHAL_LOG_LEVEL="notice",
     ):
     """
@@ -76,7 +77,7 @@ def generate(
 
     thi_init_data = thi.InitParams(
                                    qinfos=app.QueueInfos([app.QueueInfo(name="hardware_commands_in", inst="ntoq_timing_cmds", dir="input")]),
-                                   connections_file="${TIMING_SHARE}/config/etc/connections.xml",
+                                   connections_file=CONNECTIONS_FILE,
                                    gather_interval=GATHER_INTERVAL,
                                    gather_interval_debug=GATHER_INTERVAL_DEBUG,
                                    monitored_device_name_master="",

@@ -61,6 +61,7 @@ def generate(
         HSI_FE_MASK = 0,
         HSI_INV_MASK = 0,
         HSI_SOURCE = 1,
+        CONNECTIONS_FILE="${TIMING_SHARE}/config/etc/connections.xml",
         HSI_DEVICE_NAME="BOREAS_TLU",
         UHAL_LOG_LEVEL="notice",
     ):
@@ -124,7 +125,7 @@ def generate(
                                            )
                 ),
                         ("hsir", hsi.ConfParams(
-                        connections_file="${TIMING_SHARE}/config/etc/connections.xml",
+                        connections_file=CONNECTIONS_FILE,
                         readout_period=READOUT_PERIOD_US,
                         hsi_device_name=HSI_DEVICE_NAME,
                         uhal_log_level=UHAL_LOG_LEVEL
