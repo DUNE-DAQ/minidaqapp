@@ -42,6 +42,7 @@ import dunedaq.nwqueueadapters.networkobjectreceiver as nor
 import dunedaq.nwqueueadapters.networkobjectsender as nos
 import dunedaq.readout.fakecardreader as fakecr
 import dunedaq.flxlibs.felixcardreader as flxcr
+import dunedaq.lbrulibs.pacmancardreader as pcr
 import dunedaq.readout.datalinkhandler as dlh
 import dunedaq.readout.datarecorder as dr
 
@@ -176,8 +177,14 @@ def generate(
                                 for idx in range(5, NUMBER_OF_DATA_PRODUCERS)
                             ]))
     else:
-        mod_specs.append(mspec("fake_source", "FakeCardReader", [
-                        app.QueueInfo(name=f"output_{idx}", inst=f"wib_link_{idx}", dir="output")
+        fake_source = "fake_source"
+        card_reader = "FakeCardReader"
+        if FRONTEND_TYPE=='pacman':
+          fake_source = "pacman_source"
+          card_reader = "PacmanCardReader"
+
+        mod_specs.append(mspec(fake_source, card_reader, [
+                        app.QueueInfo(name=f"output_{idx}", inst=f"{FRONTEND_TYPE}_link_{idx}", dir="output")
                             for idx in range(NUMBER_OF_DATA_PRODUCERS)
                         ]))
 
@@ -211,7 +218,7 @@ def generate(
                 ("trb", trb.ConfParams(
                         general_queue_timeout=QUEUE_POP_WAIT_MS,
                         map=trb.mapgeoidqueue([
-                                trb.geoidinst(region=0, element=idx, system="TPC", queueinstance=f"data_requests_{idx}") for idx in range(NUMBER_OF_DATA_PRODUCERS)
+                                trb.geoidinst(region=0, element=idx, system=SYSTEM_TYPE, queueinstance=f"data_requests_{idx}") for idx in range(NUMBER_OF_DATA_PRODUCERS)
                             ])  
                         )),
                 ("datawriter", dw.ConfParams(
@@ -245,6 +252,11 @@ def generate(
                             data_filename = DATA_FILE,
                             queue_timeout_ms = QUEUE_POP_WAIT_MS
                         )),
+                ("pacman_source",pcr.Conf(
+                                          link_confs=[pcr.LinkConfiguration(
+                                          geoid=pcr.GeoID(system=SYSTEM_TYPE, region=0, element=idx),
+                                          ) for idx in range(NUMBER_OF_DATA_PRODUCERS)],
+                                          zmq_receiver_timeout = 10000)),
                 ("flxcard_0",flxcr.Conf(
                             card_id=0,
                             logical_unit=0,
@@ -281,7 +293,7 @@ def generate(
                 (f"data_recorder_{idx}", dr.Conf(
                         output_file = join(RAW_RECORDING_OUTPUT_DIR, f"output_{idx}.out"),
                         compression_algorithm = "None",
-                        stream_buffer_size = 8388608
+                        stream_buffer_size = 100 if FRONTEND_TYPE=='pacman' else 8388608
                         )) for idx in (range(NUMBER_OF_DATA_PRODUCERS) if RAW_RECORDING_ENABLED else [])
             ])
 
@@ -294,6 +306,7 @@ def generate(
             ("datahandler_.*", startpars),
             ("data_recorder_.*", startpars),
             ("fake_source", startpars),
+            ("pacman_source", startpars),
             ("flxcard.*", startpars),
             ("trb", startpars),
             ("ntoq_trigdec", startpars),
@@ -303,6 +316,7 @@ def generate(
             ("ntoq_trigdec", None),
             ("flxcard.*", None),
             ("fake_source", None),
+            ("pacman_source", startpars),
             ("datahandler_.*", None),
             ("data_recorder_.*", None),
             ("qton_timesync", None),

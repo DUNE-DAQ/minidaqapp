@@ -17,6 +17,7 @@ moo.otypes.load_types('nwqueueadapters/networkobjectsender.jsonnet')
 moo.otypes.load_types('flxlibs/felixcardreader.jsonnet')
 moo.otypes.load_types('readout/sourceemulatorconfig.jsonnet')
 moo.otypes.load_types('readout/readoutconfig.jsonnet')
+moo.otypes.load_types('lbrulibs/pacmancardreader.jsonnet')
 moo.otypes.load_types('dqm/dqmprocessor.jsonnet')
 moo.otypes.load_types('dfmodules/fakedataprod.jsonnet')
 
@@ -32,6 +33,7 @@ import dunedaq.nwqueueadapters.networkobjectsender as nos
 import dunedaq.readout.sourceemulatorconfig as sec
 import dunedaq.flxlibs.felixcardreader as flxcr
 import dunedaq.readout.readoutconfig as rconf
+import dunedaq.lbrulibs.pacmancardreader as pcr
 import dunedaq.dfmodules.triggerrecordbuilder as trb
 import dunedaq.dqm.dqmprocessor as dqmprocessor
 import dunedaq.dfmodules.fakedataprod as fdp
@@ -223,7 +225,13 @@ def generate(NETWORK_ENDPOINTS,
                                     for idx in range(5, NUMBER_OF_DATA_PRODUCERS)
                                 ]))
         else:
-            mod_specs.append(mspec("fake_source", "FakeCardReader", [
+            fake_source = "fake_source"
+            card_reader = "FakeCardReader"
+            if FRONTEND_TYPE=='pacman':
+              fake_source = "pacman_source"
+              card_reader = "PacmanCardReader"
+
+            mod_specs.append(mspec(fake_source, card_reader, [
                             app.QueueInfo(name=f"output_{idx}", inst=f"{FRONTEND_TYPE}_link_{idx}", dir="output")
                                 for idx in range(NUMBER_OF_DATA_PRODUCERS)
                             ]))
@@ -253,6 +261,11 @@ def generate(NETWORK_ENDPOINTS,
                                 ) for idx in range(MIN_LINK,MAX_LINK)],
                             # input_limit=10485100, # default
                             queue_timeout_ms = QUEUE_POP_WAIT_MS)),
+                ("pacman_source",pcr.Conf(
+                                          link_confs=[pcr.LinkConfiguration(
+                                           geoid=pcr.GeoID(system=SYSTEM_TYPE, region=0, element=idx),
+                                           ) for idx in range(NUMBER_OF_DATA_PRODUCERS)],
+                                           zmq_receiver_timeout = 10000)),
                 ("flxcard_0",flxcr.Conf(card_id=CARDID,
                             logical_unit=0,
                             dma_id=0,
@@ -329,7 +342,7 @@ def generate(NETWORK_ENDPOINTS,
                             region_id = 0,
                             element_id = TOTAL_NUMBER_OF_DATA_PRODUCERS + idx,
                             # output_file = f"output_{idx + MIN_LINK}.out",
-                            # stream_buffer_size = 8388608,
+                            stream_buffer_size = 100 if FRONTEND_TYPE=='pacman' else 8388608,
                             enable_raw_recording = False,
                         )
                         )) for idx in range(MIN_LINK, MAX_LINK)
@@ -337,7 +350,7 @@ def generate(NETWORK_ENDPOINTS,
                 ("trb_dqm", trb.ConfParams(
                         general_queue_timeout=QUEUE_POP_WAIT_MS,
                         map=trb.mapgeoidqueue([
-                                trb.geoidinst(region=0, element=idx, system="TPC", queueinstance=f"data_requests_dqm_{idx}") for idx in range(MIN_LINK, MAX_LINK)
+                                trb.geoidinst(region=0, element=idx, system=SYSTEM_TYPE, queueinstance=f"data_requests_dqm_{idx}") for idx in range(MIN_LINK, MAX_LINK)
                             ]),
                         ))
             ] + [
@@ -410,6 +423,7 @@ def generate(NETWORK_ENDPOINTS,
             ("qton_timesync", startpars),
             ("datahandler_.*", startpars),
             ("fake_source", startpars),
+            ("pacman_source", startpars),
             ("flxcard.*", startpars),
             ("ntoq_datareq_.*", startpars),
             ("ntoq_trigdec", startpars),
@@ -425,6 +439,7 @@ def generate(NETWORK_ENDPOINTS,
             ("ntoq_datareq_.*", None),
             ("flxcard.*", None),
             ("fake_source", None),
+            ("pacman_source", None),
             ("datahandler_.*", None),
             ("qton_timesync", None),
             ("qton_fragments", None),
