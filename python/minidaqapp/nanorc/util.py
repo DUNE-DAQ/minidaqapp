@@ -68,6 +68,8 @@ class Direction(Enum):
     OUT = 2
 
 Endpoint = namedtuple("Endpoint", [ 'external_name', 'internal_name', 'direction' ])
+GeoID = namedtuple('GeoID', ['system', 'region', 'element'])
+FragmentProducer = namedtuple('FragmentProducer', ['geoid', 'requests_in', 'fragments_out', 'queue_name'])
 
 class ModuleGraph:
     """A set of modules and connections between them.
@@ -85,16 +87,18 @@ class ModuleGraph:
     changed without affecting other applications.
 
     """
-    def __init__(self, modules=None, endpoints=None):
+    def __init__(self, modules=None, endpoints=None, fragment_producers=None):
         self.modules=modules if modules else dict()
         self.endpoints=endpoints if endpoints else dict()
-
+        self.fragment_producers = fragment_producers if  fragment_producers else dict()
+        
     def __repr__(self):
-        return f"modulegraph(modules={self.modules}, endpoints={self.endpoints})"
+        return f"modulegraph(modules={self.modules}, endpoints={self.endpoints}, fragment_producers={self.fragment_producers})"
 
     def __rich_repr__(self):
         yield "modules", self.modules
         yield "endpoints", self.endpoints
+        yield "fragment_producers", self.fragment_producers
 
     def set_from_dict(self, module_dict):
         self.modules=module_dict
@@ -122,8 +126,15 @@ class ModuleGraph:
             return [ e[0] for e in self.endpoints.items() if e[1].inout==inout ]
         return self.endpoints.keys()
 
+    def add_fragment_producer(self, system, region, element, requests_in, fragments_out):
+        geoid = GeoID(system, region, element)
+        queue_name = f"data_request_{len(self.fragment_producers)}_output_queue"
+        self.fragment_producers[geoid] = FragmentProducer(geoid, requests_in, fragments_out, queue_name)
 
-App = namedtuple("App", ['modulegraph', 'host'], defaults=({}, "localhost"))
+class App:
+    def __init__(self, modulegraph=None, host="localhost"):
+        self.modulegraph = modulegraph if modulegraph else ModuleGraph()
+        self.host = host
 
 Publisher = namedtuple(
     "Publisher", ['msg_type', 'msg_module_name', 'subscribers'])
@@ -156,6 +167,7 @@ class System:
         yield "app_connections", self.app_connections
         yield "network_endpoints", self.network_endpoints
         yield "app_start_order", self.app_start_order
+
 
 ########################################################################
 #
@@ -357,6 +369,30 @@ def make_app_command_data(app, verbose=False):
 
     return command_data
 
+def connect_fragment_producers(app_name, the_system, verbose=False):
+    if verbose:
+        console.log(f"Connecting fragment producers in {app_name}")
+        
+    app = the_system.apps[app_name]
+    producers = app.modulegraph.fragment_producers
+    for producer in producers.values():
+        geoid_str = f"geoid{producer.geoid.system}_{producer.geoid.region}_{producer.geoid.element}"
+        request_endpoint = f"data_request_{geoid_str}"
+        if verbose:
+            console.log(f"Creating request endpoint {request_endpoint}")
+        app.modulegraph.add_endpoint(request_endpoint, producer.requests_in, Direction.IN)
+        the_system.app_connections[f"dataflow.{producer.queue_name}"] = Sender(msg_type="dunedaq::dfmessages::DataRequest",
+                                                                               msg_module_name="DataRequestNQ",
+                                                                               receiver=f"{app_name}.{request_endpoint}")
+        
+        frag_endpoint = f"fragments_{geoid_str}"
+        if verbose:
+            console.log(f"Creating fragment endpoint {frag_endpoint}")
+        app.modulegraph.add_endpoint(frag_endpoint, producer.fragments_out, Direction.OUT)
+
+        the_system.app_connections[f"{app_name}.{frag_endpoint}"] = Sender(msg_type="std::unique_ptr<dunedaq::dataformats::Fragment>",
+                                                                           msg_module_name="FragmentNQ",
+                                                                           receiver=f"dataflow.fragments")
 
 def assign_network_endpoints(the_system, verbose=False):
     """Given a set of applications and connections between them, come up
@@ -471,7 +507,8 @@ def add_network(app_name, the_system, verbose=False):
             #
             # TODO: DRY
             to_app, to_endpoint = conn.receiver.split(".", maxsplit=1)
-            unconnected_endpoints.remove(to_endpoint)
+            if to_endpoint in unconnected_endpoints:
+                unconnected_endpoints.remove(to_endpoint)
             to_endpoint = resolve_endpoint(app, to_endpoint, Direction.IN)
             
             ntoq_name = conn.receiver.replace(".", "_")
@@ -482,9 +519,8 @@ def add_network(app_name, the_system, verbose=False):
                                                          "output": Connection(to_endpoint)},
                                                      conf=ntoq.Conf(msg_type=conn.msg_type,
                                                                     msg_module_name=conn.msg_module_name,
-                                                                    receiver_config=nor.Conf(ipm_plugin_type="ZmqSubscriber",
-                                                                                             address=the_system.network_endpoints[conn_name],
-                                                                                             subscriptions=["foo"]))
+                                                                    receiver_config=nor.Conf(ipm_plugin_type="ZmqReceiver",
+                                                                                             address=the_system.network_endpoints[conn_name]))
                                                      )
 
     if unconnected_endpoints:
@@ -654,6 +690,10 @@ def make_apps_json(the_system, json_dir, verbose=False):
 
     for app_name, app in the_system.apps.items():
         console.rule(f"Application generation for {app_name}")
+        # Add the endpoints and connections that are needed for fragment producers
+        #
+        # NB: modifies app's modulegraph in-place
+        connect_fragment_producers(app_name, the_system, verbose)
         # Add the NetworkToQueue/QueueToNetwork modules that are needed.
         #
         # NB: modifies app's modulegraph in-place

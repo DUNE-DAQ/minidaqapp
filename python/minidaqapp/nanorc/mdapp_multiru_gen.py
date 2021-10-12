@@ -215,8 +215,8 @@ def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowd
         add_manual_endpoint(f"datareq_{idx}", "dataflow")
         if enable_software_tpg:
             add_manual_endpoint(f"tp_datareq_{idx}", "dataflow")
-            add_manual_endpoint(f'frags_tpset_ds_{idx}', "trigger")
-            add_manual_endpoint(f"ds_tp_datareq_{idx}", "dataflow")
+            # add_manual_endpoint(f'frags_tpset_ds_{idx}', "trigger")
+            # add_manual_endpoint(f"ds_tp_datareq_{idx}", "dataflow")
 
     cardid = {}
     host_id_dict = {}
@@ -261,11 +261,27 @@ def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowd
 
     console.log("trigger module graph:", mgraph_trigger)
 
+    fragment_producers = mgraph_trigger.fragment_producers
+
+    # Manually add the readout fragment producers
+    for hostidx in range(len(host_ru)):
+        for dataprod in range(number_of_data_producers):
+            fragment_producers[geoid] = FragmentProducer(geoid, requests_in, fragments_out, queue_name)    
+
+    mgraph_dataflow = dataflow_gen.generate(
+        FRAGMENT_PRODUCERS = fragment_producers,
+        NUMBER_OF_DATA_PRODUCERS = total_number_of_data_producers,
+        OUTPUT_PATH = output_path,
+        TOKEN_COUNT = df_token_count,
+        SYSTEM_TYPE = system_type,
+        SOFTWARE_TPG_ENABLED = enable_software_tpg,
+        TPSET_WRITING_ENABLED = enable_tpset_writing)
+
     from . import util
     apps = {
         "hsi":      util.App(host=host_hsi),
         "trigger":  util.App(modulegraph=mgraph_trigger, host=host_trigger),
-        "dataflow": util.App(host=host_df),
+        "dataflow": util.App(modulegraph=mgraph_dataflow, host=host_df),
     }
 
     apps.update({ru_name: util.App(host=host_ru[i]) for i,ru_name in enumerate(ru_app_names)})
@@ -292,20 +308,13 @@ def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowd
                                                                                  f"trigger.tpsets_into_chain_link{idx}"])
                              for idx in range(total_number_of_data_producers) })
 
-    app_connections.update({ f"dataflow.ds_tp_datareq_{idx}": util.Sender(msg_type="dunedaq::dfmessages::DataRequest",
-                                                                          msg_module_name="DataRequestNQ",
-                                                                          receiver=f"trigger.tp_data_requests{idx}")
-                             for idx in range(total_number_of_data_producers) })
-    
-    app_connections.update({ f"trigger.tp_fragments{idx}": util.Sender(msg_type="std::unique_ptr<dunedaq::dataformats::Fragment>",
-                                                                       msg_module_name="FragmentNQ",
-                                                                       receiver=f"dataflow.somethingsomething")
-                             for idx in range(total_number_of_data_producers) })
-    
     the_system = util.System(apps, app_connections=app_connections,
                              app_start_order=["dataflow", "trigger"]+ru_app_names+["hsi"])
 
+    util.connect_fragment_producers("trigger", the_system, verbose=True)
+    
     util.add_network("trigger", the_system, verbose=True)
+    util.add_network("dataflow", the_system, verbose=True)
 
     console.log(f"before assign_manual_endpoints(), the_system.network_endpoints = {the_system.network_endpoints}")
     
@@ -355,15 +364,15 @@ def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowd
 
     console.log("hsi cmd data:", cmd_data_hsi)
 
-    cmd_data_dataflow = dataflow_gen.generate(the_system.network_endpoints,
-        NUMBER_OF_DATA_PRODUCERS = total_number_of_data_producers,
-        RUN_NUMBER = run_number,
-        OUTPUT_PATH = output_path,
-        TOKEN_COUNT = df_token_count,
-        SYSTEM_TYPE = system_type,
-        SOFTWARE_TPG_ENABLED = enable_software_tpg,
-        TPSET_WRITING_ENABLED = enable_tpset_writing)
-    console.log("dataflow cmd data:", cmd_data_dataflow)
+    # cmd_data_dataflow = dataflow_gen.generate(the_system.network_endpoints,
+    #     NUMBER_OF_DATA_PRODUCERS = total_number_of_data_producers,
+    #     RUN_NUMBER = run_number,
+    #     OUTPUT_PATH = output_path,
+    #     TOKEN_COUNT = df_token_count,
+    #     SYSTEM_TYPE = system_type,
+    #     SOFTWARE_TPG_ENABLED = enable_software_tpg,
+    #     TPSET_WRITING_ENABLED = enable_tpset_writing)
+    # console.log("dataflow cmd data:", cmd_data_dataflow)
 
     cmd_data_readout = [ readout_gen.generate(the_system.network_endpoints,
             NUMBER_OF_DATA_PRODUCERS = number_of_data_producers,
@@ -389,6 +398,8 @@ def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowd
 
     
     cmd_data_trigger = util.make_app_command_data(apps["trigger"], verbose=True)
+
+    cmd_data_dataflow = util.make_app_command_data(apps["dataflow"], verbose=True)
 
     # Arrange per-app command data into the format used by util.write_json_files()
     app_command_datas = {

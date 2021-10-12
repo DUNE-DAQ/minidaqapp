@@ -328,7 +328,7 @@ def generate(NETWORK_ENDPOINTS,
                 ("trb_dqm", trb.ConfParams(
                         general_queue_timeout=QUEUE_POP_WAIT_MS,
                         map=trb.mapgeoidqueue([
-                                trb.geoidinst(region=0, element=idx, system="TPC", queueinstance=f"data_requests_dqm_{idx}") for idx in range(MIN_LINK, MAX_LINK)
+                                trb.geoidinst(region=0, element=idx, system="TPC", queuename=f"data_requests_dqm_{idx}") for idx in range(MIN_LINK, MAX_LINK)
                             ]),
                         ))
             ] + [
