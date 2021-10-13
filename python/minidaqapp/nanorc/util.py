@@ -48,10 +48,10 @@ class Module:
        modules
     """
     
-    def __init__(self, plugin, conf=None, connections=[]):
+    def __init__(self, plugin, conf=None, connections=None):
         self.plugin=plugin
         self.conf=conf
-        self.connections=connections
+        self.connections=connections if connections else dict()
 
     def __repr__(self):
         return f"module(plugin={self.plugin}, conf={self.conf}, connections={self.connections})"
