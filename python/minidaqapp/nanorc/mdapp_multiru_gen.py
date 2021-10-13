@@ -168,9 +168,9 @@ def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowd
 
     ru_app_names=[f"ruflx{idx}" if use_felix else f"ruemu{idx}" for idx in range(len(host_ru))]
 
-    add_manual_endpoint("hsievent", "hsi")
-    add_manual_endpoint("tokens",  "dataflow")
-    add_manual_endpoint("hsicmds",  "hsi")
+    # add_manual_endpoint("hsievent", "hsi")
+    # add_manual_endpoint("tokens",  "dataflow")
+    # add_manual_endpoint("hsicmds",  "hsi")
 
     if frontend_type == 'wib' or frontend_type == 'wib2':
         system_type = 'TPC'
@@ -215,8 +215,8 @@ def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowd
         add_manual_endpoint(f"datareq_{idx}", "dataflow")
         if enable_software_tpg:
             add_manual_endpoint(f"tp_datareq_{idx}", "dataflow")
-            # add_manual_endpoint(f'frags_tpset_ds_{idx}', "trigger")
-            # add_manual_endpoint(f"ds_tp_datareq_{idx}", "dataflow")
+            add_manual_endpoint(f'frags_tpset_ds_{idx}', "trigger")
+            add_manual_endpoint(f"ds_tp_datareq_{idx}", "dataflow")
 
     cardid = {}
     host_id_dict = {}
@@ -238,12 +238,6 @@ def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowd
             host_id_dict[host_ru[hostidx]] = 0
         hostidx = hostidx + 1
 
-
-
-
-    # Make dummy system data. Do this before old-style app command generation so
-    # we can get the network endpoints as we want
-
     mgraph_trigger = trigger_gen.generate(
         NUMBER_OF_RAWDATA_PRODUCERS = total_number_of_data_producers,
         NUMBER_OF_TPSET_PRODUCERS = total_number_of_data_producers if enable_software_tpg else 0,
@@ -261,12 +255,36 @@ def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowd
 
     console.log("trigger module graph:", mgraph_trigger)
 
+    if use_hsi_hw:
+        mgraph_hsi = hsi_gen.generate(# the_system.network_endpoints,
+            # RUN_NUMBER = run_number,
+            CONTROL_HSI_HARDWARE=control_timing_hw,
+            READOUT_PERIOD_US = hsi_readout_period,
+            HSI_DEVICE_NAME = hsi_device_name,
+            HSI_ENDPOINT_ADDRESS = hsi_endpoint_address,
+            HSI_ENDPOINT_PARTITION = hsi_endpoint_partition,
+            HSI_RE_MASK=hsi_re_mask,
+            HSI_FE_MASK=hsi_fe_mask,
+            HSI_INV_MASK=hsi_inv_mask,
+            HSI_SOURCE=hsi_source,)
+    else:
+        mgraph_hsi = fake_hsi_gen.generate(
+            # the_system.network_endpoints,
+            # RUN_NUMBER = run_number,
+            CLOCK_SPEED_HZ = CLOCK_SPEED_HZ,
+            DATA_RATE_SLOWDOWN_FACTOR = data_rate_slowdown_factor,
+            TRIGGER_RATE_HZ = trigger_rate_hz,
+            HSI_DEVICE_ID = hsi_device_id,
+            MEAN_SIGNAL_MULTIPLICITY = mean_hsi_signal_multiplicity,
+            SIGNAL_EMULATION_MODE = hsi_signal_emulation_mode,
+            ENABLED_SIGNALS =  enabled_hsi_signals,)
+
     fragment_producers = mgraph_trigger.fragment_producers
 
     # Manually add the readout fragment producers
-    for hostidx in range(len(host_ru)):
-        for dataprod in range(number_of_data_producers):
-            fragment_producers[geoid] = FragmentProducer(geoid, requests_in, fragments_out, queue_name)    
+    # for hostidx in range(len(host_ru)):
+    #     for dataprod in range(number_of_data_producers):
+    #         fragment_producers[geoid] = FragmentProducer(geoid, requests_in, fragments_out, queue_name)    
 
     mgraph_dataflow = dataflow_gen.generate(
         FRAGMENT_PRODUCERS = fragment_producers,
@@ -277,9 +295,12 @@ def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowd
         SOFTWARE_TPG_ENABLED = enable_software_tpg,
         TPSET_WRITING_ENABLED = enable_tpset_writing)
 
+    # Make partially-dummy system data. Do this before old-style app command generation so
+    # we can get the network endpoints as we want
+
     from . import util
     apps = {
-        "hsi":      util.App(host=host_hsi),
+        "hsi":      util.App(modulegraph=mgraph_hsi, host=host_hsi),
         "trigger":  util.App(modulegraph=mgraph_trigger, host=host_trigger),
         "dataflow": util.App(modulegraph=mgraph_dataflow, host=host_df),
     }
@@ -307,15 +328,28 @@ def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowd
                                                                     subscribers=[f"trigger.tpsets_into_buffer_link{idx}",
                                                                                  f"trigger.tpsets_into_chain_link{idx}"])
                              for idx in range(total_number_of_data_producers) })
+    
+    app_connections.update({ f"ruemu0.timesync_0": util.Publisher(msg_type="dunedaq::dfmessages::TimeSync",
+                                                                  msg_module_name="TimeSyncNQ",
+                                                                  subscribers=["hsi.time_sync"])
+                             for idx in range(total_number_of_data_producers) })
 
     the_system = util.System(apps, app_connections=app_connections,
                              app_start_order=["dataflow", "trigger"]+ru_app_names+["hsi"])
 
+
     util.connect_fragment_producers("trigger", the_system, verbose=True)
+
+    console.log("After connecting fragment producers, trigger mgraph:", the_system.apps['trigger'].modulegraph)
+    console.log("After connecting fragment producers, the_system.app_connections:", the_system.app_connections)
     
     util.add_network("trigger", the_system, verbose=True)
-    util.add_network("dataflow", the_system, verbose=True)
+    util.add_network("hsi", the_system, verbose=True)
 
+    console.log("Before add_network(), dataflow mgraph:", the_system.apps['dataflow'].modulegraph)
+    util.add_network("dataflow", the_system, verbose=True)
+    console.log("After add_network(), dataflow mgraph:", the_system.apps['dataflow'].modulegraph)
+    
     console.log(f"before assign_manual_endpoints(), the_system.network_endpoints = {the_system.network_endpoints}")
     
     assign_manual_endpoints(the_system)
@@ -338,41 +372,8 @@ def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowd
         )
         console.log("thi cmd data:", cmd_data_thi)
 
-    if use_hsi_hw:
-        cmd_data_hsi = hsi_gen.generate(the_system.network_endpoints,
-            RUN_NUMBER = run_number,
-            CONTROL_HSI_HARDWARE=control_timing_hw,
-            READOUT_PERIOD_US = hsi_readout_period,
-            HSI_DEVICE_NAME = hsi_device_name,
-            HSI_ENDPOINT_ADDRESS = hsi_endpoint_address,
-            HSI_ENDPOINT_PARTITION = hsi_endpoint_partition,
-            HSI_RE_MASK=hsi_re_mask,
-            HSI_FE_MASK=hsi_fe_mask,
-            HSI_INV_MASK=hsi_inv_mask,
-            HSI_SOURCE=hsi_source,)
-    else:
-        cmd_data_hsi = fake_hsi_gen.generate(
-            the_system.network_endpoints,
-            RUN_NUMBER = run_number,
-            CLOCK_SPEED_HZ = CLOCK_SPEED_HZ,
-            DATA_RATE_SLOWDOWN_FACTOR = data_rate_slowdown_factor,
-            TRIGGER_RATE_HZ = trigger_rate_hz,
-            HSI_DEVICE_ID = hsi_device_id,
-            MEAN_SIGNAL_MULTIPLICITY = mean_hsi_signal_multiplicity,
-            SIGNAL_EMULATION_MODE = hsi_signal_emulation_mode,
-            ENABLED_SIGNALS =  enabled_hsi_signals,)
 
-    console.log("hsi cmd data:", cmd_data_hsi)
 
-    # cmd_data_dataflow = dataflow_gen.generate(the_system.network_endpoints,
-    #     NUMBER_OF_DATA_PRODUCERS = total_number_of_data_producers,
-    #     RUN_NUMBER = run_number,
-    #     OUTPUT_PATH = output_path,
-    #     TOKEN_COUNT = df_token_count,
-    #     SYSTEM_TYPE = system_type,
-    #     SOFTWARE_TPG_ENABLED = enable_software_tpg,
-    #     TPSET_WRITING_ENABLED = enable_tpset_writing)
-    # console.log("dataflow cmd data:", cmd_data_dataflow)
 
     cmd_data_readout = [ readout_gen.generate(the_system.network_endpoints,
             NUMBER_OF_DATA_PRODUCERS = number_of_data_producers,
@@ -398,7 +399,8 @@ def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowd
 
     
     cmd_data_trigger = util.make_app_command_data(apps["trigger"], verbose=True)
-
+    cmd_data_hsi = util.make_app_command_data(apps["hsi"], verbose=True)
+    
     cmd_data_dataflow = util.make_app_command_data(apps["dataflow"], verbose=True)
 
     # Arrange per-app command data into the format used by util.write_json_files()
