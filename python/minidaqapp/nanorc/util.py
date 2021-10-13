@@ -402,7 +402,7 @@ def assign_network_endpoints(the_system, verbose=False):
     Algorithm is to make an endpoint name like tcp://host:port, where
     host is the hostname for the app at the upstream end of the
     connection, port starts at some fixed value, and increases by 1
-    for each new endpoint on that host.
+    for each new endpoint.
 
     """
     endpoints = {}
@@ -436,6 +436,14 @@ def resolve_endpoint(app, external_name, inout, verbose=False):
     else:
         raise KeyError(f"Endpoint {external_name} not found")
 
+def make_unique_name(base, dictionary):
+    suffix=0
+    while f"{base}{suffix}" in dictionary:
+        suffix+=1
+    assert f"{base}{suffix}" not in dictionary
+    
+    return f"{base}{suffix}"
+    
 def add_network(app_name, the_system, verbose=False):
     """Add the necessary QueueToNetwork and NetworkToQueue objects to the
        application named `app_name`, based on the inter-application
@@ -463,6 +471,8 @@ def add_network(app_name, the_system, verbose=False):
 
             # We're a publisher or sender. Make the queue to network
             qton_name = conn_name.replace(".", "_")
+            qton_name = make_unique_name(qton_name, modules_with_network)
+                
             if verbose:
                 console.log(f"Adding QueueToNetwork named {qton_name} connected to {from_endpoint} in app {app_name}")
             modules_with_network[qton_name] = Module(plugin="QueueToNetwork",
@@ -489,6 +499,8 @@ def add_network(app_name, the_system, verbose=False):
                         unconnected_endpoints.remove(to_endpoint)
                     to_endpoint = resolve_endpoint(app, to_endpoint, Direction.IN)
                     ntoq_name = to_conn.replace(".", "_")
+                    ntoq_name = make_unique_name(ntoq_name, modules_with_network)
+
                     if verbose:
                         console.log(f"Adding NetworkToQueue named {ntoq_name} connected to {to_endpoint} in app {app_name}")
 
@@ -512,6 +524,8 @@ def add_network(app_name, the_system, verbose=False):
             to_endpoint = resolve_endpoint(app, to_endpoint, Direction.IN)
             
             ntoq_name = conn.receiver.replace(".", "_")
+            ntoq_name = make_unique_name(ntoq_name, modules_with_network)
+
             if verbose:
                 console.log(f"Adding NetworkToQueue named {ntoq_name} connected to {to_endpoint} in app {app_name}")
             modules_with_network[ntoq_name] = Module(plugin="NetworkToQueue",
