@@ -72,7 +72,7 @@ def make_moo_record(conf_dict,name,path='temptypes'):
 
 #===============================================================================
 def generate(
-        NETWORK_ENDPOINTS: list,
+        NW_SPECS: list,
 
         NUMBER_OF_RAWDATA_PRODUCERS: int = 2,
         NUMBER_OF_TPSET_PRODUCERS: int = 2,
@@ -192,9 +192,7 @@ def generate(
 
     ]
 
-    nw_specs = ([nwmgr.Connection(name=f"{epkey}" , type = "Receiver" , address = f"{epval}") for epkey,epval in NETWORK_ENDPOINTS.items()])
-
-    cmd_data['init'] = app.Init(queues=queue_specs, modules=mod_specs, nwconnections=nw_specs)
+    cmd_data['init'] = app.Init(queues=queue_specs, modules=mod_specs, nwconnections=NW_SPECS)
 
     # Generate schema for the maker plugins on the fly in the temptypes module
     make_moo_record(ACTIVITY_CONFIG,'ActivityConf','temptypes')
@@ -209,26 +207,22 @@ def generate(
             (f"tpset_subscriber_{idx}", ntoq.Conf(
                 msg_type="dunedaq::trigger::TPSet",
                 msg_module_name="TPSetNQ",
-                receiver_config=nor.Conf(ipm_plugin_type="ZmqSubscriber",
-                                         address=NETWORK_ENDPOINTS[f'{PARTITION}.tpsets_{idx}'],
+                receiver_config=nor.Conf(name=f'{PARTITION}.tpsets_{idx}',
                                          subscriptions=["TPSets"])
             )),
             (f"ntoq_tpset_for_buf{idx}", ntoq.Conf(
                 msg_type="dunedaq::trigger::TPSet",
                 msg_module_name="TPSetNQ",
-                receiver_config=nor.Conf(ipm_plugin_type="ZmqSubscriber",
-                                         address=NETWORK_ENDPOINTS[f'{PARTITION}.tpsets_{idx}'],
+                receiver_config=nor.Conf(name=f'{PARTITION}.tpsets_{idx}',
                                          subscriptions=["TPSets"])
             )),
             (f"ntoq_data_request{idx}", ntoq.Conf(msg_type="dunedaq::dfmessages::DataRequest",
                                                   msg_module_name="DataRequestNQ",
-                                                  receiver_config=nor.Conf(ipm_plugin_type="ZmqReceiver",
-                                                                           address=NETWORK_ENDPOINTS[f"{PARTITION}.ds_tp_datareq_{idx}"])
+                                                  receiver_config=nor.Conf(name=f"{PARTITION}.ds_tp_datareq_{idx}")
             )),
             (f"qton_fragment{idx}", qton.Conf(msg_type="std::unique_ptr<dunedaq::dataformats::Fragment>",
                                         msg_module_name="FragmentNQ",
-                                        sender_config=nos.Conf(ipm_plugin_type="ZmqSender",
-                                                               address=NETWORK_ENDPOINTS[f"{PARTITION}.frags_tpset_ds_{idx}"],
+                                        sender_config=nos.Conf(name=f"{PARTITION}.frags_tpset_ds_{idx}",
                                                                stype="msgpack"))),
 
         ])
@@ -263,8 +257,7 @@ def generate(
         ("ntoq_hsievent", ntoq.Conf(
             msg_type="dunedaq::dfmessages::HSIEvent",
             msg_module_name="HSIEventNQ",
-            receiver_config=nor.Conf(ipm_plugin_type="ZmqReceiver",
-                                     address=NETWORK_ENDPOINTS[PARTITION+".hsievent"])
+            receiver_config=nor.Conf(name=PARTITION+".hsievent")
         )),
 
         ("ttcm", ttcm.Conf(
@@ -282,15 +275,13 @@ def generate(
         ("ntoq_token", ntoq.Conf(
             msg_type="dunedaq::dfmessages::TriggerDecisionToken",
             msg_module_name="TriggerDecisionTokenNQ",
-            receiver_config=nor.Conf(ipm_plugin_type="ZmqReceiver",
-                                     address=NETWORK_ENDPOINTS[PARTITION+".triginh"])
+            receiver_config=nor.Conf(name=PARTITION+".triginh")
         )),
 
         ("qton_trigdec", qton.Conf(
             msg_type="dunedaq::dfmessages::TriggerDecision",
             msg_module_name="TriggerDecisionNQ",
-            sender_config=nos.Conf(ipm_plugin_type="ZmqSender",
-                                   address=NETWORK_ENDPOINTS[PARTITION+".trigdec"])
+            sender_config=nos.Conf(name=PARTITION+".trigdec")
         )),
 
         ("mlt", mlt.ConfParams(

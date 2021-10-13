@@ -51,7 +51,8 @@ QUEUE_POP_WAIT_MS = 100
 # local clock speed Hz
 # CLOCK_SPEED_HZ = 50000000;
 
-def generate(NETWORK_ENDPOINTS,
+def generate(
+        NW_SPECS,
         NUMBER_OF_DATA_PRODUCERS=2,
         EMULATOR_MODE=False,
         DATA_RATE_SLOWDOWN_FACTOR=1,
@@ -74,8 +75,8 @@ def generate(NETWORK_ENDPOINTS,
     cmd_data = {}
 
     required_eps = {f'{PARTITION}.timesync_{HOSTIDX}'}
-    if not required_eps.issubset(NETWORK_ENDPOINTS):
-        raise RuntimeError(f"ERROR: not all the required endpoints ({', '.join(required_eps)}) found in list of endpoints {' '.join(NETWORK_ENDPOINTS.keys())}")
+    if not required_eps.issubset([nw.name for nw in NW_SPECS]):
+        raise RuntimeError(f"ERROR: not all the required endpoints ({', '.join(required_eps)}) found in list of endpoints {' '.join([nw.name for nw in NW_SPECS])}")
 
 
 
@@ -226,14 +227,11 @@ def generate(NETWORK_ENDPOINTS,
                                 for idx in range(NUMBER_OF_DATA_PRODUCERS)
                             ]))
 
-    nw_specs = ([nwmgr.Connection(name=f"{epkey}" , type = "Receiver" , address = f"{epval}") for epkey,epval in NETWORK_ENDPOINTS.items()])
-
-    cmd_data['init'] = app.Init(queues=queue_specs, modules=mod_specs, nwconnections=nw_specs)
+    cmd_data['init'] = app.Init(queues=queue_specs, modules=mod_specs, nwconnections=NW_SPECS)
 
     conf_list = [("qton_timesync", qton.Conf(msg_type="dunedaq::dfmessages::TimeSync",
                                              msg_module_name="TimeSyncNQ",
-                                             sender_config=nos.Conf(ipm_plugin_type="ZmqSender",
-                                                                    address=NETWORK_ENDPOINTS[f"{PARTITION}.timesync_{HOSTIDX}"],
+                                             sender_config=nos.Conf(name=f"{PARTITION}.timesync_{HOSTIDX}",
                                                                     stype="msgpack"))),
 
                 ("fake_source",sec.Conf(
@@ -344,8 +342,7 @@ def generate(NETWORK_ENDPOINTS,
             ] + [
                 ("timesync_to_network", qton.Conf(msg_type="dunedaq::dfmessages::TimeSync",
                                 msg_module_name="TimeSyncNQ",
-                                sender_config=nos.Conf(ipm_plugin_type="ZmqPublisher",
-                                                        address=NETWORK_ENDPOINTS[f"{PARTITION}.timesync_{HOSTIDX}"],
+                                sender_config=nos.Conf(name=f"{PARTITION}.timesync_{HOSTIDX}",
                                                         topic="Timesync",
                                                         stype="msgpack")
                                 )
@@ -353,8 +350,7 @@ def generate(NETWORK_ENDPOINTS,
             ] + [
                 ("dqm_subscriber", ntoq.Conf(msg_type="dunedaq::dfmessages::TimeSync",
                                 msg_module_name="TimeSyncNQ",
-                                receiver_config=nor.Conf(ipm_plugin_type="ZmqSubscriber",
-                                                        address=NETWORK_ENDPOINTS[f"{PARTITION}.timesync_{HOSTIDX}"],
+                                receiver_config=nor.Conf(name=f"{PARTITION}.timesync_{HOSTIDX}",
                                                         subscriptions=["Timesync"],
                                                         # stype="msgpack")
                                                          )
@@ -366,19 +362,16 @@ def generate(NETWORK_ENDPOINTS,
         conf_list.extend([
                             ("qton_tp_fragments", qton.Conf(msg_type="std::unique_ptr<dunedaq::dataformats::Fragment>",
                                                             msg_module_name="FragmentNQ",
-                                                            sender_config=nos.Conf(ipm_plugin_type="ZmqSender",
-                                                                                   address=NETWORK_ENDPOINTS[f"{PARTITION}.tp_frags_{HOSTIDX}"],
+                                                            sender_config=nos.Conf(name=f"{PARTITION}.tp_frags_{HOSTIDX}",
                                                                                    stype="msgpack")))
                         ] + [
                             (f"ntoq_tp_datarequests_{idx}", ntoq.Conf(msg_type="dunedaq::dfmessages::DataRequest",
                                                                       msg_module_name="DataRequestNQ",
-                                                                      receiver_config=nor.Conf(ipm_plugin_type="ZmqReceiver",
-                                                                                               address=NETWORK_ENDPOINTS[f"{PARTITION}.tp_datareq_{idx}"]))) for idx in range(NUMBER_OF_DATA_PRODUCERS)
+                                                                      receiver_config=nor.Conf(name=f"{PARTITION}.tp_datareq_{idx}"))) for idx in range(NUMBER_OF_DATA_PRODUCERS)
                         ] + [
                             (f"tpset_publisher_{idx}", qton.Conf(msg_type="dunedaq::trigger::TPSet",
                                                                  msg_module_name="TPSetNQ",
-                                                                 sender_config=nos.Conf(ipm_plugin_type="ZmqPublisher",
-                                                                                        address=NETWORK_ENDPOINTS[f"{PARTITION}.tpsets_{idx}"],
+                                                                 sender_config=nos.Conf(name=f"{PARTITION}.tpsets_{idx}",
                                                                                         topic="TPSets",
                                                                                         stype="msgpack"))) for idx in range(NUMBER_OF_DATA_PRODUCERS)
                         ])
@@ -387,7 +380,7 @@ def generate(NETWORK_ENDPOINTS,
         conf_list.extend([
             (f"fakedataprod_{idx}", fdp.Conf(
                 system_type = SYSTEM_TYPE,
-                apa_number = 0,
+                apa_number = HOSTIDX,
                 link_number = idx,
                 time_tick_diff = 25,
                 frame_size = 464,

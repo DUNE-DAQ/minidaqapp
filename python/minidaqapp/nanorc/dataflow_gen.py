@@ -48,7 +48,7 @@ QUEUE_POP_WAIT_MS = 100
 # local clock speed Hz
 # CLOCK_SPEED_HZ = 50000000;
 
-def generate(NETWORK_ENDPOINTS,
+def generate(NW_SPECS,
         NUMBER_OF_DATA_PRODUCERS=2,
         NUMBER_OF_RU_HOSTS=1,
         RUN_NUMBER=333,
@@ -75,8 +75,8 @@ def generate(NETWORK_ENDPOINTS,
     cmd_data = {}
 
     required_eps = {PARTITION+'.trigdec', PARTITION+'.triginh'}
-    if not required_eps.issubset(NETWORK_ENDPOINTS):
-        raise RuntimeError(f"ERROR: not all the required endpoints ({', '.join(required_eps)}) found in list of endpoints {' '.join(NETWORK_ENDPOINTS.keys())}")
+    if not required_eps.issubset([nw.name for nw in NW_SPECS]):
+        raise RuntimeError(f"ERROR: not all the required endpoints ({', '.join(required_eps)}) found in list of endpoints {' '.join([nw.name for nw in NW_SPECS])}")
 
 
 
@@ -116,23 +116,18 @@ def generate(NETWORK_ENDPOINTS,
     ] if TPSET_WRITING_ENABLED else [])
 
 
-    # Hack, all connections set as receivers, but probably this should be in the code not in the config
-    nw_specs = ([nwmgr.Connection(name=f"{epkey}" , type = "Receiver" , address = f"{epval}") for epkey,epval in NETWORK_ENDPOINTS.items()])
-
-    cmd_data['init'] = app.Init(queues=queue_specs, modules=mod_specs, nwconnections=nw_specs)
+    cmd_data['init'] = app.Init(queues=queue_specs, modules=mod_specs, nwconnections=NW_SPECS)
 
 
     cmd_data['conf'] = acmd([
                 ("ntoq_trigdec", ntoq.Conf(msg_type="dunedaq::dfmessages::TriggerDecision",
                                            msg_module_name="TriggerDecisionNQ",
-                                           receiver_config=nor.Conf(ipm_plugin_type="ZmqReceiver",
-                                                                    address=NETWORK_ENDPOINTS[PARTITION+".trigdec"]))),
+                                           receiver_config=nor.Conf(name=PARTITION+".trigdec"))),
 
 
                 ("qton_token", qton.Conf(msg_type="dunedaq::dfmessages::TriggerDecisionToken",
                                            msg_module_name="TriggerDecisionTokenNQ",
-                                           sender_config=nos.Conf(ipm_plugin_type="ZmqSender",
-                                                                  address=NETWORK_ENDPOINTS[PARTITION+".triginh"],
+                                           sender_config=nos.Conf(name=PARTITION+".triginh",
                                                                   stype="msgpack"))),
 
                 ("trb", trb.ConfParams( general_queue_timeout=QUEUE_POP_WAIT_MS,
@@ -170,8 +165,7 @@ def generate(NETWORK_ENDPOINTS,
                 (f"tpset_subscriber_{idx}", ntoq.Conf(
                     msg_type="dunedaq::trigger::TPSet",
                     msg_module_name="TPSetNQ",
-                    receiver_config=nor.Conf(ipm_plugin_type="ZmqSubscriber",
-                                             address=NETWORK_ENDPOINTS[f'{PARTITION}.tpsets_{idx}'],
+                    receiver_config=nor.Conf(name=f'{PARTITION}.tpsets_{idx}',
                                              subscriptions=["TPSets"])
                 ))
                 for idx in range(NUMBER_OF_TP_SUBSCRIBERS)

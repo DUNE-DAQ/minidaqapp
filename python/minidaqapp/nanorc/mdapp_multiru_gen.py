@@ -13,6 +13,15 @@ CONTEXT_SETTINGS = dict(help_option_names=['-h', '--help'])
 
 console = Console()
 
+# Set moo schema search path
+from dunedaq.env import get_moo_model_path
+import moo.io
+moo.io.default_load_path = get_moo_model_path()
+
+# Load configuration types
+import moo.otypes
+moo.otypes.load_types('networkmanager/nwmgr.jsonnet')
+import dunedaq.networkmanager.nwmgr as nwmgr
 
 import click
 
@@ -158,44 +167,45 @@ def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowd
     app_df = "dataflow"
     app_ru = [f"ruflx{idx}" if use_felix else f"ruemu{idx}" for idx in range(len(host_ru))]
 
-    network_endpoints = {
-        partition_name+".hsievent" : "tcp://{host_hsi}:12344",
-        partition_name+".trigdec" : "tcp://{host_trigger}:12345",
-        partition_name+".triginh" : "tcp://{host_df}:12346",
-        partition_name+".hsicmds":  "tcp://{host_hsi}:12347",
-    }
+    nw_specs = [
+        nwmgr.Connection(name=partition_name+".hsievent", type="Receiver", address="tcp://{host_trigger}:12344"),
+        nwmgr.Connection(name=partition_name+".trigdec", type="Receiver", address="tcp://{host_df}:12345"),
+        nwmgr.Connection(name=partition_name+".triginh", type="Receiver", address="tcp://{host_trigger}:12346"),
+        nwmgr.Connection(name=partition_name+".frags_0", type="Receiver", address="tcp://{host_df}:12347")
+    ]
 
     port = 12348
+    if control_timing_hw:
+        nw_specs.append(nwmgr.Connection(name=partition_name+".hsicmds", type="Receiver", address="tcp://{host_timing_hw}:" + f"{port}"))
+        port = port + 1
 
-    for idx in range(len(host_ru)):
-        if enable_software_tpg:
-            network_endpoints[f"{partition_name}.tp_datareq_{idx}"] = "tcp://{host_df}:" + f"{port}"
-            port = port + 1
-            network_endpoints[f'{partition_name}.frags_tpset_ds_{idx}'] = "tcp://{host_trigger}:"+str(port)
-            port += 1
-            network_endpoints[f"{partition_name}.ds_tp_datareq_{idx}"] = "tcp://{host_df}:" + f"{port}"
-            port += 1
+    if enable_software_tpg:
+        nw_specs.append(nwmgr.Connection(name=partition_name+".tp_frags_0", type="Receiver", address="tcp://{host_df}:" + f"{port}"))
+        port = port + 1
 
     cardid = {}
     host_id_dict = {}
 
     for hostidx in range(len(host_ru)):
-        network_endpoints[f"{partition_name}.datareq_{hostidx}"] = "tcp://{host_df}:" + f"{port}"
+        if enable_software_tpg:
+            nw_specs.append(nwmgr.Connection(name=f"{partition_name}.tp_datareq_{hostidx}", type="Receiver", address="tcp://{host_ru" + f"{hostidx}" + "}:" + f"{port}"))
+            port = port + 1
+            nw_specs.append(nwmgr.Connection(name=f'{partition_name}.frags_tpset_ds_{hostidx}', type="Receiver", address="tcp://{host_df}:" + f"{port}"))
+            port = port + 1
+            nw_specs.append(nwmgr.Connection(name=f"{partition_name}.ds_tp_datareq_{hostidx}", type="Receiver", address="tcp://{host_trigger}:" + f"{port}"))
+            port = port + 1
+            for idx in range(number_of_data_producers):
+                nw_specs.append(nwmgr.Connection(name=f"{partition_name}.tpsets_{hostidx*number_of_data_producers+idx}", type="Subscriber", address = "tcp://{host_ru" + f"{hostidx}" + "}:" + f"{port}"))
+                port = port + 1
+
+        nw_specs.append(nwmgr.Connection(name=f"{partition_name}.datareq_{hostidx}", type="Receiver", address="tcp://{host_ru" + f"{hostidx}" + "}:" + f"{port}"))
         port = port + 1
 
         # Should end up something like 'network_endpoints[timesync_0]:
         # "tcp://{host_ru0}:12347"'
-        network_endpoints[f"{partition_name}.timesync_{hostidx}"] = "tcp://{host_ru" + f"{hostidx}" + "}:" + f"{port}"
-        port = port + 1
-        network_endpoints[f"{partition_name}.frags_{hostidx}"] =  "tcp://{host_ru" + f"{hostidx}" + "}:" + f"{port}"
+        nw_specs.append(nwmgr.Connection(name=f"{partition_name}.timesync_{hostidx}", type="Subscriber", address= "tcp://{host_ru" + f"{hostidx}" + "}:" + f"{port}"))
         port = port + 1
 
-        if enable_software_tpg:
-            network_endpoints[f"{partition_name}.tp_frags_{hostidx}"] = "tcp://{host_ru" + f"{hostidx}" + "}:" + f"{port}"
-            port = port + 1
-            for idx in range(number_of_data_producers):
-                network_endpoints[f"{partition_name}.tpsets_{hostidx*number_of_data_producers+idx}"] = "tcp://{host_ru" + f"{hostidx}" + "}:" + f"{port}"
-                port = port + 1
         if host_ru[hostidx] in host_id_dict:
             host_id_dict[host_ru[hostidx]] = host_id_dict[host_ru[hostidx]] + 1
             cardid[hostidx] = host_id_dict[host_ru[hostidx]]
@@ -210,14 +220,14 @@ def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowd
             timing_cmd_network_endpoints.add(partition_name+'hsicmds')
         cmd_data_thi = thi_gen.generate(
             RUN_NUMBER = run_number,
-            NETWORK_ENDPOINTS=network_endpoints,
+            NW_SPECS=nw_specs,
             TIMING_CMD_NETWORK_ENDPOINTS=timing_cmd_network_endpoints,
             HSI_DEVICE_NAME=hsi_device_name,
         )
         console.log("thi cmd data:", cmd_data_thi)
 
     if use_hsi_hw:
-        cmd_data_hsi = hsi_gen.generate(network_endpoints,
+        cmd_data_hsi = hsi_gen.generate(nw_specs,
             RUN_NUMBER = run_number,
             CONTROL_HSI_HARDWARE=control_timing_hw,
             READOUT_PERIOD_US = hsi_readout_period,
@@ -231,7 +241,7 @@ def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowd
             PARTITION=partition_name)
     else:
         cmd_data_hsi = fake_hsi_gen.generate(
-            network_endpoints,
+            nw_specs,
             RUN_NUMBER = run_number,
             CLOCK_SPEED_HZ = CLOCK_SPEED_HZ,
             DATA_RATE_SLOWDOWN_FACTOR = data_rate_slowdown_factor,
@@ -244,7 +254,7 @@ def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowd
 
     console.log("hsi cmd data:", cmd_data_hsi)
 
-    cmd_data_trigger = trigger_gen.generate(network_endpoints,
+    cmd_data_trigger = trigger_gen.generate(nw_specs,
         NUMBER_OF_RAWDATA_PRODUCERS = number_of_data_producers,
         NUMBER_OF_TPSET_PRODUCERS = number_of_data_producers if enable_software_tpg else 0,
         NUMBER_OF_REGIONS = len(host_ru),
@@ -263,7 +273,7 @@ def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowd
 
     console.log("trigger cmd data:", cmd_data_trigger)
 
-    cmd_data_dataflow = dataflow_gen.generate(network_endpoints,
+    cmd_data_dataflow = dataflow_gen.generate(nw_specs,
         NUMBER_OF_DATA_PRODUCERS = number_of_data_producers,
         NUMBER_OF_RU_HOSTS = len(host_ru),
         RUN_NUMBER = run_number,
@@ -275,7 +285,7 @@ def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowd
         PARTITION=partition_name)
     console.log("dataflow cmd data:", cmd_data_dataflow)
 
-    cmd_data_readout = [ readout_gen.generate(network_endpoints,
+    cmd_data_readout = [ readout_gen.generate(nw_specs,
             NUMBER_OF_DATA_PRODUCERS = number_of_data_producers,
             EMULATOR_MODE = emulator_mode,
             DATA_RATE_SLOWDOWN_FACTOR = data_rate_slowdown_factor,
