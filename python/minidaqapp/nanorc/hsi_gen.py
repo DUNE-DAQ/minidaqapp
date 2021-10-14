@@ -61,6 +61,7 @@ def generate(
         HSI_FE_MASK = 0,
         HSI_INV_MASK = 0,
         HSI_SOURCE = 1,
+        HSI_RANDOM_RATE = 1.0,
         CONNECTIONS_FILE="${TIMING_SHARE}/config/etc/connections.xml",
         HSI_DEVICE_NAME="BOREAS_TLU",
         UHAL_LOG_LEVEL="notice",
@@ -147,6 +148,7 @@ def generate(
                                 falling_edge_mask=HSI_FE_MASK,
                                 invert_edge_mask=HSI_INV_MASK,
                                 data_source=HSI_SOURCE,
+                                random_rate=HSI_RANDOM_RATE,
                                 )),
         ])
     cmd_data['conf'] = acmd(conf_cmds)
