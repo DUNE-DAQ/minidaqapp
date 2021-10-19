@@ -64,6 +64,7 @@ def generate(NETWORK_ENDPOINTS,
         SYSTEM_TYPE='TPC',
         DQM_ENABLED=False,
         DQM_KAFKA_ADDRESS='',
+        DQM_CMAP='HD',
         SOFTWARE_TPG_ENABLED=False,
         USE_FAKE_DATA_PRODUCERS=False):
     """Generate the json configuration for the readout and DF process"""
@@ -333,6 +334,7 @@ def generate(NETWORK_ENDPOINTS,
                         ))
             ] + [
                 ('dqmprocessor', dqmprocessor.Conf(
+                        channel_map='HD', # 'HD' for horizontal drift or 'VD' for vertical drift
                         sdqm_hist=dqmprocessor.StandardDQM(how_often=60, unavailable_time=10, num_frames=50),
                         sdqm_mean_rms=dqmprocessor.StandardDQM(how_often=10, unavailable_time=1, num_frames=100),
                         sdqm_fourier=dqmprocessor.StandardDQM(how_often=60 * 20, unavailable_time=60, num_frames=100),

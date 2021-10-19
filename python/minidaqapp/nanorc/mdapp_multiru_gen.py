@@ -71,6 +71,7 @@ import click
 @click.option('--enable-software-tpg', is_flag=True, default=False, help="Enable software TPG")
 @click.option('--enable-tpset-writing', is_flag=True, default=False, help="Enable the writing of TPSets to disk (only works with --enable-software-tpg")
 @click.option('--use-fake-data-producers', is_flag=True, default=False, help="Use fake data producers that respond with empty fragments immediately instead of (fake) cards and DLHs")
+@click.option('--dqm-cmap', type=click.Choice(['HD', 'VD']), help="Which channel map to use for DQM")
 @click.argument('json_dir', type=click.Path())
 
 def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowdown_factor, run_number, trigger_rate_hz, trigger_window_before_ticks, trigger_window_after_ticks,
@@ -78,7 +79,7 @@ def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowd
         hsi_device_name, hsi_readout_period, hsi_endpoint_address, hsi_endpoint_partition, hsi_re_mask, hsi_fe_mask, hsi_inv_mask, hsi_source,
         use_hsi_hw, hsi_device_id, mean_hsi_signal_multiplicity, hsi_signal_emulation_mode, enabled_hsi_signals,
         ttcm_s1, ttcm_s2, trigger_activity_plugin, trigger_activity_config, trigger_candidate_plugin, trigger_candidate_config,
-        enable_raw_recording, raw_recording_output_dir, frontend_type, opmon_impl, enable_dqm, ers_impl, dqm_impl, pocket_url, enable_software_tpg, enable_tpset_writing, use_fake_data_producers, json_dir):
+        enable_raw_recording, raw_recording_output_dir, frontend_type, opmon_impl, enable_dqm, ers_impl, dqm_impl, pocket_url, enable_software_tpg, enable_tpset_writing, use_fake_data_producers, dqm_cmap, json_dir):
     """
       JSON_DIR: Json file output folder
     """
@@ -284,6 +285,7 @@ def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowd
             SYSTEM_TYPE = system_type,
             DQM_ENABLED=enable_dqm,
             DQM_KAFKA_ADDRESS=dqm_kafka_address,
+            DQM_CMAP=dqm_cmap,
             SOFTWARE_TPG_ENABLED = enable_software_tpg,
             USE_FAKE_DATA_PRODUCERS = use_fake_data_producers
             ) for hostidx in range(len(host_ru))]
