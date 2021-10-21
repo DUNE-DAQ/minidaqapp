@@ -11,6 +11,8 @@
 # in this directory, no modules from the readout package are used: the
 # fragments are provided by the FakeDataProd module from dfmodules
 
+from rich.console import Console
+console = Console()
 
 # Set moo schema search path
 from dunedaq.env import get_moo_model_path
@@ -138,6 +140,9 @@ def generate(
     trigger_interval_ticks=0
     if TRIGGER_RATE_HZ > 0:
         trigger_interval_ticks=math.floor((1/TRIGGER_RATE_HZ) * CLOCK_SPEED_HZ)
+    elif CONTROL_HSI_HARDWARE:
+        console.log('WARNING! Real HSI hardware requires non 0 emulated trigger rate! Overriding to 1.0. To disable emulated HSI triggers, use  option: "--hsi-source 0"', style="bold red")
+        trigger_interval_ticks=CLOCK_SPEED_HZ
 
     if CONTROL_HSI_HARDWARE:
         conf_cmds.extend([
