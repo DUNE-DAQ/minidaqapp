@@ -141,8 +141,7 @@ def generate(
     if TRIGGER_RATE_HZ > 0:
         trigger_interval_ticks=math.floor((1/TRIGGER_RATE_HZ) * CLOCK_SPEED_HZ)
     elif CONTROL_HSI_HARDWARE:
-        console.log('WARNING! Real HSI hardware requires non 0 emulated trigger rate! Overriding to 1.0. To disable emulated HSI triggers, use  option: "--hsi-source 0"', style="bold red")
-        trigger_interval_ticks=CLOCK_SPEED_HZ
+        console.log('WARNING! Emulated trigger rate of 0 will not disable signal emulation in real HSI hardware! To disable emulated HSI triggers, use  option: "--hsi-source 0" or mask all signal bits', style="bold red")
 
     if CONTROL_HSI_HARDWARE:
         conf_cmds.extend([
