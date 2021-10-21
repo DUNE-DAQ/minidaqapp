@@ -161,26 +161,24 @@ def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowd
     dqm_kafka_address = "dqmbroadcast:9092" if dqm_impl == 'cern' else pocket_url + ":30092" if dqm_impl == 'pocket' else ''
 
     # network connections map
-    app_thi="thi"
+    app_thi = "thi"
     app_hsi = "hsi"
     app_trigger = "trigger"
     app_df = "dataflow"
     app_ru = [f"ruflx{idx}" if use_felix else f"ruemu{idx}" for idx in range(len(host_ru))]
 
-    nw_specs = [
-        nwmgr.Connection(name=partition_name+".hsievent", type="Receiver", address="tcp://{host_trigger}:12344"),
-        nwmgr.Connection(name=partition_name+".trigdec", type="Receiver", address="tcp://{host_df}:12345"),
-        nwmgr.Connection(name=partition_name+".triginh", type="Receiver", address="tcp://{host_trigger}:12346"),
-        nwmgr.Connection(name=partition_name+".frags_0", type="Receiver", address="tcp://{host_df}:12347")
-    ]
+    nw_specs = [nwmgr.Connection(name=partition_name + ".hsievent",topics=[],  address="tcp://{host_trigger}:12344"),
+        nwmgr.Connection(name=partition_name + ".trigdec",topics=[],  address="tcp://{host_df}:12345"),
+        nwmgr.Connection(name=partition_name + ".triginh",topics=[],   address="tcp://{host_trigger}:12346"),
+        nwmgr.Connection(name=partition_name + ".frags_0", topics=[],  address="tcp://{host_df}:12347")]
 
     port = 12348
     if control_timing_hw:
-        nw_specs.append(nwmgr.Connection(name=partition_name+".hsicmds", type="Receiver", address="tcp://{host_timing_hw}:" + f"{port}"))
+        nw_specs.append(nwmgr.Connection(name=partition_name + ".hsicmds",  topics=[], address="tcp://{host_timing_hw}:" + f"{port}"))
         port = port + 1
 
     if enable_software_tpg:
-        nw_specs.append(nwmgr.Connection(name=partition_name+".tp_frags_0", type="Receiver", address="tcp://{host_df}:" + f"{port}"))
+        nw_specs.append(nwmgr.Connection(name=partition_name + ".tp_frags_0", topics=[],  address="tcp://{host_df}:" + f"{port}"))
         port = port + 1
 
     cardid = {}
@@ -188,22 +186,22 @@ def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowd
 
     for hostidx in range(len(host_ru)):
         if enable_software_tpg:
-            nw_specs.append(nwmgr.Connection(name=f"{partition_name}.tp_datareq_{hostidx}", type="Receiver", address="tcp://{host_ru" + f"{hostidx}" + "}:" + f"{port}"))
+            nw_specs.append(nwmgr.Connection(name=f"{partition_name}.tp_datareq_{hostidx}",topics=[], address="tcp://{host_ru" + f"{hostidx}" + "}:" + f"{port}"))
             port = port + 1
-            nw_specs.append(nwmgr.Connection(name=f'{partition_name}.frags_tpset_ds_{hostidx}', type="Receiver", address="tcp://{host_df}:" + f"{port}"))
+            nw_specs.append(nwmgr.Connection(name=f'{partition_name}.frags_tpset_ds_{hostidx}', topics=[],  address="tcp://{host_df}:" + f"{port}"))
             port = port + 1
-            nw_specs.append(nwmgr.Connection(name=f"{partition_name}.ds_tp_datareq_{hostidx}", type="Receiver", address="tcp://{host_trigger}:" + f"{port}"))
+            nw_specs.append(nwmgr.Connection(name=f"{partition_name}.ds_tp_datareq_{hostidx}",topics=[],   address="tcp://{host_trigger}:" + f"{port}"))
             port = port + 1
             for idx in range(number_of_data_producers):
-                nw_specs.append(nwmgr.Connection(name=f"{partition_name}.tpsets_{hostidx*number_of_data_producers+idx}", type="Subscriber", address = "tcp://{host_ru" + f"{hostidx}" + "}:" + f"{port}"))
+                nw_specs.append(nwmgr.Connection(name=f"{partition_name}.tpsets_{hostidx*number_of_data_producers+idx}", topics=["TPSets"], address = "tcp://{host_ru" + f"{hostidx}" + "}:" + f"{port}"))
                 port = port + 1
 
-        nw_specs.append(nwmgr.Connection(name=f"{partition_name}.datareq_{hostidx}", type="Receiver", address="tcp://{host_ru" + f"{hostidx}" + "}:" + f"{port}"))
+        nw_specs.append(nwmgr.Connection(name=f"{partition_name}.datareq_{hostidx}", topics=[], address="tcp://{host_ru" + f"{hostidx}" + "}:" + f"{port}"))
         port = port + 1
 
         # Should end up something like 'network_endpoints[timesync_0]:
         # "tcp://{host_ru0}:12347"'
-        nw_specs.append(nwmgr.Connection(name=f"{partition_name}.timesync_{hostidx}", type="Subscriber", address= "tcp://{host_ru" + f"{hostidx}" + "}:" + f"{port}"))
+        nw_specs.append(nwmgr.Connection(name=f"{partition_name}.timesync_{hostidx}", topics=["Timesync"], address= "tcp://{host_ru" + f"{hostidx}" + "}:" + f"{port}"))
         port = port + 1
 
         if host_ru[hostidx] in host_id_dict:
@@ -215,15 +213,13 @@ def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowd
         hostidx = hostidx + 1
     
     if control_timing_hw:
-        timing_cmd_network_endpoints=set()
+        timing_cmd_network_endpoints = set()
         if use_hsi_hw:
-            timing_cmd_network_endpoints.add(partition_name+'hsicmds')
-        cmd_data_thi = thi_gen.generate(
-            RUN_NUMBER = run_number,
+            timing_cmd_network_endpoints.add(partition_name + 'hsicmds')
+        cmd_data_thi = thi_gen.generate(RUN_NUMBER = run_number,
             NW_SPECS=nw_specs,
             TIMING_CMD_NETWORK_ENDPOINTS=timing_cmd_network_endpoints,
-            HSI_DEVICE_NAME=hsi_device_name,
-        )
+            HSI_DEVICE_NAME=hsi_device_name,)
         console.log("thi cmd data:", cmd_data_thi)
 
     if use_hsi_hw:
@@ -240,8 +236,7 @@ def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowd
             HSI_SOURCE=hsi_source,
             PARTITION=partition_name)
     else:
-        cmd_data_hsi = fake_hsi_gen.generate(
-            nw_specs,
+        cmd_data_hsi = fake_hsi_gen.generate(nw_specs,
             RUN_NUMBER = run_number,
             CLOCK_SPEED_HZ = CLOCK_SPEED_HZ,
             DATA_RATE_SLOWDOWN_FACTOR = data_rate_slowdown_factor,
@@ -303,8 +298,7 @@ def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowd
             DQM_KAFKA_ADDRESS=dqm_kafka_address,
             SOFTWARE_TPG_ENABLED = enable_software_tpg,
             USE_FAKE_DATA_PRODUCERS = use_fake_data_producers,
-            PARTITION=partition_name
-            ) for hostidx in range(len(host_ru))]
+            PARTITION=partition_name) for hostidx in range(len(host_ru))]
     console.log("readout cmd data:", cmd_data_readout)
 
     if exists(json_dir):
@@ -318,12 +312,12 @@ def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowd
     jf_df = join(data_dir, app_df)
     jf_ru = [join(data_dir, app_ru[idx]) for idx in range(len(host_ru))]
     if control_timing_hw:
-        jf_thi=join(data_dir, app_thi)
+        jf_thi = join(data_dir, app_thi)
 
     cmd_set = ["init", "conf", "start", "stop", "pause", "resume", "scrap", "record"]
     
-    apps =  [app_hsi, app_trigger, app_df] + app_ru
-    cmds_data =  [cmd_data_hsi, cmd_data_trigger, cmd_data_dataflow] + cmd_data_readout
+    apps = [app_hsi, app_trigger, app_df] + app_ru
+    cmds_data = [cmd_data_hsi, cmd_data_trigger, cmd_data_dataflow] + cmd_data_readout
     if control_timing_hw:
         apps.append(app_thi)
         cmds_data.append(cmd_data_thi)
@@ -340,17 +334,17 @@ def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowd
     start_order = [app_df] + [app_trigger] + app_ru + [app_hsi]
     resume_order = [app_trigger]
     if not use_hsi_hw:
-        resume_order=[app_hsi]+resume_order
+        resume_order = [app_hsi] + resume_order
 
     for c in cmd_set:
         with open(join(json_dir,f'{c}.json'), 'w') as f:
             cfg = {
                 "apps": { app: f'data/{app}_{c}' for app in apps }
             }
-            if c in [ 'conf']:
-                conf_order=start_order
+            if c in ['conf']:
+                conf_order = start_order
                 if control_timing_hw:
-                    conf_order=[app_thi]+conf_order
+                    conf_order = [app_thi] + conf_order
                 cfg[f'order'] = conf_order
             elif c == 'start':
                 cfg['order'] = start_order
@@ -468,7 +462,7 @@ def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowd
             cfg["apps"][app_thi] = {
                     "exec": "daq_application",
                     "host": "host_timing_hw",
-                    "port": appport+len(host_ru) }
+                    "port": appport + len(host_ru) }
 
         json.dump(cfg, f, indent=4, sort_keys=True)
     console.log(f"MDAapp config generated in {json_dir}")

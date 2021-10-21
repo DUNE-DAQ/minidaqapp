@@ -424,7 +424,7 @@ def generate(
 
     cmd_data['resume'] = acmd([("", None)])
 
-    cmd_data['scrap'] = acmd([("", None)])
+    cmd_data['scrap'] = acmd([("request_receiver", None)])
 
     cmd_data['record'] = acmd([("", None)])
 
