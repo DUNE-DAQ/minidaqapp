@@ -234,6 +234,8 @@ def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowd
     if use_hsi_hw:
         cmd_data_hsi = hsi_gen.generate(network_endpoints,
             RUN_NUMBER = run_number,
+            CLOCK_SPEED_HZ = CLOCK_SPEED_HZ,
+            TRIGGER_RATE_HZ = trigger_rate_hz,
             CONTROL_HSI_HARDWARE=control_timing_hw,
             CONNECTIONS_FILE=timing_hw_connections_file,
             READOUT_PERIOD_US = hsi_readout_period,
@@ -352,9 +354,10 @@ def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowd
     console.log(f"Generating top-level command json files")
 
     start_order = [app_df] + [app_trigger] + app_ru + [app_hsi]
-    resume_order = [app_trigger]
-    if not use_hsi_hw:
-        resume_order=[app_hsi]+resume_order
+    if not control_timing_hw and use_hsi_hw:
+        resume_order = [app_trigger]
+    else:
+        resume_order = [app_hsi, app_trigger]
 
     for c in cmd_set:
         with open(join(json_dir,f'{c}.json'), 'w') as f:
@@ -378,7 +381,7 @@ def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowd
                 del cfg['apps'][app_df]
                 if control_timing_hw:
                     del cfg['apps'][app_thi]
-                if use_hsi_hw:
+                elif use_hsi_hw:
                     del cfg['apps'][app_hsi]
                 for ruapp in app_ru:
                     del cfg['apps'][ruapp]

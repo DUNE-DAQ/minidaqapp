@@ -53,6 +53,8 @@ from pprint import pprint
 def generate(
         NETWORK_ENDPOINTS: list,
         RUN_NUMBER = 333,
+        CLOCK_SPEED_HZ: int = 50000000,
+        TRIGGER_RATE_HZ: int = 1,
         CONTROL_HSI_HARDWARE = False,
         READOUT_PERIOD_US: int = 1e3,
         HSI_ENDPOINT_ADDRESS = 1,
@@ -63,6 +65,7 @@ def generate(
         HSI_SOURCE = 1,
         CONNECTIONS_FILE="${TIMING_SHARE}/config/etc/connections.xml",
         HSI_DEVICE_NAME="BOREAS_TLU",
+        CONNECTIONS_FILE="${TIMING_SHARE}/config/etc/connections.xml",
         UHAL_LOG_LEVEL="notice",
     ):
     """
@@ -132,6 +135,10 @@ def generate(
                         )),
     ]
     
+    trigger_interval_ticks=0
+    if TRIGGER_RATE_HZ > 0:
+        trigger_interval_ticks=math.floor((1/TRIGGER_RATE_HZ) * CLOCK_SPEED_HZ)
+
     if CONTROL_HSI_HARDWARE:
         conf_cmds.extend([
             ("qton_hw_cmds", qton.Conf(msg_type="dunedaq::timinglibs::timingcmd::TimingHwCmd",
@@ -141,6 +148,8 @@ def generate(
                                                                   stype="msgpack")
                                            )),
             ("hsic", hsic.ConfParams(
+                                clock_frequency=CLOCK_SPEED_HZ,
+                                trigger_interval_ticks=trigger_interval_ticks,
                                 address=HSI_ENDPOINT_ADDRESS,
                                 partition=HSI_ENDPOINT_PARTITION,
                                 rising_edge_mask=HSI_RE_MASK,
@@ -151,7 +160,8 @@ def generate(
         ])
     cmd_data['conf'] = acmd(conf_cmds)
 
-    startpars = rccmd.StartParams(run=RUN_NUMBER)
+    startpars = rccmd.StartParams(run=RUN_NUMBER, trigger_interval_ticks = trigger_interval_ticks)
+    resumepars = rccmd.ResumeParams(trigger_interval_ticks = trigger_interval_ticks)
 
     cmd_data['start'] = acmd([
             ("hsi.*", startpars),
@@ -167,7 +177,12 @@ def generate(
             ("", None)
         ])
 
-    cmd_data['resume'] = acmd([
+    if CONTROL_HSI_HARDWARE:
+        cmd_data['resume'] = acmd([
+                ("hsic", resumepars)
+            ])
+    else:
+        cmd_data['resume'] = acmd([
             ("", None)
         ])
 
