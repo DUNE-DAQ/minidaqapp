@@ -347,7 +347,8 @@ def generate(
                 time_tick_diff = 25,
                 frame_size = 464,
                 response_delay = 0,
-                timesync_channel = f"{PARTITION}.timesync_0",
+                timesync_connection_name = f"{PARTITION}.timesync_{HOSTIDX}",
+                timesync_topic_name = "Timesync",
                 fragment_type = "FakeData")) for idx in range(NUMBER_OF_DATA_PRODUCERS)
         ])
 

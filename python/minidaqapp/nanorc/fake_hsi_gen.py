@@ -89,7 +89,7 @@ def generate(NW_SPECS: list,
                         mean_signal_multiplicity=MEAN_SIGNAL_MULTIPLICITY,
                         signal_emulation_mode=SIGNAL_EMULATION_MODE,
                         enabled_signals=ENABLED_SIGNALS,
-                        timesync_channel=f"{PARTITION}.timesync_0"
+                        timesync_topic="Timesync"
                         )),
 
                 ("qton_hsievent", qton.Conf(msg_type="dunedaq::dfmessages::HSIEvent",
