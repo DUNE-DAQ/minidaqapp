@@ -73,9 +73,9 @@ import click
 @click.option('--enable-tpset-writing', is_flag=True, default=False, help="Enable the writing of TPSets to disk (only works with --enable-software-tpg")
 @click.option('--use-fake-data-producers', is_flag=True, default=False, help="Use fake data producers that respond with empty fragments immediately instead of (fake) cards and DLHs")
 @click.option('--dqm-cmap', type=click.Choice(['HD', 'VD']), help="Which channel map to use for DQM")
-@click.option('--dqm-rawdisplay-params', nargs=3, help="Parameters that control the data sent for the raw display plot")
-@click.option('--dqm-meanrms-params', nargs=3, help="Parameters that control the data sent for the mean/rms plot")
-@click.option('--dqm-fourier-params', nargs=3, help="Parameters that control the data sent for the fourier transform plot")
+@click.option('--dqm-rawdisplay-params', nargs=3, default=[60, 10, 50], help="Parameters that control the data sent for the raw display plot")
+@click.option('--dqm-meanrms-params', nargs=3, default=[10, 1, 100], help="Parameters that control the data sent for the mean/rms plot")
+@click.option('--dqm-fourier-params', nargs=3, default=[600, 60, 100], help="Parameters that control the data sent for the fourier transform plot")
 @click.option('--op-env', default='swtest', help="Operational environment - used for raw data filename prefix and HDF5 Attribute inside the files")
 @click.argument('json_dir', type=click.Path())
 
@@ -87,6 +87,7 @@ def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowd
         enable_raw_recording, raw_recording_output_dir, frontend_type, opmon_impl, enable_dqm, ers_impl, dqm_impl, pocket_url, enable_software_tpg, enable_tpset_writing, use_fake_data_producers, dqm_cmap,
         dqm_rawdisplay_params, dqm_meanrms_params, dqm_fourier_params,
         op_env, json_dir):
+
     """
       JSON_DIR: Json file output folder
     """
