@@ -66,6 +66,9 @@ def generate(NETWORK_ENDPOINTS,
         DQM_ENABLED=False,
         DQM_KAFKA_ADDRESS='',
         DQM_CMAP='HD',
+        DQM_RAWDISPLAY_PARAMS=[60, 10, 50],
+        DQM_MEANRMS_PARAMS=[10, 1, 100],
+        DQM_FOURIER_PARAMS=[600, 60, 100],
         SOFTWARE_TPG_ENABLED=False,
         USE_FAKE_DATA_PRODUCERS=False):
     """Generate the json configuration for the readout and DF process"""
@@ -357,9 +360,9 @@ def generate(NETWORK_ENDPOINTS,
             ] + [
                 ('dqmprocessor', dqmprocessor.Conf(
                         channel_map=DQM_CMAP, # 'HD' for horizontal drift or 'VD' for vertical drift
-                        sdqm_hist=dqmprocessor.StandardDQM(how_often=60, unavailable_time=10, num_frames=50),
-                        sdqm_mean_rms=dqmprocessor.StandardDQM(how_often=10, unavailable_time=1, num_frames=100),
-                        sdqm_fourier=dqmprocessor.StandardDQM(how_often=60 * 20, unavailable_time=60, num_frames=100),
+                        sdqm_hist=dqmprocessor.StandardDQM(**{'how_often' : DQM_RAWDISPLAY_PARAMS[0], 'unavailable_time' : DQM_RAWDISPLAY_PARAMS[1], 'num_frames' : DQM_RAWDISPLAY_PARAMS[2]}),
+                        sdqm_mean_rms=dqmprocessor.StandardDQM(**{'how_often' : DQM_MEANRMS_PARAMS[0], 'unavailable_time' : DQM_MEANRMS_PARAMS[1], 'num_frames' : DQM_MEANRMS_PARAMS[2]}),
+                        sdqm_fourier=dqmprocessor.StandardDQM(**{'how_often' : DQM_FUORIER_PARAMS[0], 'unavailable_time' : DQM_FUORIER_PARAMS[1], 'num_frames' : DQM_FUORIER_PARAMS[2]}),
                         kafka_address=DQM_KAFKA_ADDRESS,
                         link_idx=list(range(MIN_LINK, MAX_LINK)),
                         clock_frequency=CLOCK_SPEED_HZ,
