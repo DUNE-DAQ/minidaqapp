@@ -1,4 +1,4 @@
-Here is a diagram of a simple system that is supported in dunedaq-v2.6.0.  It uses 'fake' sources to emulate the behavior of the FELIX and HSI electronics.  
+Here is a diagram of a simple system that is supported in dunedaq-v2.8.0.  It uses 'fake' sources to emulate the behavior of the FELIX and HSI electronics.  
 
 ![Overview](Simplev2.6System_Overview.png)
 
