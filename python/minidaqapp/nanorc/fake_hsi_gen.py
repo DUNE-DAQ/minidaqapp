@@ -68,18 +68,14 @@ def generate(NW_SPECS: list,
         raise RuntimeError(f"ERROR: not all the required endpoints ({', '.join(required_eps)}) found in list of endpoints {' '.join([nw.name for nw in NW_SPECS])}")
 
     # Define modules and queues
-    queue_bare_specs = [app.QueueSpec(inst="time_sync_from_netq", kind='FollyMPMCQueue', capacity=100),
-            app.QueueSpec(inst="hsievent_q_to_net", kind='FollySPSCQueue', capacity=100),]
+    queue_bare_specs = [app.QueueSpec(inst="hsievent_q_to_net", kind='FollySPSCQueue', capacity=100),]
 
     # Only needed to reproduce the same order as when using jsonnet
     queue_specs = app.QueueSpecs(sorted(queue_bare_specs, key=lambda x: x.inst))
 
 
-    mod_specs = [mspec("fhsig", "FakeHSIEventGenerator", [app.QueueInfo(name="time_sync_source", inst="time_sync_from_netq", dir="input"),
-                        app.QueueInfo(name="hsievent_sink", inst="hsievent_q_to_net", dir="output"),]),
-        mspec("qton_hsievent", "QueueToNetwork", [app.QueueInfo(name="input", inst="hsievent_q_to_net", dir="input")]),] + [
-
-           mspec(f"ntoq_timesync_{idx}", "NetworkToQueue", [app.QueueInfo(name="output", inst="time_sync_from_netq", dir="output")]) for idx, inst in enumerate(NW_SPECS) if "timesync" in inst.name
+    mod_specs = [mspec("fhsig", "FakeHSIEventGenerator", [app.QueueInfo(name="hsievent_sink", inst="hsievent_q_to_net", dir="output"),]),
+        mspec("qton_hsievent", "QueueToNetwork", [app.QueueInfo(name="input", inst="hsievent_q_to_net", dir="input")])
         ]
 
     cmd_data['init'] = app.Init(queues=queue_specs, modules=mod_specs, nwconnections=NW_SPECS)
@@ -92,28 +88,25 @@ def generate(NW_SPECS: list,
                         trigger_interval_ticks=trigger_interval_ticks,
                         mean_signal_multiplicity=MEAN_SIGNAL_MULTIPLICITY,
                         signal_emulation_mode=SIGNAL_EMULATION_MODE,
-                        enabled_signals=ENABLED_SIGNALS,)),
+                        enabled_signals=ENABLED_SIGNALS,
+                        timesync_topic="Timesync"
+                        )),
 
                 ("qton_hsievent", qton.Conf(msg_type="dunedaq::dfmessages::HSIEvent",
                                            msg_module_name="HSIEventNQ",
                                            sender_config=nos.Conf(name=PARTITION + ".hsievent",
-                                                                  stype="msgpack"))),] + [
-
-                (f"ntoq_timesync_{idx}", ntoq.Conf(msg_type="dunedaq::dfmessages::TimeSync",
-                                           msg_module_name="TimeSyncNQ",
-                                           receiver_config=nor.Conf(subscriptions=["Timesync"],
-                                                                    name=inst.name))) for idx, inst in enumerate(NW_SPECS) if "timesync" in inst.name
-    ])
+                                                                  stype="msgpack")))
+                ])
  
 
     startpars = rccmd.StartParams(run=RUN_NUMBER, trigger_interval_ticks = trigger_interval_ticks)
     resumepars = rccmd.ResumeParams(trigger_interval_ticks = trigger_interval_ticks)
 
-    cmd_data['start'] = acmd([("ntoq_timesync_.*", startpars),
+    cmd_data['start'] = acmd([
             ("fhsig", startpars),
             ("qton_hsievent", startpars)])
 
-    cmd_data['stop'] = acmd([("ntoq_timesync_.*", None),
+    cmd_data['stop'] = acmd([
             ("fhsig", None),
             ("qton_hsievent", None)])
 

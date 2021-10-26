@@ -88,8 +88,6 @@ def generate(
     #MAX_LINK = MIN_LINK + NUMBER_OF_DATA_PRODUCERS
     # Define modules and queues
     queue_bare_specs = [
-            app.QueueSpec(inst="time_sync_q", kind='FollyMPMCQueue', capacity=100),
-        ] + [
             app.QueueSpec(inst=f"data_requests_{idx}", kind='FollySPSCQueue', capacity=100)
                 for idx in range(NUMBER_OF_DATA_PRODUCERS)
         ]
@@ -102,7 +100,6 @@ def generate(
 
     if DQM_ENABLED:
         queue_bare_specs += [
-            app.QueueSpec(inst=f"time_sync_dqm_q", kind='FollyMPMCQueue', capacity=1000),
             app.QueueSpec(inst="data_fragments_q_dqm", kind='FollyMPMCQueue', capacity=1000),
             app.QueueSpec(inst="trigger_decision_q_dqm", kind='FollySPSCQueue', capacity=20),
             app.QueueSpec(inst="trigger_record_q_dqm", kind='FollySPSCQueue', capacity=20),
@@ -141,8 +138,7 @@ def generate(
             mspec(f"tp_datahandler_{idx}", "DataLinkHandler", [
                 app.QueueInfo(name="raw_input", inst=f"tp_link_{idx}", dir="input"),
                 app.QueueInfo(name="data_requests_0", inst=f"tp_requests_{idx}", dir="input"),
-                app.QueueInfo(name="data_response_0", inst="tp_fragments_q", dir="output"),
-                app.QueueInfo(name="timesync", inst="time_sync_q", dir="output")
+                app.QueueInfo(name="data_response_0", inst="tp_fragments_q", dir="output")
             ]) for idx in range(NUMBER_OF_DATA_PRODUCERS)
         ] + [
             mspec(f"tpset_publisher_{idx}", "QueueToNetwork", [
@@ -158,14 +154,12 @@ def generate(
         if USE_FAKE_DATA_PRODUCERS:
             mod_specs = mod_specs + [
                 mspec(f"fakedataprod_{idx}", "FakeDataProd", [
-                    app.QueueInfo(name="timesync_output_queue", inst="time_sync_q", dir="output"),
                     app.QueueInfo(name="data_request_input_queue", inst=f"data_requests_{idx}", dir="input"),
                 ])
             ]
         else:
             ls = [
                     app.QueueInfo(name="raw_input", inst=f"{FRONTEND_TYPE}_link_{idx}", dir="input"),
-                    app.QueueInfo(name="timesync", inst="time_sync_q", dir="output"),
                     app.QueueInfo(name="data_requests_0", inst=f"data_requests_{idx}", dir="input"),
                 ]
 
@@ -182,10 +176,6 @@ def generate(
 
             mod_specs += [mspec(f"datahandler_{idx}", "DataLinkHandler", ls)]
 
-    mod_specs += [mspec("timesync_to_network", "QueueToNetwork",
-              [app.QueueInfo(name="input", inst="time_sync_q", dir="input")]
-              )]
-
     if DQM_ENABLED:
         mod_specs += [mspec("trb_dqm", "TriggerRecordBuilder", [
                         app.QueueInfo(name="trigger_decision_input_queue", inst="trigger_decision_q_dqm", dir="input"),
@@ -200,15 +190,9 @@ def generate(
         mod_specs += [mspec("dqmprocessor", "DQMProcessor", [
                         app.QueueInfo(name="trigger_record_dqm_processor", inst="trigger_record_q_dqm", dir="input"),
                         app.QueueInfo(name="trigger_decision_dqm_processor", inst="trigger_decision_q_dqm", dir="output"),
-                        # app.QueueInfo(name="timesync_dqm_processor", inst="time_sync_q", dir="input"),
-                        app.QueueInfo(name="timesync_dqm_processor", inst="time_sync_dqm_q", dir="input"),
                     ]),
 
         ]
-
-        mod_specs += [mspec("dqm_subscriber", "NetworkToQueue",
-                [app.QueueInfo(name="output", inst="time_sync_dqm_q", dir="output")]
-                )]
 
     if not USE_FAKE_DATA_PRODUCERS:
         if FLX_INPUT:
@@ -229,12 +213,7 @@ def generate(
 
     cmd_data['init'] = app.Init(queues=queue_specs, modules=mod_specs, nwconnections=NW_SPECS)
 
-    conf_list = [("qton_timesync", qton.Conf(msg_type="dunedaq::dfmessages::TimeSync",
-                                             msg_module_name="TimeSyncNQ",
-                                             sender_config=nos.Conf(name=f"{PARTITION}.timesync_{HOSTIDX}",
-                                                                    stype="msgpack"))),
-
-                ("fake_source",sec.Conf(
+    conf_list = [("fake_source",sec.Conf(
                             link_confs=[sec.LinkConfiguration(
                             geoid=sec.GeoID(system=SYSTEM_TYPE, region=HOSTIDX, element=idx),
                                 slowdown=DATA_RATE_SLOWDOWN_FACTOR,
@@ -339,23 +318,6 @@ def generate(
                         link_idx=list(range(NUMBER_OF_DATA_PRODUCERS)),
                         clock_frequency=CLOCK_SPEED_HZ,
                         ))
-            ] + [
-                ("timesync_to_network", qton.Conf(msg_type="dunedaq::dfmessages::TimeSync",
-                                msg_module_name="TimeSyncNQ",
-                                sender_config=nos.Conf(name=f"{PARTITION}.timesync_{HOSTIDX}",
-                                                        topic="Timesync",
-                                                        stype="msgpack")
-                                )
-                )
-            ] + [
-                ("dqm_subscriber", ntoq.Conf(msg_type="dunedaq::dfmessages::TimeSync",
-                                msg_module_name="TimeSyncNQ",
-                                receiver_config=nor.Conf(name=f"{PARTITION}.timesync_{HOSTIDX}",
-                                                        subscriptions=["Timesync"],
-                                                        # stype="msgpack")
-                                                         )
-                                )
-                )
             ]
 
     if SOFTWARE_TPG_ENABLED:
@@ -378,13 +340,15 @@ def generate(
 
     if USE_FAKE_DATA_PRODUCERS:
         conf_list.extend([
-            (f"fakedataprod_{idx}", fdp.Conf(
+            (f"fakedataprod_{idx}", fdp.ConfParams(
                 system_type = SYSTEM_TYPE,
                 apa_number = HOSTIDX,
                 link_number = idx,
                 time_tick_diff = 25,
                 frame_size = 464,
                 response_delay = 0,
+                timesync_connection_name = f"{PARTITION}.timesync_{HOSTIDX}",
+                timesync_topic_name = "Timesync",
                 fragment_type = "FakeData")) for idx in range(NUMBER_OF_DATA_PRODUCERS)
         ])
 
@@ -393,7 +357,6 @@ def generate(
 
     startpars = rccmd.StartParams(run=RUN_NUMBER)
     cmd_data['start'] = acmd([
-            ("qton_timesync", startpars),
             ("datahandler_.*", startpars),
             ("fake_source", startpars),
             ("flxcard.*", startpars),
@@ -411,7 +374,6 @@ def generate(
             ("flxcard.*", None),
             ("fake_source", None),
             ("datahandler_.*", None),
-            ("qton_timesync", None),
             ("trb_dqm", None),
             ("dqmprocessor", None),
             ("qton_tp_fragments", None),
