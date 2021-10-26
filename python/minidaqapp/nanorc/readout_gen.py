@@ -56,7 +56,8 @@ def generate(NETWORK_ENDPOINTS,
         DATA_RATE_SLOWDOWN_FACTOR=1,
         RUN_NUMBER=333, 
         DATA_FILE="./frames.bin",
-        FLX_INPUT=True,
+        FLX_INPUT=False,
+        SSP_INPUT=True,
         CLOCK_SPEED_HZ=50000000,
         HOSTIDX=0, CARDID=0,
         RAW_RECORDING_ENABLED=False,
@@ -228,6 +229,12 @@ def generate(NETWORK_ENDPOINTS,
                                 app.QueueInfo(name=f"output_{idx}", inst=f"{FRONTEND_TYPE}_link_{idx}", dir="output")
                                     for idx in range(5, NUMBER_OF_DATA_PRODUCERS)
                                 ]))
+        elif SSP_INPUT:
+            mod_specs.append(mspec("ssp_0", "SSPCardReader", [
+                            app.QueueInfo(name=f"output_{idx}", inst=f"{FRONTEND_TYPE}_link_{idx}", dir="output")
+                                for idx in range(NUMBER_OF_DATA_PRODUCERS)
+                            ]))
+
         else:
             fake_source = "fake_source"
             card_reader = "FakeCardReader"
@@ -286,6 +293,14 @@ def generate(NETWORK_ENDPOINTS,
                             dma_memory_size_gb= 4,
                             numa_id=0,
                             num_links=max(0, NUMBER_OF_DATA_PRODUCERS - 5))),
+                ("ssp_0",flxcr.Conf(card_id=CARDID,
+                            logical_unit=0,
+                            dma_id=0,
+                            chunk_trailer_size= 32,
+                            dma_block_size_kb= 4,
+                            dma_memory_size_gb= 4,
+                            numa_id=0,
+                            num_links=NUMBER_OF_DATA_PRODUCERS)),
             ] + [
                 (f"ntoq_datareq_{idx}", ntoq.Conf(msg_type="dunedaq::dfmessages::DataRequest",
                                            msg_module_name="DataRequestNQ",
@@ -431,6 +446,7 @@ def generate(NETWORK_ENDPOINTS,
             ("fake_source", startpars),
             ("pacman_source", startpars),
             ("flxcard.*", startpars),
+            ("ssp.*", startpars),
             ("ntoq_datareq_.*", startpars),
             ("ntoq_trigdec", startpars),
             ("trb_dqm", startpars),
@@ -444,6 +460,7 @@ def generate(NETWORK_ENDPOINTS,
     cmd_data['stop'] = acmd([("ntoq_trigdec", None),
             ("ntoq_datareq_.*", None),
             ("flxcard.*", None),
+            ("ssp.*", None),
             ("fake_source", None),
             ("pacman_source", None),
             ("datahandler_.*", None),

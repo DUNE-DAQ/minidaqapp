@@ -30,6 +30,7 @@ import click
 @click.option('-o', '--output-path', type=click.Path(), default='.')
 @click.option('--disable-trace', is_flag=True, help="Do not enable TRACE (default TRACE_FILE is /tmp/trace_buffer_\${HOSTNAME}_\${USER})")
 @click.option('-f', '--use-felix', is_flag=True, help="Use real felix cards instead of fake ones")
+@click.option('--use-ssp', is_flag=True, help="Use real SSPs instead of fake sources")
 @click.option('--host-df', default='localhost')
 @click.option('--host-ru', multiple=True, default=['localhost'], help="This option is repeatable, with each repetition adding an additional ru process.")
 @click.option('--host-trigger', default='localhost', help='Host to run the trigger app on')
@@ -63,7 +64,7 @@ import click
 
 @click.option('--enable-raw-recording', is_flag=True, help="Add queues and modules necessary for the record command")
 @click.option('--raw-recording-output-dir', type=click.Path(), default='.', help="Output directory where recorded data is written to. Data for each link is written to a separate file")
-@click.option('--frontend-type', type=click.Choice(['wib', 'wib2', 'pds_queue', 'pds_list', 'pacman']), default='wib', help="Frontend type (wib, wib2 or pds) and latency buffer implementation in case of pds (folly queue or skip list)")
+@click.option('--frontend-type', type=click.Choice(['wib', 'wib2', 'pds_queue', 'pds_list', 'pacman', 'ssp']), default='wib', help="Frontend type (wib, wib2 or pds) and latency buffer implementation in case of pds (folly queue or skip list)")
 @click.option('--enable-dqm', is_flag=True, help="Enable Data Quality Monitoring")
 @click.option('--opmon-impl', type=click.Choice(['json','cern','pocket'], case_sensitive=False),default='json', help="Info collector service implementation to use")
 @click.option('--ers-impl', type=click.Choice(['local','cern','pocket'], case_sensitive=False), default='local', help="ERS destination (Kafka used for cern and pocket)")
@@ -80,7 +81,7 @@ import click
 @click.argument('json_dir', type=click.Path())
 
 def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowdown_factor, run_number, trigger_rate_hz, trigger_window_before_ticks, trigger_window_after_ticks,
-        token_count, data_file, output_path, disable_trace, use_felix, host_df, host_ru, host_trigger, host_hsi, host_timing_hw, control_timing_hw, timing_hw_connections_file,
+        token_count, data_file, output_path, disable_trace, use_felix, use_ssp, host_df, host_ru, host_trigger, host_hsi, host_timing_hw, control_timing_hw, timing_hw_connections_file,
         hsi_device_name, hsi_readout_period, hsi_endpoint_address, hsi_endpoint_partition, hsi_re_mask, hsi_fe_mask, hsi_inv_mask, hsi_source,
         use_hsi_hw, hsi_device_id, mean_hsi_signal_multiplicity, hsi_signal_emulation_mode, enabled_hsi_signals,
         ttcm_s1, ttcm_s2, trigger_activity_plugin, trigger_activity_config, trigger_candidate_plugin, trigger_candidate_config,
@@ -106,7 +107,11 @@ def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowd
     console.log(f"Generating configs for hosts trigger={host_trigger} dataflow={host_df} readout={host_ru} hsi={host_hsi}")
 
     total_number_of_data_producers = 0
-    if number_of_data_producers > 10:
+
+    if use_ssp:
+        total_number_of_data_producers = number_of_data_producers * len(host_ru)
+        console.log(f"Will setup {number_of_data_producers} SSP channels per host, for a total of {total_number_of_data_producers}") 
+    elif number_of_data_producers > 10:
         total_old = number_of_data_producers
         number_of_data_producers = math.floor(number_of_data_producers / len(host_ru))
         total_number_of_data_producers = number_of_data_producers * len(host_ru)
@@ -289,6 +294,7 @@ def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowd
             RUN_NUMBER = run_number,
             DATA_FILE = data_file,
             FLX_INPUT = use_felix,
+            SSP_INPUT = use_ssp,
             CLOCK_SPEED_HZ = CLOCK_SPEED_HZ,
             HOSTIDX = hostidx,
             CARDID = cardid[hostidx],
@@ -318,6 +324,8 @@ def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowd
     app_trigger = "trigger"
     app_df = "dataflow"
     app_ru = [f"ruflx{idx}" if use_felix else f"ruemu{idx}" for idx in range(len(host_ru))]
+    if use_ssp:
+        app_ru = [f"russp{idx}" if use_ssp else f"ruemu{idx}" for idx in range(len(host_ru))]
 
     jf_hsi = join(data_dir, app_hsi)
     jf_trigemu = join(data_dir, app_trigger)
