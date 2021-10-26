@@ -67,7 +67,6 @@ def generate(
         HSI_SOURCE = 1,
         CONNECTIONS_FILE="${TIMING_SHARE}/config/etc/connections.xml",
         HSI_DEVICE_NAME="BOREAS_TLU",
-        CONNECTIONS_FILE="${TIMING_SHARE}/config/etc/connections.xml",
         UHAL_LOG_LEVEL="notice",
     ):
     """
