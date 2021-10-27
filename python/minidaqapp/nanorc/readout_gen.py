@@ -251,6 +251,8 @@ def generate(
                             # fake_trigger_flag=0, # default
                             region_id = HOSTIDX,
                             element_id = idx,
+                            timesync_connection_name = f"{PARTITION}.timesync_{HOSTIDX}",
+                            timesync_topic_name = "Timesync",
                         ),
                         latencybufferconf= rconf.LatencyBufferConf(
                             latency_buffer_size = LATENCY_BUFFER_SIZE,
