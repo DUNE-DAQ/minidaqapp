@@ -15,6 +15,7 @@ moo.otypes.load_types('dfmodules/datawriter.jsonnet')
 moo.otypes.load_types('dfmodules/hdf5datastore.jsonnet')
 moo.otypes.load_types('dfmodules/tpsetwriter.jsonnet')
 moo.otypes.load_types('dfmodules/fragmentreceiver.jsonnet')
+moo.otypes.load_types('dfmodules/triggerdecisionreceiver.jsonnet')
 moo.otypes.load_types('nwqueueadapters/queuetonetwork.jsonnet')
 moo.otypes.load_types('nwqueueadapters/networktoqueue.jsonnet')
 moo.otypes.load_types('nwqueueadapters/networkobjectreceiver.jsonnet')
@@ -32,6 +33,7 @@ import dunedaq.dfmodules.datawriter as dw
 import dunedaq.dfmodules.hdf5datastore as hdf5ds
 import dunedaq.dfmodules.tpsetwriter as tpsw
 import dunedaq.dfmodules.fragmentreceiver as frcv
+import dunedaq.dfmodules.triggerdecisionreceiver as tdrcv
 import dunedaq.nwqueueadapters.networktoqueue as ntoq
 import dunedaq.nwqueueadapters.queuetonetwork as qton
 import dunedaq.nwqueueadapters.networkobjectreceiver as nor
@@ -119,8 +121,8 @@ def generate(NW_SPECS,
 
 
     cmd_data['conf'] = acmd([
-                ("trigdec_receiver", ntoq.Conf(general_queue_timeout=QUEUE_POP_WAIT_MS,
-                                               connection_name=PARTITION+".trigdec")),
+                ("trigdec_receiver", tdrcv.ConfParams(general_queue_timeout=QUEUE_POP_WAIT_MS,
+                                                      connection_name=PARTITION+".trigdec")),
 
                 ("qton_token", qton.Conf(msg_type="dunedaq::dfmessages::TriggerDecisionToken",
                                            msg_module_name="TriggerDecisionTokenNQ",
