@@ -100,7 +100,7 @@ def generate(NW_SPECS,
 
         mspec("qton_token", "QueueToNetwork", [app.QueueInfo(name="input", inst="token_q", dir="input")]),
 
-        mspec("trb", "TriggerRecordBuilder", [  app.QueueInfo(name="trigger_decision_input_queue", inst="trigger_decision_from_netq", dir="input"),
+        mspec("trb", "TriggerRecordBuilder", [  app.QueueInfo(name="trigger_decision_input_queue", inst="trigger_decision_q", dir="input"),
                                                 app.QueueInfo(name="trigger_record_output_queue", inst="trigger_record_q", dir="output"),
                                                 app.QueueInfo(name="data_fragment_input_queue", inst="data_fragments_q", dir="input")
                                              ]),
