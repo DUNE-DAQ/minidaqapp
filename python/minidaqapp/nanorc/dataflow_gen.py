@@ -83,7 +83,6 @@ def generate(NW_SPECS,
     # Define modules and queues
     queue_bare_specs = [app.QueueSpec(inst="token_q", kind='FollySPSCQueue', capacity=100),
             app.QueueSpec(inst="trigger_decision_q", kind='FollySPSCQueue', capacity=100),
-            app.QueueSpec(inst="trigger_decision_from_netq", kind='FollySPSCQueue', capacity=100),
             app.QueueSpec(inst="trigger_record_q", kind='FollySPSCQueue', capacity=100),
             app.QueueSpec(inst="data_fragments_q", kind='FollyMPMCQueue', capacity=1000),
             ] + ([
@@ -95,7 +94,7 @@ def generate(NW_SPECS,
 
 
     mod_specs = [
-        mspec("ntoq_trigdec", "NetworkToQueue", [app.QueueInfo(name="output", inst="trigger_decision_from_netq", dir="output")]),
+        mspec("trigdec_receiver", "TriggerDecisionReceiver", [app.QueueInfo(name="output", inst="trigger_decision_q", dir="output")]),
 
         mspec("qton_token", "QueueToNetwork", [app.QueueInfo(name="input", inst="token_q", dir="input")]),
 
@@ -120,10 +119,8 @@ def generate(NW_SPECS,
 
 
     cmd_data['conf'] = acmd([
-                ("ntoq_trigdec", ntoq.Conf(msg_type="dunedaq::dfmessages::TriggerDecision",
-                                           msg_module_name="TriggerDecisionNQ",
-                                           receiver_config=nor.Conf(name=PARTITION+".trigdec"))),
-
+                ("trigdec_receiver", ntoq.Conf(general_queue_timeout=QUEUE_POP_WAIT_MS,
+                                               connection_name=PARTITION+".trigdec")),
 
                 ("qton_token", qton.Conf(msg_type="dunedaq::dfmessages::TriggerDecisionToken",
                                            msg_module_name="TriggerDecisionTokenNQ",
@@ -185,9 +182,9 @@ def generate(NW_SPECS,
             ("datawriter", startpars),
             ("fragment_receiver", startpars),
             ("trb", startpars),
-            ("ntoq_trigdec", startpars)])
+            ("trigdec_receiver", startpars)])
 
-    cmd_data['stop'] = acmd([("ntoq_trigdec", None),
+    cmd_data['stop'] = acmd([("trigdec_receiver", None),
             ("trb", None),
             ("fragment_receiver", None),
             ("datawriter", None),
@@ -203,7 +200,6 @@ def generate(NW_SPECS,
     cmd_data['resume'] = acmd([("", None)])
 
     cmd_data['scrap'] = acmd([("fragment_receiver", None),
-            ("ntoq_trigdec", None),
             ("qton_token", None)])
 
     cmd_data['record'] = acmd([("", None)])

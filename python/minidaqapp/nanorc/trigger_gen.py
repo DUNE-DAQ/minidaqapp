@@ -107,7 +107,6 @@ def generate(
         app.QueueSpec(inst='trigger_candidate_q', kind='FollyMPMCQueue', capacity=1000),
         app.QueueSpec(inst="hsievent_from_netq", kind='FollyMPMCQueue', capacity=1000),
         app.QueueSpec(inst="token_from_netq", kind='FollySPSCQueue', capacity=1000),
-        app.QueueSpec(inst="trigger_decision_to_netq", kind='FollySPSCQueue', capacity=1000),
     ]
 
     for idx in range(NUMBER_OF_TPSET_PRODUCERS):
@@ -180,13 +179,8 @@ def generate(
             app.QueueInfo(name="output", inst="token_from_netq", dir="output")
         ]),
 
-        mspec("qton_trigdec", "QueueToNetwork", [
-            app.QueueInfo(name="input", inst="trigger_decision_to_netq", dir="input")
-        ]),
-
         mspec("mlt", "ModuleLevelTrigger", [
             app.QueueInfo(name="token_source", inst="token_from_netq", dir="input"),
-            app.QueueInfo(name="trigger_decision_sink", inst="trigger_decision_to_netq", dir="output"),
             app.QueueInfo(name="trigger_candidate_source", inst="trigger_candidate_q", dir="input"),
         ]),
 
@@ -278,14 +272,9 @@ def generate(
             receiver_config=nor.Conf(name=PARTITION+".triginh")
         )),
 
-        ("qton_trigdec", qton.Conf(
-            msg_type="dunedaq::dfmessages::TriggerDecision",
-            msg_module_name="TriggerDecisionNQ",
-            sender_config=nos.Conf(name=PARTITION+".trigdec")
-        )),
-
         ("mlt", mlt.ConfParams(
             # This line requests the raw data from upstream DAQ _and_ the raw TPs from upstream DAQ
+            td_connection_name=PARTITION+".trigdec",
             links=[
                 mlt.GeoID(system=SYSTEM_TYPE, region=rdx, element=idx)
                 for idx in range(NUMBER_OF_RAWDATA_PRODUCERS + NUMBER_OF_TPSET_PRODUCERS) for rdx in range(NUMBER_OF_REGIONS)
@@ -307,8 +296,7 @@ def generate(
         "mlt",
         "ttcm",
         "ntoq_hsievent",
-        "ntoq_token",
-        "qton_trigdec"
+        "ntoq_token"
     ]
 
     if NUMBER_OF_TPSET_PRODUCERS:
