@@ -396,19 +396,19 @@ def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowd
     console.log(f"Generating boot json file")
     with open(join(json_dir,'boot.json'), 'w') as f:
         daq_app_specs = {
-            "daq_application_ups" : {
-                "comment": "Application profile based on a full dbt runtime environment",
-                "env": {
-                "DBT_AREA_ROOT": "getenv"
-                },
-                "cmd": ["CMD_FAC=rest://localhost:${APP_PORT}",
-                    "INFO_SVC=" + info_svc_uri,
-                    "cd ${DBT_AREA_ROOT}",
-                    "source dbt-env.sh",
-                    "dbt-workarea-env",
-                    "cd ${APP_WD}",
-                    "daq_application --name ${APP_NAME} -c ${CMD_FAC} -i ${INFO_SVC}"]
-            },
+            # "daq_application_ups" : {
+            #     "comment": "Application profile based on a full dbt runtime environment",
+            #     "env": {
+            #     "DBT_AREA_ROOT": "getenv"
+            #     },
+            #     "cmd": ["CMD_FAC=rest://localhost:${APP_PORT}",
+            #         "INFO_SVC=" + info_svc_uri,
+            #         "cd ${DBT_AREA_ROOT}",
+            #         "source dbt-env.sh",
+            #         "dbt-workarea-env",
+            #         "cd ${APP_WD}",
+            #         "daq_application --name ${APP_NAME} -c ${CMD_FAC} -i ${INFO_SVC}"]
+            # },
             "daq_application" : {
                 "comment": "Application profile using  PATH variables (lower start time)",
                 "env":{
@@ -428,7 +428,7 @@ def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowd
 
         if not disable_trace:
             daq_app_specs["daq_application"]["env"]["TRACE_FILE"] = "getenv:/tmp/trace_buffer_${HOSTNAME}_${USER}"
-            daq_app_specs["daq_application_ups"]["env"]["TRACE_FILE"] = "getenv:/tmp/trace_buffer_${HOSTNAME}_${USER}"
+            # daq_app_specs["daq_application_ups"]["env"]["TRACE_FILE"] = "getenv:/tmp/trace_buffer_${HOSTNAME}_${USER}"
 
         cfg = {
             "env" : {
