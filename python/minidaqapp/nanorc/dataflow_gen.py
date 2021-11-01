@@ -191,7 +191,7 @@ def generate(NW_SPECS,
     cmd_data['resume'] = acmd([("", None)])
 
     cmd_data['scrap'] = acmd([("fragment_receiver", None),
-                               ])
+                              ("trigdec_receiver", None)])
 
     cmd_data['record'] = acmd([("", None)])
 
