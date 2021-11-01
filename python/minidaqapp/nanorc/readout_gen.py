@@ -115,8 +115,7 @@ def generate(
         ] + [
             app.QueueSpec(inst=f"tp_fragments_q", kind='FollyMPMCQueue', capacity=100)
         ] + [
-            app.QueueSpec(inst=f"tpset_queue_{idx}", kind='FollyMPMCQueue', capacity=10000)
-                for idx in range(NUMBER_OF_DATA_PRODUCERS)
+            app.QueueSpec(inst=f"tpset_queue", kind='FollyMPMCQueue', capacity=10000)
         ] + [
             app.QueueSpec(inst=f"tp_requests_{idx}", kind='FollySPSCQueue', capacity=100)
                 for idx in range(NUMBER_OF_DATA_PRODUCERS)
@@ -133,7 +132,7 @@ def generate(
         mod_specs += [
             mspec("qton_tp_fragments", "QueueToNetwork", [app.QueueInfo(name="input", inst="tp_fragments_q", dir="input")])
         ] + [
-            mspec(f"ntoq_tp_datarequests_{idx}", "NetworkToQueue", [app.QueueInfo(name="output", inst=f"tp_requests_{idx}", dir="output")]) for idx in range(NUMBER_OF_DATA_PRODUCERS)
+            mspec(f"tp_request_receiver", "RequestReceiver", [app.QueueInfo(name="output", inst=f"tp_requests_{idx}", dir="output")]) for idx in range(NUMBER_OF_DATA_PRODUCERS)
         ] + [
             mspec(f"tp_datahandler_{idx}", "DataLinkHandler", [
                 app.QueueInfo(name="raw_input", inst=f"tp_link_{idx}", dir="input"),
@@ -141,9 +140,9 @@ def generate(
                 app.QueueInfo(name="data_response_0", inst="tp_fragments_q", dir="output")
             ]) for idx in range(NUMBER_OF_DATA_PRODUCERS)
         ] + [
-            mspec(f"tpset_publisher_{idx}", "QueueToNetwork", [
-                app.QueueInfo(name="input", inst=f"tpset_queue_{idx}", dir="input")
-            ]) for idx in range(NUMBER_OF_DATA_PRODUCERS)
+            mspec(f"tpset_publisher", "QueueToNetwork", [
+                app.QueueInfo(name="input", inst=f"tpset_queue", dir="input")
+            ])
         ]
 
 
@@ -171,7 +170,7 @@ def generate(
             if SOFTWARE_TPG_ENABLED:
                 ls.extend([
                     app.QueueInfo(name="tp_out", inst=f"tp_link_{idx}", dir="output"),
-                    app.QueueInfo(name="tpset_out", inst=f"tpset_queue_{idx}", dir="output")
+                    app.QueueInfo(name="tpset_out", inst=f"tpset_queue", dir="output")
                 ])
 
             mod_specs += [mspec(f"datahandler_{idx}", "DataLinkHandler", ls)]
@@ -326,18 +325,19 @@ def generate(
         conf_list.extend([
                             ("qton_tp_fragments", qton.Conf(msg_type="std::unique_ptr<dunedaq::dataformats::Fragment>",
                                                             msg_module_name="FragmentNQ",
-                                                            sender_config=nos.Conf(name=f"{PARTITION}.tp_frags_{HOSTIDX}",
+                                                            sender_config=nos.Conf(name=f"{PARTITION}.tp_frags_0",
                                                                                    stype="msgpack")))
                         ] + [
-                            (f"ntoq_tp_datarequests_{idx}", ntoq.Conf(msg_type="dunedaq::dfmessages::DataRequest",
-                                                                      msg_module_name="DataRequestNQ",
-                                                                      receiver_config=nor.Conf(name=f"{PARTITION}.tp_datareq_{idx}"))) for idx in range(NUMBER_OF_DATA_PRODUCERS)
+                            ("tp_request_receiver", rrcv.ConfParams(
+                                        map = [rrcv.geoidinst(region=HOSTIDX , element=NUMBER_OF_DATA_PRODUCERS+idx , system=SYSTEM_TYPE , queueinstance=f"tp_requests_{idx}") for idx in range(NUMBER_OF_DATA_PRODUCERS)],
+                                        general_queue_timeout = QUEUE_POP_WAIT_MS,
+                                        connection_name = f"{PARTITION}.tp_datareq_{HOSTIDX}")) 
                         ] + [
-                            (f"tpset_publisher_{idx}", qton.Conf(msg_type="dunedaq::trigger::TPSet",
+                            (f"tpset_publisher", qton.Conf(msg_type="dunedaq::trigger::TPSet",
                                                                  msg_module_name="TPSetNQ",
-                                                                 sender_config=nos.Conf(name=f"{PARTITION}.tpsets_{idx}",
+                                                                 sender_config=nos.Conf(name=f"{PARTITION}.tpsets_{HOSTIDX}",
                                                                                         topic="TPSets",
-                                                                                        stype="msgpack"))) for idx in range(NUMBER_OF_DATA_PRODUCERS)
+                                                                                        stype="msgpack")))
                         ])
 
     if USE_FAKE_DATA_PRODUCERS:
@@ -363,12 +363,12 @@ def generate(
             ("fake_source", startpars),
             ("flxcard.*", startpars),
             ("request_receiver", startpars),
+            ("tp_request_receiver", startpars),
             ("trb_dqm", startpars),
             ("dqmprocessor", startpars),
             ("qton_tp_fragments", startpars),
-            (f"ntoq_tp_datarequests_.*", startpars),
             (f"tp_datahandler_.*", startpars),
-            (f"tpset_publisher_.*", startpars),
+            (f"tpset_publisher", startpars),
             ("fakedataprod_.*", startpars)])
 
     cmd_data['stop'] = acmd([
@@ -379,9 +379,9 @@ def generate(
             ("trb_dqm", None),
             ("dqmprocessor", None),
             ("qton_tp_fragments", None),
-            (f"ntoq_tp_datarequests_.*", None),
             (f"tp_datahandler_.*", None),
-            (f"tpset_publisher_.*", None),
+            (f"tpset_publisher", None),
+            ("tp_request_receiver", None),
             ("fakedataprod_.*", None)])
 
     cmd_data['pause'] = acmd([("", None)])
@@ -389,6 +389,9 @@ def generate(
     cmd_data['resume'] = acmd([("", None)])
 
     cmd_data['scrap'] = acmd([("request_receiver", None),
+            ("tp_request_receiver", None),
+            ("qton_tp_fragments", None),
+            (f"tpset_publisher", None),
             ("timesync_to_network", None)])
 
     cmd_data['record'] = acmd([("", None)])

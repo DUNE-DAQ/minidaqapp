@@ -98,6 +98,8 @@ def generate(NW_SPECS,
         mspec("trigdec_receiver", "TriggerDecisionReceiver", [app.QueueInfo(name="output", inst="trigger_decision_q", dir="output")]),
 
         mspec("fragment_receiver", "FragmentReceiver", [app.QueueInfo(name="output", inst="data_fragments_q", dir="output")]),
+        mspec("tp_fragment_receiver", "FragmentReceiver", [app.QueueInfo(name="output", inst="data_fragments_q", dir="output")]),
+        mspec("ds_tpset_fragment_receiver", "FragmentReceiver", [app.QueueInfo(name="output", inst="data_fragments_q", dir="output")]),
 
         mspec("trb", "TriggerRecordBuilder", [  app.QueueInfo(name="trigger_decision_input_queue", inst="trigger_decision_q", dir="input"),
                                                 app.QueueInfo(name="trigger_record_output_queue", inst="trigger_record_q", dir="output"),
@@ -125,9 +127,9 @@ def generate(NW_SPECS,
                                         map=trb.mapgeoidconnections([
                                                 trb.geoidinst(region=idx, element=idy, system=SYSTEM_TYPE, connection_name=f"{PARTITION}.datareq_{idx}")  for idx in range(NUMBER_OF_RU_HOSTS) for idy in range(NUMBER_OF_DATA_PRODUCERS)
                                         ] + [
-                                            trb.geoidinst(region=0, element=NUMBER_OF_DATA_PRODUCERS + idx, system=SYSTEM_TYPE, connection_name=f"{PARTITION}.tp_data_requests_{idx}")  for idx in range(NUMBER_OF_RAW_TP_PRODUCERS)
+                                            trb.geoidinst(region=idx, element=NUMBER_OF_DATA_PRODUCERS + idy, system=SYSTEM_TYPE, connection_name=f"{PARTITION}.tp_datareq_{idx}") for idx in range(NUMBER_OF_RU_HOSTS) for idy in range(NUMBER_OF_RAW_TP_PRODUCERS)
                                         ] + [
-                                            trb.geoidinst(region=0, element=idx, system="DataSelection", connection_name=f"{PARTITION}.ds_tp_data_requests_{idx}")  for idx in range(NUMBER_OF_DS_TP_PRODUCERS)
+                                            trb.geoidinst(region=idx, element=0, system="DataSelection", connection_name=f"{PARTITION}.ds_tp_datareq_0")  for idx in range(NUMBER_OF_RU_HOSTS)
                                         ]
                                                               ) )),
                 ("datawriter", dw.ConfParams(initial_token_count=TOKEN_COUNT,
@@ -151,6 +153,14 @@ def generate(NW_SPECS,
                     general_queue_timeout=QUEUE_POP_WAIT_MS,
                     connection_name=PARTITION+".frags_0"
                 )), 
+                ("tp_fragment_receiver", frcv.ConfParams(
+                    general_queue_timeout=QUEUE_POP_WAIT_MS,
+                    connection_name=PARTITION+".tp_frags_0"
+                )), 
+                ("ds_tpset_fragment_receiver", frcv.ConfParams(
+                    general_queue_timeout=QUEUE_POP_WAIT_MS,
+                    connection_name=PARTITION+".frags_tpset_ds_0"
+                )), 
             ] + [
                 (f"tpset_subscriber_{idx}", ntoq.Conf(
                     msg_type="dunedaq::trigger::TPSet",
@@ -173,12 +183,16 @@ def generate(NW_SPECS,
             + [
             ("datawriter", startpars),
             ("fragment_receiver", startpars),
+            ("tp_fragment_receiver",startpars),
+            ("ds_tpset_fragment_receiver",startpars),
             ("trb", startpars),
             ("trigdec_receiver", startpars)])
 
     cmd_data['stop'] = acmd([("trigdec_receiver", None),
             ("trb", None),
             ("fragment_receiver", None),
+              ("tp_fragment_receiver",None),
+              ("ds_tpset_fragment_receiver",None),
             ("datawriter", None),
             ] + ([
               ("tpset_subscriber_.*", None),
@@ -190,8 +204,11 @@ def generate(NW_SPECS,
 
     cmd_data['resume'] = acmd([("", None)])
 
-    cmd_data['scrap'] = acmd([("fragment_receiver", None),
-                               ])
+    cmd_data['scrap'] = acmd([("trigdec_receiver", None),
+            ("fragment_receiver", None),
+              ("tp_fragment_receiver",None),
+              ("ds_tpset_fragment_receiver",None),
+            ("qton_token", None)])
 
     cmd_data['record'] = acmd([("", None)])
 

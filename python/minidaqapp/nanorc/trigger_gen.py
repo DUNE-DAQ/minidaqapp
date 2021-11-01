@@ -22,6 +22,7 @@ moo.otypes.load_types('nwqueueadapters/queuetonetwork.jsonnet')
 moo.otypes.load_types('nwqueueadapters/networktoqueue.jsonnet')
 moo.otypes.load_types('nwqueueadapters/networkobjectreceiver.jsonnet')
 moo.otypes.load_types('nwqueueadapters/networkobjectsender.jsonnet')
+moo.otypes.load_types('dfmodules/requestreceiver.jsonnet')
 moo.otypes.load_types('networkmanager/nwmgr.jsonnet')
 
 # Import new types
@@ -42,6 +43,7 @@ import dunedaq.nwqueueadapters.networktoqueue as ntoq
 import dunedaq.nwqueueadapters.queuetonetwork as qton
 import dunedaq.nwqueueadapters.networkobjectreceiver as nor
 import dunedaq.nwqueueadapters.networkobjectsender as nos
+import dunedaq.dfmodules.requestreceiver as rrcv
 import dunedaq.networkmanager.nwmgr as nwmgr
 
 from appfwk.utils import acmd, mcmd, mrccmd, mspec
@@ -108,39 +110,42 @@ def generate(
         app.QueueSpec(inst="hsievent_from_netq", kind='FollyMPMCQueue', capacity=1000),
     ]
 
-    for idx in range(NUMBER_OF_TPSET_PRODUCERS):
+    if NUMBER_OF_TPSET_PRODUCERS:
         queue_bare_specs.extend([
-            app.QueueSpec(inst=f"fragment_q{idx}", kind='FollySPSCQueue', capacity=1000),
-            app.QueueSpec(inst=f"tpset_q_for_buf{idx}", kind='FollySPSCQueue', capacity=1000),
-            app.QueueSpec(inst=f"data_request_q{idx}", kind='FollySPSCQueue', capacity=1000),
         ])
+        for idx in range(NUMBER_OF_REGIONS):
+            queue_bare_specs.extend([
+                app.QueueSpec(inst=f"fragment_q{idx}", kind='FollySPSCQueue', capacity=1000),
+                app.QueueSpec(inst=f"tpset_q_for_buf{idx}", kind='FollySPSCQueue', capacity=1000),
+                app.QueueSpec(inst=f"data_request_q{idx}", kind='FollySPSCQueue', capacity=1000),
+            ])
 
     # Only needed to reproduce the same order as when using jsonnet
     queue_specs = app.QueueSpecs(sorted(queue_bare_specs, key=lambda x: x.inst))
 
     mod_specs = []
 
-    for idx in range(NUMBER_OF_TPSET_PRODUCERS):
+    if NUMBER_OF_TPSET_PRODUCERS:
         mod_specs.extend([
-            mspec(f"ntoq_data_request{idx}", "NetworkToQueue", [
-                app.QueueInfo(name="output", inst=f"data_request_q{idx}", dir="output")
-            ]),
-            mspec(f"ntoq_tpset_for_buf{idx}", "NetworkToQueue", [
-                app.QueueInfo(name="output", inst=f"tpset_q_for_buf{idx}", dir="output")
-            ]),
-            mspec(f"tpset_subscriber_{idx}", "NetworkToQueue", [
-                app.QueueInfo(name="output", inst=f"tpsets_from_netq", dir="output")
-            ]),
-            mspec(f"qton_fragment{idx}", "QueueToNetwork", [
-                app.QueueInfo(name="input", inst=f"fragment_q{idx}", dir="input")
-            ]),
-            mspec(f"buf{idx}", "TPSetBufferCreator", [
-                app.QueueInfo(name="tpset_source", inst=f"tpset_q_for_buf{idx}", dir="input"),
-                app.QueueInfo(name="data_request_source", inst=f"data_request_q{idx}", dir="input"),
-                app.QueueInfo(name="fragment_sink", inst=f"fragment_q{idx}", dir="output"),
+            mspec(f"request_receiver", "RequestReceiver", [
+                    app.QueueInfo(name="output", inst=f"data_request_q{idx}", dir="output")]) for idx in range(NUMBER_OF_REGIONS)])
+        for idx in range(NUMBER_OF_REGIONS):
+            mod_specs.extend([
+                mspec(f"ntoq_tpset_for_buf{idx}", "NetworkToQueue", [
+                    app.QueueInfo(name="output", inst=f"tpset_q_for_buf{idx}", dir="output")
+                ]),
+                mspec(f"tpset_subscriber_{idx}", "NetworkToQueue", [
+                    app.QueueInfo(name="output", inst=f"tpsets_from_netq", dir="output")
+                ]),
+                mspec(f"qton_fragment{idx}", "QueueToNetwork", [
+                    app.QueueInfo(name="input", inst=f"fragment_q{idx}", dir="input")
+                ]),
+                mspec(f"buf{idx}", "TPSetBufferCreator", [
+                    app.QueueInfo(name="tpset_source", inst=f"tpset_q_for_buf{idx}", dir="input"),
+                    app.QueueInfo(name="data_request_source", inst=f"data_request_q{idx}", dir="input"),
+                    app.QueueInfo(name="fragment_sink", inst=f"fragment_q{idx}", dir="output"),
+                ])
             ])
-
-        ])
 
     mod_specs += ([
             mspec("zip", "TPZipper", [
@@ -189,28 +194,31 @@ def generate(
 
     tp_confs = []
 
-    for idx in range(NUMBER_OF_TPSET_PRODUCERS):
+    if NUMBER_OF_TPSET_PRODUCERS:
         tp_confs.extend([
-            (f"buf{idx}", buf.Conf(tpset_buffer_size=10000, region=0, element=idx)),
-            (f"tpset_subscriber_{idx}", ntoq.Conf(
-                msg_type="dunedaq::trigger::TPSet",
-                msg_module_name="TPSetNQ",
-                receiver_config=nor.Conf(name=f'{PARTITION}.tpsets_{idx}',
-                                         subscriptions=["TPSets"])
-            )),
-            (f"ntoq_tpset_for_buf{idx}", ntoq.Conf(
-                msg_type="dunedaq::trigger::TPSet",
-                msg_module_name="TPSetNQ",
-                receiver_config=nor.Conf(name=f'{PARTITION}.tpsets_{idx}',
-                                         subscriptions=["TPSets"])
-            )),
-            (f"ntoq_data_request{idx}", ntoq.Conf(msg_type="dunedaq::dfmessages::DataRequest",
-                                                  msg_module_name="DataRequestNQ",
-                                                  receiver_config=nor.Conf(name=f"{PARTITION}.ds_tp_datareq_{idx}")
-            )),
-            (f"qton_fragment{idx}", qton.Conf(msg_type="std::unique_ptr<dunedaq::dataformats::Fragment>",
-                                        msg_module_name="FragmentNQ",
-                                        sender_config=nos.Conf(name=f"{PARTITION}.frags_tpset_ds_{idx}",
+                            ("request_receiver", rrcv.ConfParams(
+                                        map = [rrcv.geoidinst(region=idx , element=0, system="DataSelection" , queueinstance=f"data_request_q{idx}") for idx in range(NUMBER_OF_REGIONS)],
+                                        general_queue_timeout = 100,
+                                        connection_name = f"{PARTITION}.ds_tp_datareq_0")) 
+                        ])
+        for idx in range(NUMBER_OF_REGIONS):
+            tp_confs.extend([
+                (f"buf{idx}", buf.Conf(tpset_buffer_size=10000, region=idx, element=0)),
+                (f"tpset_subscriber_{idx}", ntoq.Conf(
+                    msg_type="dunedaq::trigger::TPSet",
+                    msg_module_name="TPSetNQ",
+                    receiver_config=nor.Conf(name=f'{PARTITION}.tpsets_{idx}',
+                                             subscriptions=["TPSets"])
+                )),
+                (f"ntoq_tpset_for_buf{idx}", ntoq.Conf(
+                    msg_type="dunedaq::trigger::TPSet",
+                    msg_module_name="TPSetNQ",
+                    receiver_config=nor.Conf(name=f'{PARTITION}.tpsets_{idx}',
+                                             subscriptions=["TPSets"])
+                )),
+                (f"qton_fragment{idx}", qton.Conf(msg_type="std::unique_ptr<dunedaq::dataformats::Fragment>",
+                                            msg_module_name="FragmentNQ",
+                                            sender_config=nos.Conf(name=f"{PARTITION}.frags_tpset_ds_0",
                                                                stype="msgpack"))),
 
         ])
@@ -294,7 +302,7 @@ def generate(
             "tam",
             "zip",
             "tpset_subscriber_.*",
-            "ntoq_data_request.*"
+            "request_receiver"
         ]
 
     stop_order = start_order[::-1]
