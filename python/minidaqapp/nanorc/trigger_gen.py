@@ -106,7 +106,6 @@ def generate(
         ] if NUMBER_OF_TPSET_PRODUCERS else []) + [
         app.QueueSpec(inst='trigger_candidate_q', kind='FollyMPMCQueue', capacity=1000),
         app.QueueSpec(inst="hsievent_from_netq", kind='FollyMPMCQueue', capacity=1000),
-        app.QueueSpec(inst="token_from_netq", kind='FollySPSCQueue', capacity=1000),
     ]
 
     for idx in range(NUMBER_OF_TPSET_PRODUCERS):
@@ -175,12 +174,7 @@ def generate(
 
         ### Module level trigger
 
-        mspec("ntoq_token", "NetworkToQueue", [
-            app.QueueInfo(name="output", inst="token_from_netq", dir="output")
-        ]),
-
         mspec("mlt", "ModuleLevelTrigger", [
-            app.QueueInfo(name="token_source", inst="token_from_netq", dir="input"),
             app.QueueInfo(name="trigger_candidate_source", inst="trigger_candidate_q", dir="input"),
         ]),
 
@@ -266,15 +260,10 @@ def generate(
 
 
         # Module level trigger
-        ("ntoq_token", ntoq.Conf(
-            msg_type="dunedaq::dfmessages::TriggerDecisionToken",
-            msg_module_name="TriggerDecisionTokenNQ",
-            receiver_config=nor.Conf(name=PARTITION+".triginh")
-        )),
-
         ("mlt", mlt.ConfParams(
             # This line requests the raw data from upstream DAQ _and_ the raw TPs from upstream DAQ
             td_connection_name=PARTITION+".trigdec",
+            token_connection_name=PARTITION+".triginh",
             links=[
                 mlt.GeoID(system=SYSTEM_TYPE, region=rdx, element=idx)
                 for idx in range(NUMBER_OF_RAWDATA_PRODUCERS + NUMBER_OF_TPSET_PRODUCERS) for rdx in range(NUMBER_OF_REGIONS)
