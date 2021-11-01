@@ -83,8 +83,7 @@ def generate(NW_SPECS,
 
 
     # Define modules and queues
-    queue_bare_specs = [app.QueueSpec(inst="token_q", kind='FollySPSCQueue', capacity=100),
-            app.QueueSpec(inst="trigger_decision_q", kind='FollySPSCQueue', capacity=100),
+    queue_bare_specs = [app.QueueSpec(inst="trigger_decision_q", kind='FollySPSCQueue', capacity=100),
             app.QueueSpec(inst="trigger_record_q", kind='FollySPSCQueue', capacity=100),
             app.QueueSpec(inst="data_fragments_q", kind='FollyMPMCQueue', capacity=1000),
             ] + ([
@@ -98,18 +97,15 @@ def generate(NW_SPECS,
     mod_specs = [
         mspec("trigdec_receiver", "TriggerDecisionReceiver", [app.QueueInfo(name="output", inst="trigger_decision_q", dir="output")]),
 
-        mspec("qton_token", "QueueToNetwork", [app.QueueInfo(name="input", inst="token_q", dir="input")]),
+        mspec("fragment_receiver", "FragmentReceiver", [app.QueueInfo(name="output", inst="data_fragments_q", dir="output")]),
 
         mspec("trb", "TriggerRecordBuilder", [  app.QueueInfo(name="trigger_decision_input_queue", inst="trigger_decision_q", dir="input"),
                                                 app.QueueInfo(name="trigger_record_output_queue", inst="trigger_record_q", dir="output"),
                                                 app.QueueInfo(name="data_fragment_input_queue", inst="data_fragments_q", dir="input")
                                              ]),
+        
+        mspec("datawriter", "DataWriter", [ app.QueueInfo(name="trigger_record_input_queue", inst="trigger_record_q", dir="input")]),
 
-        mspec("datawriter", "DataWriter", [ app.QueueInfo(name="trigger_record_input_queue", inst="trigger_record_q", dir="input"),
-                                            app.QueueInfo(name="token_output_queue", inst="token_q", dir="output"),]),
-
-    ] + [
-        mspec(f"fragment_receiver", "FragmentReceiver", [app.QueueInfo(name="output", inst="data_fragments_q", dir="output")])
     ] + ([        
         mspec(f"tpset_subscriber_{idx}", "NetworkToQueue", [app.QueueInfo(name="output", inst=f"tpsets_from_netq", dir="output")])  for idx in range(NUMBER_OF_TP_SUBSCRIBERS)
     ]) + ([
@@ -124,11 +120,6 @@ def generate(NW_SPECS,
                 ("trigdec_receiver", tdrcv.ConfParams(general_queue_timeout=QUEUE_POP_WAIT_MS,
                                                       connection_name=PARTITION+".trigdec")),
 
-                ("qton_token", qton.Conf(msg_type="dunedaq::dfmessages::TriggerDecisionToken",
-                                           msg_module_name="TriggerDecisionTokenNQ",
-                                           sender_config=nos.Conf(name=PARTITION+".triginh",
-                                                                  stype="msgpack"))),
-
                 ("trb", trb.ConfParams( general_queue_timeout=QUEUE_POP_WAIT_MS,
                                         reply_connection_name = PARTITION+".frags_0",
                                         map=trb.mapgeoidconnections([
@@ -140,6 +131,7 @@ def generate(NW_SPECS,
                                         ]
                                                               ) )),
                 ("datawriter", dw.ConfParams(initial_token_count=TOKEN_COUNT,
+                                             token_connection=PARTITION+".triginh",
                             data_store_parameters=hdf5ds.ConfParams(name="data_store",
                                 # type = "HDF5DataStore", # default
                                 directory_path = OUTPUT_PATH, # default
@@ -155,7 +147,6 @@ def generate(NW_SPECS,
                                     digits_for_apa_number = 3,
                                     digits_for_link_number = 2,)))),
             ] + [
-                # placeholder for fragment_receiver conf params
                 ("fragment_receiver", frcv.ConfParams(
                     general_queue_timeout=QUEUE_POP_WAIT_MS,
                     connection_name=PARTITION+".frags_0"
@@ -180,7 +171,6 @@ def generate(NW_SPECS,
               ("tpset_subscriber_.*", startpars)
             ] if TPSET_WRITING_ENABLED else [])
             + [
-            ("qton_token", startpars),
             ("datawriter", startpars),
             ("fragment_receiver", startpars),
             ("trb", startpars),
@@ -190,7 +180,6 @@ def generate(NW_SPECS,
             ("trb", None),
             ("fragment_receiver", None),
             ("datawriter", None),
-            ("qton_token", None),
             ] + ([
               ("tpset_subscriber_.*", None),
               ("tpswriter", None)
