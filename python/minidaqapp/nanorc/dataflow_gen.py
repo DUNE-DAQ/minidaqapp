@@ -204,10 +204,11 @@ def generate(NW_SPECS,
 
     cmd_data['resume'] = acmd([("", None)])
 
-    cmd_data['scrap'] = acmd([("trigdec_receiver", None),
+    cmd_data['scrap'] = acmd([
             ("fragment_receiver", None),
-              ("tp_fragment_receiver",None),
-              ("ds_tpset_fragment_receiver",None),
+            ("trigdec_receiver", None),
+            ("tp_fragment_receiver",None),
+            ("ds_tpset_fragment_receiver",None),
             ("qton_token", None)])
 
     cmd_data['record'] = acmd([("", None)])
