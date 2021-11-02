@@ -59,7 +59,8 @@ def generate(NW_SPECS,
         SYSTEM_TYPE="TPC",
         SOFTWARE_TPG_ENABLED=False,
         TPSET_WRITING_ENABLED=False,
-        PARTITION="UNKNOWN"):
+        PARTITION="UNKNOWN",
+        OPERATIONAL_ENVIRONMENT="swtest"):
     """Generate the json configuration for the readout and DF process"""
 
     if SOFTWARE_TPG_ENABLED:
@@ -134,20 +135,33 @@ def generate(NW_SPECS,
                                                               ) )),
                 ("datawriter", dw.ConfParams(initial_token_count=TOKEN_COUNT,
                                              token_connection=PARTITION+".triginh",
-                            data_store_parameters=hdf5ds.ConfParams(name="data_store",
-                                # type = "HDF5DataStore", # default
-                                directory_path = OUTPUT_PATH, # default
-                                # mode = "all-per-file", # default
+                                data_store_parameters=hdf5ds.ConfParams(name="data_store",
+                                version = 3,
+                                operational_environment = OPERATIONAL_ENVIRONMENT,
+                                directory_path = OUTPUT_PATH,
                                 max_file_size_bytes = 1073741824,
                                 disable_unique_filename_suffix = False,
-                                filename_parameters = hdf5ds.HDF5DataStoreFileNameParams(overall_prefix = "swtest",
+                                filename_parameters = hdf5ds.FileNameParams(overall_prefix = OPERATIONAL_ENVIRONMENT,
                                     digits_for_run_number = 6,
                                     file_index_prefix = "",
                                     digits_for_file_index = 4,),
-                                file_layout_parameters = hdf5ds.HDF5DataStoreFileLayoutParams(trigger_record_name_prefix= "TriggerRecord",
+                                file_layout_parameters = hdf5ds.FileLayoutParams(trigger_record_name_prefix= "TriggerRecord",
                                     digits_for_trigger_number = 5,
-                                    digits_for_apa_number = 3,
-                                    digits_for_link_number = 2,)))),
+                                    path_param_list = hdf5ds.PathParamList([hdf5ds.PathParams(detector_group_type="TPC",
+                                                                                              detector_group_name="TPC",
+                                                                                              region_name_prefix="APA",
+                                                                                              element_name_prefix="Link"),
+                                                                            hdf5ds.PathParams(detector_group_type="PDS",
+                                                                                              detector_group_name="PDS"),
+                                                                            hdf5ds.PathParams(detector_group_type="NDLArTPC",
+                                                                                              detector_group_name="NDLArTPC"),
+                                                                            hdf5ds.PathParams(detector_group_type="Trigger",
+                                                                                              detector_group_name="Trigger"),
+                                                                            hdf5ds.PathParams(detector_group_type="TPC_TP",
+                                                                                              detector_group_name="TPC",
+                                                                                              region_name_prefix="TP_APA",
+                                                                                              element_name_prefix="Link")])
+                                )))),
             ] + [
                 ("fragment_receiver", frcv.ConfParams(
                     general_queue_timeout=QUEUE_POP_WAIT_MS,

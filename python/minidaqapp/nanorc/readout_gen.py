@@ -17,6 +17,7 @@ moo.otypes.load_types('nwqueueadapters/networkobjectsender.jsonnet')
 moo.otypes.load_types('flxlibs/felixcardreader.jsonnet')
 moo.otypes.load_types('readout/sourceemulatorconfig.jsonnet')
 moo.otypes.load_types('readout/readoutconfig.jsonnet')
+moo.otypes.load_types('lbrulibs/pacmancardreader.jsonnet')
 moo.otypes.load_types('dqm/dqmprocessor.jsonnet')
 moo.otypes.load_types('dfmodules/fakedataprod.jsonnet')
 moo.otypes.load_types('dfmodules/requestreceiver.jsonnet')
@@ -34,6 +35,7 @@ import dunedaq.nwqueueadapters.networkobjectsender as nos
 import dunedaq.readout.sourceemulatorconfig as sec
 import dunedaq.flxlibs.felixcardreader as flxcr
 import dunedaq.readout.readoutconfig as rconf
+import dunedaq.lbrulibs.pacmancardreader as pcr
 import dunedaq.dfmodules.triggerrecordbuilder as trb
 import dunedaq.dqm.dqmprocessor as dqmprocessor
 import dunedaq.dfmodules.fakedataprod as fdp
@@ -58,7 +60,8 @@ def generate(
         DATA_RATE_SLOWDOWN_FACTOR=1,
         RUN_NUMBER=333, 
         DATA_FILE="./frames.bin",
-        FLX_INPUT=True,
+        FLX_INPUT=False,
+        SSP_INPUT=True,
         CLOCK_SPEED_HZ=50000000,
         HOSTIDX=0, CARDID=0,
         RAW_RECORDING_ENABLED=False,
@@ -67,6 +70,10 @@ def generate(
         SYSTEM_TYPE='TPC',
         DQM_ENABLED=False,
         DQM_KAFKA_ADDRESS='',
+        DQM_CMAP='HD',
+        DQM_RAWDISPLAY_PARAMS=[60, 10, 50],
+        DQM_MEANRMS_PARAMS=[10, 1, 100],
+        DQM_FOURIER_PARAMS=[600, 60, 100],
         SOFTWARE_TPG_ENABLED=False,
         USE_FAKE_DATA_PRODUCERS=False,
         PARTITION="UNKNOWN"):
@@ -204,8 +211,20 @@ def generate(
                                 app.QueueInfo(name=f"output_{idx}", inst=f"{FRONTEND_TYPE}_link_{idx}", dir="output")
                                     for idx in range(5, NUMBER_OF_DATA_PRODUCERS)
                                 ]))
+        elif SSP_INPUT:
+            mod_specs.append(mspec("ssp_0", "SSPCardReader", [
+                            app.QueueInfo(name=f"output_{idx}", inst=f"{FRONTEND_TYPE}_link_{idx}", dir="output")
+                                for idx in range(NUMBER_OF_DATA_PRODUCERS)
+                            ]))
+
         else:
-            mod_specs.append(mspec("fake_source", "FakeCardReader", [
+            fake_source = "fake_source"
+            card_reader = "FakeCardReader"
+            if FRONTEND_TYPE=='pacman':
+              fake_source = "pacman_source"
+              card_reader = "PacmanCardReader"
+
+            mod_specs.append(mspec(fake_source, card_reader, [
                             app.QueueInfo(name=f"output_{idx}", inst=f"{FRONTEND_TYPE}_link_{idx}", dir="output")
                                 for idx in range(NUMBER_OF_DATA_PRODUCERS)
                             ]))
@@ -221,6 +240,11 @@ def generate(
                                 ) for idx in range(NUMBER_OF_DATA_PRODUCERS)],
                             # input_limit=10485100, # default
                             queue_timeout_ms = QUEUE_POP_WAIT_MS)),
+                ("pacman_source",pcr.Conf(
+                                          link_confs=[pcr.LinkConfiguration(
+                                           geoid=pcr.GeoID(system=SYSTEM_TYPE, region=0, element=idx),
+                                           ) for idx in range(NUMBER_OF_DATA_PRODUCERS)],
+                                           zmq_receiver_timeout = 10000)),
                 ("flxcard_0",flxcr.Conf(card_id=CARDID,
                             logical_unit=0,
                             dma_id=0,
@@ -237,6 +261,14 @@ def generate(
                             dma_memory_size_gb= 4,
                             numa_id=0,
                             num_links=max(0, NUMBER_OF_DATA_PRODUCERS - 5))),
+                ("ssp_0",flxcr.Conf(card_id=CARDID,
+                            logical_unit=0,
+                            dma_id=0,
+                            chunk_trailer_size= 32,
+                            dma_block_size_kb= 4,
+                            dma_memory_size_gb= 4,
+                            numa_id=0,
+                            num_links=NUMBER_OF_DATA_PRODUCERS)),
             ] + [
                  ("request_receiver", rrcv.ConfParams(
                             map = [rrcv.geoidinst(region=HOSTIDX , element=idx , system=SYSTEM_TYPE , queueinstance=f"data_requests_{idx}") for idx in range(NUMBER_OF_DATA_PRODUCERS)],
@@ -300,7 +332,7 @@ def generate(
                             region_id = HOSTIDX,
                             element_id = idx,
                             # output_file = f"output_{idx + MIN_LINK}.out",
-                            # stream_buffer_size = 8388608,
+                            stream_buffer_size = 100 if FRONTEND_TYPE=='pacman' else 8388608,
                             enable_raw_recording = False,
                         )
                         )) for idx in range(NUMBER_OF_DATA_PRODUCERS)
@@ -308,13 +340,15 @@ def generate(
                 ("trb_dqm", trb.ConfParams(
                         general_queue_timeout=QUEUE_POP_WAIT_MS,
                         map=trb.mapgeoidconnections([
-                                trb.geoidinst(region=HOSTIDX, element=idx, system="TPC", connection_name=f"data_requests_dqm_{idx}") for idx in range(NUMBER_OF_DATA_PRODUCERS)
+                                trb.geoidinst(region=HOSTIDX, element=idx, system=SYSTEM_TYPE, connection_name=f"data_requests_dqm_{idx}") for idx in range(NUMBER_OF_DATA_PRODUCERS)
                             ]),
                         ))
             ] + [
                 ('dqmprocessor', dqmprocessor.Conf(
-                        mode='normal', # normal or debug
-                        sdqm=[1, 1, 1],
+                        channel_map=DQM_CMAP, # 'HD' for horizontal drift or 'VD' for vertical drift
+                        sdqm_hist=dqmprocessor.StandardDQM(**{'how_often' : DQM_RAWDISPLAY_PARAMS[0], 'unavailable_time' : DQM_RAWDISPLAY_PARAMS[1], 'num_frames' : DQM_RAWDISPLAY_PARAMS[2]}),
+                        sdqm_mean_rms=dqmprocessor.StandardDQM(**{'how_often' : DQM_MEANRMS_PARAMS[0], 'unavailable_time' : DQM_MEANRMS_PARAMS[1], 'num_frames' : DQM_MEANRMS_PARAMS[2]}),
+                        sdqm_fourier=dqmprocessor.StandardDQM(**{'how_often' : DQM_FOURIER_PARAMS[0], 'unavailable_time' : DQM_FOURIER_PARAMS[1], 'num_frames' : DQM_FOURIER_PARAMS[2]}),
                         kafka_address=DQM_KAFKA_ADDRESS,
                         link_idx=list(range(NUMBER_OF_DATA_PRODUCERS)),
                         clock_frequency=CLOCK_SPEED_HZ,
@@ -361,9 +395,12 @@ def generate(
     cmd_data['start'] = acmd([
             ("datahandler_.*", startpars),
             ("fake_source", startpars),
+            ("pacman_source", startpars),
             ("flxcard.*", startpars),
             ("request_receiver", startpars),
             ("tp_request_receiver", startpars),
+            ("ssp.*", startpars),
+            ("ntoq_trigdec", startpars),
             ("trb_dqm", startpars),
             ("dqmprocessor", startpars),
             ("qton_tp_fragments", startpars),
@@ -374,7 +411,9 @@ def generate(
     cmd_data['stop'] = acmd([
             ("request_receiver", None),
             ("flxcard.*", None),
+            ("ssp.*", None),
             ("fake_source", None),
+            ("pacman_source", None),
             ("datahandler_.*", None),
             ("trb_dqm", None),
             ("dqmprocessor", None),
