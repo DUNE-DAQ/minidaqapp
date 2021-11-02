@@ -345,11 +345,14 @@ def generate(
                         ))
             ] + [
                 ('dqmprocessor', dqmprocessor.Conf(
-                        channel_map=DQM_CMAP, # 'HD' for horizontal drift or 'VD' for vertical drift
-                        sdqm_hist=dqmprocessor.StandardDQM(**{'how_often' : DQM_RAWDISPLAY_PARAMS[0], 'unavailable_time' : DQM_RAWDISPLAY_PARAMS[1], 'num_frames' : DQM_RAWDISPLAY_PARAMS[2]}),
-                        sdqm_mean_rms=dqmprocessor.StandardDQM(**{'how_often' : DQM_MEANRMS_PARAMS[0], 'unavailable_time' : DQM_MEANRMS_PARAMS[1], 'num_frames' : DQM_MEANRMS_PARAMS[2]}),
-                        sdqm_fourier=dqmprocessor.StandardDQM(**{'how_often' : DQM_FOURIER_PARAMS[0], 'unavailable_time' : DQM_FOURIER_PARAMS[1], 'num_frames' : DQM_FOURIER_PARAMS[2]}),
-                        kafka_address=DQM_KAFKA_ADDRESS,
+                        mode='normal', # normal or debug
+                        sdqm=[1, 1, 1],
+# TODO, Eric Flumerfelt <eflumerf@fnal.gov> 02-Nov-2021: Uncomment when dqm is updated in nightly
+#                       channel_map=DQM_CMAP, # 'HD' for horizontal drift or 'VD' for vertical drift
+#                        sdqm_hist=dqmprocessor.StandardDQM(**{'how_often' : DQM_RAWDISPLAY_PARAMS[0], 'unavailable_time' : DQM_RAWDISPLAY_PARAMS[1], 'num_frames' : DQM_RAWDISPLAY_PARAMS[2]}),
+#                        sdqm_mean_rms=dqmprocessor.StandardDQM(**{'how_often' : DQM_MEANRMS_PARAMS[0], 'unavailable_time' : DQM_MEANRMS_PARAMS[1], 'num_frames' : DQM_MEANRMS_PARAMS[2]}),
+#                        sdqm_fourier=dqmprocessor.StandardDQM(**{'how_often' : DQM_FOURIER_PARAMS[0], 'unavailable_time' : DQM_FOURIER_PARAMS[1], 'num_frames' : DQM_FOURIER_PARAMS[2]}),
+                         kafka_address=DQM_KAFKA_ADDRESS,
                         link_idx=list(range(NUMBER_OF_DATA_PRODUCERS)),
                         clock_frequency=CLOCK_SPEED_HZ,
                         ))
