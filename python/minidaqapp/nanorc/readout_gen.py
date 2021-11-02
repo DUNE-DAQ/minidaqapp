@@ -250,7 +250,7 @@ def generate(NETWORK_ENDPOINTS,
     cmd_data['init'] = app.Init(queues=queue_specs, modules=mod_specs)
 
 
-    conf_list = [("qton_fragments", qton.Conf(msg_type="std::unique_ptr<dunedaq::dataformats::Fragment>",
+    conf_list = [("qton_fragments", qton.Conf(msg_type="std::unique_ptr<dunedaq::daqdataformats::Fragment>",
                                            msg_module_name="FragmentNQ",
                                            sender_config=nos.Conf(ipm_plugin_type="ZmqSender",
                                                                   address=NETWORK_ENDPOINTS[f"frags_{HOSTIDX}"],
@@ -405,7 +405,7 @@ def generate(NETWORK_ENDPOINTS,
 
     if SOFTWARE_TPG_ENABLED:
         conf_list.extend([
-                            ("qton_tp_fragments", qton.Conf(msg_type="std::unique_ptr<dunedaq::dataformats::Fragment>",
+                            ("qton_tp_fragments", qton.Conf(msg_type="std::unique_ptr<dunedaq::daqdataformats::Fragment>",
                                                             msg_module_name="FragmentNQ",
                                                             sender_config=nos.Conf(ipm_plugin_type="ZmqSender",
                                                                                    address=NETWORK_ENDPOINTS[f"tp_frags_{HOSTIDX}"],

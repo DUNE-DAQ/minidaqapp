@@ -211,7 +211,7 @@ def generate(NETWORK_ENDPOINTS,
                 for idx in range(NUMBER_OF_RAW_TP_PRODUCERS)
 
             ] + [
-                (f"ntoq_fragments_{idx}", ntoq.Conf(msg_type="std::unique_ptr<dunedaq::dataformats::Fragment>",
+                (f"ntoq_fragments_{idx}", ntoq.Conf(msg_type="std::unique_ptr<dunedaq::daqdataformats::Fragment>",
                                            msg_module_name="FragmentNQ",
                                            receiver_config=nor.Conf(ipm_plugin_type="ZmqReceiver",
                                                                     address=NETWORK_ENDPOINTS[inst])))

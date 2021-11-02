@@ -219,7 +219,7 @@ def generate(
                                                   receiver_config=nor.Conf(ipm_plugin_type="ZmqReceiver",
                                                                            address=NETWORK_ENDPOINTS[f"ds_tp_datareq_{idx}"])
             )),
-            (f"qton_fragment{idx}", qton.Conf(msg_type="std::unique_ptr<dunedaq::dataformats::Fragment>",
+            (f"qton_fragment{idx}", qton.Conf(msg_type="std::unique_ptr<dunedaq::daqdataformats::Fragment>",
                                         msg_module_name="FragmentNQ",
                                         sender_config=nos.Conf(ipm_plugin_type="ZmqSender",
                                                                address=NETWORK_ENDPOINTS[f"frags_tpset_ds_{idx}"],
