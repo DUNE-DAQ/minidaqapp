@@ -205,9 +205,8 @@ def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowd
         if enable_software_tpg:
             nw_specs.append(nwmgr.Connection(name=f"{partition_name}.tp_datareq_{hostidx}",topics=[], address="tcp://{host_ru" + f"{hostidx}" + "}:" + f"{port}"))
             port = port + 1
-            for idx in range(number_of_data_producers):
-                nw_specs.append(nwmgr.Connection(name=f"{partition_name}.tpsets_{hostidx*number_of_data_producers+idx}", topics=["TPSets"], address = "tcp://{host_ru" + f"{hostidx}" + "}:" + f"{port}"))
-                port = port + 1
+            nw_specs.append(nwmgr.Connection(name=f"{partition_name}.tpsets_{hostidx}", topics=["TPSets"], address = "tcp://{host_ru" + f"{hostidx}" + "}:" + f"{port}"))
+            port = port + 1
 
         nw_specs.append(nwmgr.Connection(name=f"{partition_name}.datareq_{hostidx}", topics=[], address="tcp://{host_ru" + f"{hostidx}" + "}:" + f"{port}"))
         port = port + 1
