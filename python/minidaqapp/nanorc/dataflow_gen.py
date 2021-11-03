@@ -131,7 +131,7 @@ def generate(NW_SPECS,
                                         ] + [
                                             trb.geoidinst(region=idx, element=NUMBER_OF_DATA_PRODUCERS + idy, system=SYSTEM_TYPE, connection_name=f"{PARTITION}.tp_datareq_{idx}") for idx in range(NUMBER_OF_RU_HOSTS) for idy in range(NUMBER_OF_RAW_TP_PRODUCERS)
                                         ] + [
-                                            trb.geoidinst(region=idx, element=0, system="DataSelection", connection_name=f"{PARTITION}.ds_tp_datareq_0")  for idx in range(NUMBER_OF_RU_HOSTS)
+                                            trb.geoidinst(region=idx, element=idy, system="DataSelection", connection_name=f"{PARTITION}.ds_tp_datareq_0")  for idx in range(NUMBER_OF_RU_HOSTS) for idy in range(NUMBER_OF_DATA_PRODUCERS)
                                         ]
                                                               ) )),
                 ("datawriter", dw.ConfParams(initial_token_count=TOKEN_COUNT,
