@@ -38,6 +38,7 @@ import click
 @click.option('--host-timing-hw', default='np04-srv-012.cern.ch', help='Host to run the timing hardware interface app on')
 @click.option('--control-timing-hw', is_flag=True, default=False, help='Flag to control whether we are controlling timing hardware')
 @click.option('--timing-hw-connections-file', default="${TIMING_SHARE}/config/etc/connections.xml", help='Real timing hardware only: path to hardware connections file')
+@click.option('--region-id', default=0)
 # hsi readout options
 @click.option('--hsi-device-name', default="BOREAS_TLU", help='Real HSI hardware only: device name of HSI hw')
 @click.option('--hsi-readout-period', default=1e3, help='Real HSI hardware only: Period between HSI hardware polling [us]')
@@ -81,7 +82,7 @@ import click
 @click.argument('json_dir', type=click.Path())
 
 def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowdown_factor, run_number, trigger_rate_hz, trigger_window_before_ticks, trigger_window_after_ticks,
-        token_count, data_file, output_path, disable_trace, use_felix, use_ssp, host_df, host_ru, host_trigger, host_hsi, host_timing_hw, control_timing_hw, timing_hw_connections_file,
+        token_count, data_file, output_path, disable_trace, use_felix, use_ssp, host_df, host_ru, host_trigger, host_hsi, host_timing_hw, control_timing_hw, timing_hw_connections_file, region_id,
         hsi_device_name, hsi_readout_period, hsi_endpoint_address, hsi_endpoint_partition, hsi_re_mask, hsi_fe_mask, hsi_inv_mask, hsi_source,
         use_hsi_hw, hsi_device_id, mean_hsi_signal_multiplicity, hsi_signal_emulation_mode, enabled_hsi_signals,
         ttcm_s1, ttcm_s2, trigger_activity_plugin, trigger_activity_config, trigger_candidate_plugin, trigger_candidate_config,
@@ -269,6 +270,7 @@ def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowd
         CANDIDATE_CONFIG = eval(trigger_candidate_config),
         TOKEN_COUNT = trigemu_token_count,
         SYSTEM_TYPE = system_type,
+        REGION_ID = region_id,
         TTCM_S1=ttcm_s1,
         TTCM_S2=ttcm_s2,
         TRIGGER_WINDOW_BEFORE_TICKS = trigger_window_before_ticks,
@@ -283,6 +285,7 @@ def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowd
         OUTPUT_PATH = output_path,
         TOKEN_COUNT = df_token_count,
         SYSTEM_TYPE = system_type,
+        REGION_ID = region_id,
         SOFTWARE_TPG_ENABLED = enable_software_tpg,
         TPSET_WRITING_ENABLED = enable_tpset_writing,
         OPERATIONAL_ENVIRONMENT = op_env)
@@ -304,6 +307,7 @@ def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowd
             RAW_RECORDING_OUTPUT_DIR = raw_recording_output_dir,
             FRONTEND_TYPE = frontend_type,
             SYSTEM_TYPE = system_type,
+            REGION_ID = region_id,
             DQM_ENABLED=enable_dqm,
             DQM_KAFKA_ADDRESS=dqm_kafka_address,
             DQM_CMAP=dqm_cmap,
@@ -404,7 +408,8 @@ def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowd
                     "TIMING_SHARE": "getenv",
                     "LD_LIBRARY_PATH": "getenv",
                     "PATH": "getenv",
-                    "READOUT_SHARE": "getenv"
+                    "READOUT_SHARE": "getenv",
+                    "DQM_SHARE": "getenv"
                 },
                 "cmd": ["CMD_FAC=rest://localhost:${APP_PORT}",
                     "INFO_SVC=" + info_svc_uri,

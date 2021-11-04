@@ -64,6 +64,7 @@ def generate(NETWORK_ENDPOINTS,
         RAW_RECORDING_OUTPUT_DIR=".",
         FRONTEND_TYPE='wib',
         SYSTEM_TYPE='TPC',
+        REGION_ID=0,
         DQM_ENABLED=False,
         DQM_KAFKA_ADDRESS='',
         DQM_CMAP='HD',
@@ -265,7 +266,7 @@ def generate(NETWORK_ENDPOINTS,
         
                 ("fake_source",sec.Conf(
                             link_confs=[sec.LinkConfiguration(
-                            geoid=sec.GeoID(system=SYSTEM_TYPE, region=0, element=idx),
+                            geoid=sec.GeoID(system=SYSTEM_TYPE, region=REGION_ID, element=idx),
                                 slowdown=DATA_RATE_SLOWDOWN_FACTOR,
                                 queue_name=f"output_{idx-MIN_LINK}",
                                 data_filename = DATA_FILE
@@ -274,7 +275,7 @@ def generate(NETWORK_ENDPOINTS,
                             queue_timeout_ms = QUEUE_POP_WAIT_MS)),
                 ("pacman_source",pcr.Conf(
                                           link_confs=[pcr.LinkConfiguration(
-                                           geoid=pcr.GeoID(system=SYSTEM_TYPE, region=0, element=idx),
+                                           geoid=pcr.GeoID(system=SYSTEM_TYPE, region=REGION_ID, element=idx),
                                            ) for idx in range(NUMBER_OF_DATA_PRODUCERS)],
                                            zmq_receiver_timeout = 10000)),
                 ("flxcard_0",flxcr.Conf(card_id=CARDID,
@@ -311,16 +312,16 @@ def generate(NETWORK_ENDPOINTS,
                         readoutmodelconf= rconf.ReadoutModelConf(
                             source_queue_timeout_ms= QUEUE_POP_WAIT_MS,
                             # fake_trigger_flag=0, # default
-                            region_id = 0,
+                            region_id = REGION_ID,
                             element_id = idx,
                         ),
                         latencybufferconf= rconf.LatencyBufferConf(
                             latency_buffer_size = LATENCY_BUFFER_SIZE,
-                            region_id = 0,
+                            region_id = REGION_ID,
                             element_id = idx,
                         ),
                         rawdataprocessorconf= rconf.RawDataProcessorConf(
-                            region_id = 0,
+                            region_id = REGION_ID,
                             element_id = idx,
                             enable_software_tpg = SOFTWARE_TPG_ENABLED,
                             emulator_mode = EMULATOR_MODE
@@ -329,7 +330,7 @@ def generate(NETWORK_ENDPOINTS,
                             latency_buffer_size = LATENCY_BUFFER_SIZE,
                             pop_limit_pct = 0.8,
                             pop_size_pct = 0.1,
-                            region_id = 0,
+                            region_id = REGION_ID,
                             element_id = idx,
                             output_file = f"output_{idx + MIN_LINK}.out",
                             stream_buffer_size = 8388608,
@@ -341,16 +342,16 @@ def generate(NETWORK_ENDPOINTS,
                         readoutmodelconf= rconf.ReadoutModelConf(
                             source_queue_timeout_ms= QUEUE_POP_WAIT_MS,
                             # fake_trigger_flag=0, default
-                            region_id = 0,
+                            region_id = REGION_ID,
                             element_id = TOTAL_NUMBER_OF_DATA_PRODUCERS + idx,
                         ),
                         latencybufferconf= rconf.LatencyBufferConf(
                             latency_buffer_size = LATENCY_BUFFER_SIZE,
-                            region_id = 0,
+                            region_id = REGION_ID,
                             element_id = TOTAL_NUMBER_OF_DATA_PRODUCERS + idx,
                         ),
                         rawdataprocessorconf= rconf.RawDataProcessorConf(
-                            region_id = 0,
+                            region_id = REGION_ID,
                             element_id = TOTAL_NUMBER_OF_DATA_PRODUCERS + idx,
                             enable_software_tpg = False,
                         ),
@@ -358,7 +359,7 @@ def generate(NETWORK_ENDPOINTS,
                             latency_buffer_size = LATENCY_BUFFER_SIZE,
                             pop_limit_pct = 0.8,
                             pop_size_pct = 0.1,
-                            region_id = 0,
+                            region_id = REGION_ID,
                             element_id = TOTAL_NUMBER_OF_DATA_PRODUCERS + idx,
                             # output_file = f"output_{idx + MIN_LINK}.out",
                             stream_buffer_size = 100 if FRONTEND_TYPE=='pacman' else 8388608,
@@ -369,11 +370,12 @@ def generate(NETWORK_ENDPOINTS,
                 ("trb_dqm", trb.ConfParams(
                         general_queue_timeout=QUEUE_POP_WAIT_MS,
                         map=trb.mapgeoidqueue([
-                                trb.geoidinst(region=0, element=idx, system=SYSTEM_TYPE, queueinstance=f"data_requests_dqm_{idx}") for idx in range(MIN_LINK, MAX_LINK)
+                                trb.geoidinst(region=REGION_ID, element=idx, system=SYSTEM_TYPE, queueinstance=f"data_requests_dqm_{idx}") for idx in range(MIN_LINK, MAX_LINK)
                             ]),
                         ))
             ] + [
                 ('dqmprocessor', dqmprocessor.Conf(
+                        region=REGION_ID,
                         channel_map=DQM_CMAP, # 'HD' for horizontal drift or 'VD' for vertical drift
                         sdqm_hist=dqmprocessor.StandardDQM(**{'how_often' : DQM_RAWDISPLAY_PARAMS[0], 'unavailable_time' : DQM_RAWDISPLAY_PARAMS[1], 'num_frames' : DQM_RAWDISPLAY_PARAMS[2]}),
                         sdqm_mean_rms=dqmprocessor.StandardDQM(**{'how_often' : DQM_MEANRMS_PARAMS[0], 'unavailable_time' : DQM_MEANRMS_PARAMS[1], 'num_frames' : DQM_MEANRMS_PARAMS[2]}),

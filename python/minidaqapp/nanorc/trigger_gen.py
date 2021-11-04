@@ -83,6 +83,7 @@ def generate(
 
         TOKEN_COUNT: int = 10,
         SYSTEM_TYPE = 'wib',
+        REGION_ID: int = 0,
         TTCM_S1: int = 1,
         TTCM_S2: int = 2,
         TRIGGER_WINDOW_BEFORE_TICKS: int = 1000,
@@ -199,7 +200,7 @@ def generate(
 
     for idx in range(NUMBER_OF_TPSET_PRODUCERS):
         tp_confs.extend([
-            (f"buf{idx}", buf.Conf(tpset_buffer_size=10000, region=0, element=idx)),
+            (f"buf{idx}", buf.Conf(tpset_buffer_size=10000, region=REGION_ID, element=idx)),
             (f"tpset_subscriber_{idx}", ntoq.Conf(
                 msg_type="dunedaq::trigger::TPSet",
                 msg_module_name="TPSetNQ",
@@ -290,10 +291,10 @@ def generate(
         ("mlt", mlt.ConfParams(
             # This line requests the raw data from upstream DAQ _and_ the raw TPs from upstream DAQ
             links=[
-                mlt.GeoID(system=SYSTEM_TYPE, region=0, element=idx)
+                mlt.GeoID(system=SYSTEM_TYPE, region=REGION_ID, element=idx)
                 for idx in range(NUMBER_OF_RAWDATA_PRODUCERS + NUMBER_OF_TPSET_PRODUCERS)
             ] + [
-                mlt.GeoID(system="DataSelection", region=0, element=idx) for idx in range(NUMBER_OF_TPSET_PRODUCERS)
+                mlt.GeoID(system="DataSelection", region=REGION_ID, element=idx) for idx in range(NUMBER_OF_TPSET_PRODUCERS)
                 ],
             initial_token_count=TOKEN_COUNT
         )),
