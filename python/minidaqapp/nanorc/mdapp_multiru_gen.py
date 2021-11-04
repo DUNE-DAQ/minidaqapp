@@ -409,7 +409,7 @@ def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowd
                     "LD_LIBRARY_PATH": "getenv",
                     "PATH": "getenv",
                     "READOUT_SHARE": "getenv",
-                    "DQM_SHARE": "getenv"
+                    "DETCHANNELMAPS_SHARE": "getenv"
                 },
                 "cmd": ["CMD_FAC=rest://localhost:${APP_PORT}",
                     "INFO_SVC=" + info_svc_uri,
