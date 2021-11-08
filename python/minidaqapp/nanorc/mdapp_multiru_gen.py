@@ -93,6 +93,8 @@ def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowd
     """
       JSON_DIR: Json file output folder
     """
+    console.log("Loading dqm config generator")
+    from . import dqm_gen
     console.log("Loading dataflow config generator")
     from . import dataflow_gen
     console.log("Loading readout config generator")
@@ -104,8 +106,6 @@ def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowd
     console.log("Loading fake hsi config generator")
     from . import fake_hsi_gen
     console.log("Loading timing hardware config generator")
-    from . import dqm_gen
-    console.log("Loading dqm config generator")
     from . import thi_gen
     console.log(f"Generating configs for hosts trigger={host_trigger} dataflow={host_df} readout={host_ru} hsi={host_hsi} dqm={host_ru}")
 
