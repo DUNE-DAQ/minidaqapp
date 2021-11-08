@@ -10,6 +10,7 @@ moo.otypes.load_types('rcif/cmd.jsonnet')
 moo.otypes.load_types('appfwk/cmd.jsonnet')
 moo.otypes.load_types('appfwk/app.jsonnet')
 
+moo.otypes.load_types('dfmodules/triggerrecordbuilder.jsonnet')
 moo.otypes.load_types('nwqueueadapters/queuetonetwork.jsonnet')
 moo.otypes.load_types('nwqueueadapters/networktoqueue.jsonnet')
 moo.otypes.load_types('nwqueueadapters/networkobjectreceiver.jsonnet')
@@ -94,27 +95,16 @@ def generate(NETWORK_ENDPOINTS,
     ]
 
     for idx in range(NUMBER_OF_DATA_PRODUCERS):
-        if USE_FAKE_DATA_PRODUCERS:
-            mod_specs = mod_specs + [
-                mspec(f"fakedataprod_{idx + MIN_LINK}", "FakeDataProd", [
-                    app.QueueInfo(name="timesync_output_queue", inst="time_sync_q", dir="output"),
-                    app.QueueInfo(name="data_request_input_queue", inst=f"data_requests_{idx + MIN_LINK}", dir="input"),
-                    app.QueueInfo(name="data_fragment_output_queue", inst="data_fragments_q", dir="output")
-                ])
+        ls = [
+                # app.QueueInfo(name="raw_input", inst=f"{FRONTEND_TYPE}_link_{idx}", dir="input"),
+                app.QueueInfo(name="timesync", inst="time_sync_q", dir="output"),
+                app.QueueInfo(name="data_requests_0", inst=f"data_requests_{idx + MIN_LINK}", dir="input"),
+                app.QueueInfo(name="data_response_0", inst="data_fragments_q", dir="output"),
             ]
-        else:
-            ls = [
-                    app.QueueInfo(name="raw_input", inst=f"{FRONTEND_TYPE}_link_{idx}", dir="input"),
-                    app.QueueInfo(name="timesync", inst="time_sync_q", dir="output"),
-                    app.QueueInfo(name="data_requests_0", inst=f"data_requests_{idx + MIN_LINK}", dir="input"),
-                    app.QueueInfo(name="data_response_0", inst="data_fragments_q", dir="output"),
-                ]
 
-            ls.extend([
-            app.QueueInfo(name="data_requests_1", inst=f"data_requests_dqm_{idx+MIN_LINK}", dir="input"),
-            app.QueueInfo(name="data_response_1", inst="data_fragments_q_dqm", dir="output")])
-
-            mod_specs += [mspec(f"datahandler_{idx + MIN_LINK}", "DataLinkHandler", ls)]
+        ls.extend([
+        app.QueueInfo(name="data_requests_1", inst=f"data_requests_dqm_{idx+MIN_LINK}", dir="input"),
+        app.QueueInfo(name="data_response_1", inst="data_fragments_q_dqm", dir="output")])
 
     mod_specs += [mspec("timesync_to_network", "QueueToNetwork",
               [app.QueueInfo(name="input", inst="time_sync_q", dir="input")]
@@ -143,41 +133,36 @@ def generate(NETWORK_ENDPOINTS,
             [app.QueueInfo(name="output", inst="time_sync_dqm_q", dir="output")]
             )]
 
-            mod_specs.append(mspec(fake_source, card_reader, [
-                            app.QueueInfo(name=f"output_{idx}", inst=f"{FRONTEND_TYPE}_link_{idx}", dir="output")
-                                for idx in range(NUMBER_OF_DATA_PRODUCERS)
-                            ]))
-
     cmd_data['init'] = app.Init(queues=queue_specs, modules=mod_specs)
 
+    conf_list = [
+               # [("qton_fragments", qton.Conf(msg_type="std::unique_ptr<dunedaq::daqdataformats::Fragment>",
+               #                             msg_module_name="FragmentNQ",
+               #                             sender_config=nos.Conf(ipm_plugin_type="ZmqSender",
+               #                                                    address=NETWORK_ENDPOINTS[f"frags_{HOSTIDX}"],
+               #                                                    stype="msgpack"))),
 
-    conf_list = [("qton_fragments", qton.Conf(msg_type="std::unique_ptr<dunedaq::daqdataformats::Fragment>",
-                                           msg_module_name="FragmentNQ",
-                                           sender_config=nos.Conf(ipm_plugin_type="ZmqSender",
-                                                                  address=NETWORK_ENDPOINTS[f"frags_{HOSTIDX}"],
-                                                                  stype="msgpack"))),
 
+                # ("qton_timesync", qton.Conf(msg_type="dunedaq::dfmessages::TimeSync",
+                #                             msg_module_name="TimeSyncNQ",
+                #                             sender_config=nos.Conf(ipm_plugin_type="ZmqSender",
+                #                                                    address=NETWORK_ENDPOINTS[f"timesync_{HOSTIDX}"],
+                #                                                    stype="msgpack"))),
 
-                ("qton_timesync", qton.Conf(msg_type="dunedaq::dfmessages::TimeSync",
-                                            msg_module_name="TimeSyncNQ",
-                                            sender_config=nos.Conf(ipm_plugin_type="ZmqSender",
-                                                                   address=NETWORK_ENDPOINTS[f"timesync_{HOSTIDX}"],
-                                                                   stype="msgpack"))),
-
-                ("fake_source",sec.Conf(
-                            link_confs=[sec.LinkConfiguration(
-                            geoid=sec.GeoID(system=SYSTEM_TYPE, region=REGION_ID, element=idx),
-                                slowdown=DATA_RATE_SLOWDOWN_FACTOR,
-                                queue_name=f"output_{idx-MIN_LINK}",
-                                data_filename = DATA_FILE
-                                ) for idx in range(MIN_LINK,MAX_LINK)],
-                            # input_limit=10485100, # default
-                            queue_timeout_ms = QUEUE_POP_WAIT_MS)),
+                # ("fake_source",sec.Conf(
+                #             link_confs=[sec.LinkConfiguration(
+                #             geoid=sec.GeoID(system=SYSTEM_TYPE, region=REGION_ID, element=idx),
+                #                 slowdown=DATA_RATE_SLOWDOWN_FACTOR,
+                #                 queue_name=f"output_{idx-MIN_LINK}",
+                #                 data_filename = DATA_FILE
+                #                 ) for idx in range(MIN_LINK,MAX_LINK)],
+                #             # input_limit=10485100, # default
+                #             queue_timeout_ms = QUEUE_POP_WAIT_MS)),
             ] + [
-                (f"ntoq_datareq_{idx}", ntoq.Conf(msg_type="dunedaq::dfmessages::DataRequest",
-                                           msg_module_name="DataRequestNQ",
+                (f"ntoq_datafrag_{idx}", ntoq.Conf(msg_type="std::unique_ptr<dunedaq::daqdataformats::Fragment>",
+                                           msg_module_name="FragmentNQ",
                                            receiver_config=nor.Conf(ipm_plugin_type="ZmqReceiver",
-                                                                    address=NETWORK_ENDPOINTS[f"datareq_{idx}"]))) for idx in range(MIN_LINK,MAX_LINK)
+                                                                    address=NETWORK_ENDPOINTS[f"frags_{HOSTIDX}"]))) for idx in range(MIN_LINK,MAX_LINK)
             ] + [
                 ("trb_dqm", trb.ConfParams(
                         general_queue_timeout=QUEUE_POP_WAIT_MS,
@@ -196,15 +181,15 @@ def generate(NETWORK_ENDPOINTS,
                         link_idx=list(range(MIN_LINK, MAX_LINK)),
                         clock_frequency=CLOCK_SPEED_HZ,
                         ))
-            ] + [
-                ("timesync_to_network", qton.Conf(msg_type="dunedaq::dfmessages::TimeSync",
-                                msg_module_name="TimeSyncNQ",
-                                sender_config=nos.Conf(ipm_plugin_type="ZmqPublisher",
-                                                        address=NETWORK_ENDPOINTS[f"timesync_{HOSTIDX}"],
-                                                        topic="Timesync",
-                                                        stype="msgpack")
-                                )
-                )
+            # ] + [
+            #     ("timesync_to_network", qton.Conf(msg_type="dunedaq::dfmessages::TimeSync",
+            #                     msg_module_name="TimeSyncNQ",
+            #                     sender_config=nos.Conf(ipm_plugin_type="ZmqPublisher",
+            #                                             address=NETWORK_ENDPOINTS[f"timesync_{HOSTIDX}"],
+            #                                             topic="Timesync",
+            #                                             stype="msgpack")
+            #                     )
+            #     )
             ] + [
                 ("dqm_subscriber", ntoq.Conf(msg_type="dunedaq::dfmessages::TimeSync",
                                 msg_module_name="TimeSyncNQ",
@@ -222,7 +207,6 @@ def generate(NETWORK_ENDPOINTS,
     startpars = rccmd.StartParams(run=RUN_NUMBER)
     cmd_data['start'] = acmd([("qton_fragments", startpars),
             ("qton_timesync", startpars),
-            ("datahandler_.*", startpars),
             ("fake_source", startpars),
             ("ntoq_datareq_.*", startpars),
             ("ntoq_trigdec", startpars),
@@ -233,7 +217,6 @@ def generate(NETWORK_ENDPOINTS,
     cmd_data['stop'] = acmd([("ntoq_trigdec", None),
             ("ntoq_datareq_.*", None),
             ("fake_source", None),
-            ("datahandler_.*", None),
             ("qton_timesync", None),
             ("qton_fragments", None),
             ("trb_dqm", None),
