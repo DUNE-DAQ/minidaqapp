@@ -18,7 +18,6 @@ moo.otypes.load_types('flxlibs/felixcardreader.jsonnet')
 moo.otypes.load_types('readout/sourceemulatorconfig.jsonnet')
 moo.otypes.load_types('readout/readoutconfig.jsonnet')
 moo.otypes.load_types('lbrulibs/pacmancardreader.jsonnet')
-moo.otypes.load_types('dqm/dqmprocessor.jsonnet')
 moo.otypes.load_types('dfmodules/fakedataprod.jsonnet')
 
 # Import new types
@@ -35,7 +34,6 @@ import dunedaq.flxlibs.felixcardreader as flxcr
 import dunedaq.readout.readoutconfig as rconf
 import dunedaq.lbrulibs.pacmancardreader as pcr
 import dunedaq.dfmodules.triggerrecordbuilder as trb
-import dunedaq.dqm.dqmprocessor as dqmprocessor
 import dunedaq.dfmodules.fakedataprod as fdp
 
 from appfwk.utils import acmd, mcmd, mrccmd, mspec
@@ -65,12 +63,6 @@ def generate(NETWORK_ENDPOINTS,
         FRONTEND_TYPE='wib',
         SYSTEM_TYPE='TPC',
         REGION_ID=0,
-        DQM_ENABLED=False,
-        DQM_KAFKA_ADDRESS='',
-        DQM_CMAP='HD',
-        DQM_RAWDISPLAY_PARAMS=[60, 10, 50],
-        DQM_MEANRMS_PARAMS=[10, 1, 100],
-        DQM_FOURIER_PARAMS=[600, 60, 100],
         SOFTWARE_TPG_ENABLED=False,
         USE_FAKE_DATA_PRODUCERS=False):
     """Generate the json configuration for the readout and DF process"""
@@ -102,17 +94,6 @@ def generate(NETWORK_ENDPOINTS,
         queue_bare_specs += [
             app.QueueSpec(inst=f"{FRONTEND_TYPE}_link_{idx}", kind='FollySPSCQueue', capacity=100000)
             for idx in range(NUMBER_OF_DATA_PRODUCERS)
-        ]
-
-    if DQM_ENABLED:
-        queue_bare_specs += [
-            app.QueueSpec(inst=f"time_sync_dqm_q", kind='FollyMPMCQueue', capacity=1000),
-            app.QueueSpec(inst="data_fragments_q_dqm", kind='FollyMPMCQueue', capacity=1000),
-            app.QueueSpec(inst="trigger_decision_q_dqm", kind='FollySPSCQueue', capacity=20),
-            app.QueueSpec(inst="trigger_record_q_dqm", kind='FollySPSCQueue', capacity=20),
-        ] + [
-            app.QueueSpec(inst=f"data_requests_dqm_{idx+MIN_LINK}", kind='FollySPSCQueue', capacity=100)
-                for idx in range(NUMBER_OF_DATA_PRODUCERS)
         ]
 
     if SOFTWARE_TPG_ENABLED:
@@ -178,11 +159,6 @@ def generate(NETWORK_ENDPOINTS,
                     app.QueueInfo(name="data_response_0", inst="data_fragments_q", dir="output"),
                 ]
 
-            if DQM_ENABLED:
-                ls.extend([
-                app.QueueInfo(name="data_requests_1", inst=f"data_requests_dqm_{idx+MIN_LINK}", dir="input"),
-                app.QueueInfo(name="data_response_1", inst="data_fragments_q_dqm", dir="output")])
-
             if SOFTWARE_TPG_ENABLED:
                 ls.extend([
                     app.QueueInfo(name="tp_out", inst=f"tp_link_{idx+MIN_LINK}", dir="output"),
@@ -194,30 +170,6 @@ def generate(NETWORK_ENDPOINTS,
     mod_specs += [mspec("timesync_to_network", "QueueToNetwork",
               [app.QueueInfo(name="input", inst="time_sync_q", dir="input")]
               )]
-
-    if DQM_ENABLED:
-        mod_specs += [mspec("trb_dqm", "TriggerRecordBuilder", [
-                        app.QueueInfo(name="trigger_decision_input_queue", inst="trigger_decision_q_dqm", dir="input"),
-                        app.QueueInfo(name="trigger_record_output_queue", inst="trigger_record_q_dqm", dir="output"),
-                        app.QueueInfo(name="data_fragment_input_queue", inst="data_fragments_q_dqm", dir="input")
-                    ] + [
-                        app.QueueInfo(name=f"data_request_{idx}_output_queue", inst=f"data_requests_dqm_{idx+MIN_LINK}", dir="output")
-                            # for idx in range(NUMBER_OF_DATA_PRODUCERS)
-                            for idx in range(NUMBER_OF_DATA_PRODUCERS)
-                    ]),
-        ]
-        mod_specs += [mspec("dqmprocessor", "DQMProcessor", [
-                        app.QueueInfo(name="trigger_record_dqm_processor", inst="trigger_record_q_dqm", dir="input"),
-                        app.QueueInfo(name="trigger_decision_dqm_processor", inst="trigger_decision_q_dqm", dir="output"),
-                        # app.QueueInfo(name="timesync_dqm_processor", inst="time_sync_q", dir="input"),
-                        app.QueueInfo(name="timesync_dqm_processor", inst="time_sync_dqm_q", dir="input"),
-                    ]),
-
-        ]
-
-        mod_specs += [mspec("dqm_subscriber", "NetworkToQueue",
-                [app.QueueInfo(name="output", inst="time_sync_dqm_q", dir="output")]
-                )]
 
     if not USE_FAKE_DATA_PRODUCERS:
         if FLX_INPUT:
@@ -367,40 +319,12 @@ def generate(NETWORK_ENDPOINTS,
                         )
                         )) for idx in range(MIN_LINK, MAX_LINK)
             ] + [
-                ("trb_dqm", trb.ConfParams(
-                        general_queue_timeout=QUEUE_POP_WAIT_MS,
-                        map=trb.mapgeoidqueue([
-                                trb.geoidinst(region=REGION_ID, element=idx, system=SYSTEM_TYPE, queueinstance=f"data_requests_dqm_{idx}") for idx in range(MIN_LINK, MAX_LINK)
-                            ]),
-                        ))
-            ] + [
-                ('dqmprocessor', dqmprocessor.Conf(
-                        region=REGION_ID,
-                        channel_map=DQM_CMAP, # 'HD' for horizontal drift or 'VD' for vertical drift
-                        sdqm_hist=dqmprocessor.StandardDQM(**{'how_often' : DQM_RAWDISPLAY_PARAMS[0], 'unavailable_time' : DQM_RAWDISPLAY_PARAMS[1], 'num_frames' : DQM_RAWDISPLAY_PARAMS[2]}),
-                        sdqm_mean_rms=dqmprocessor.StandardDQM(**{'how_often' : DQM_MEANRMS_PARAMS[0], 'unavailable_time' : DQM_MEANRMS_PARAMS[1], 'num_frames' : DQM_MEANRMS_PARAMS[2]}),
-                        sdqm_fourier=dqmprocessor.StandardDQM(**{'how_often' : DQM_FOURIER_PARAMS[0], 'unavailable_time' : DQM_FOURIER_PARAMS[1], 'num_frames' : DQM_FOURIER_PARAMS[2]}),
-                        kafka_address=DQM_KAFKA_ADDRESS,
-                        link_idx=list(range(MIN_LINK, MAX_LINK)),
-                        clock_frequency=CLOCK_SPEED_HZ,
-                        ))
-            ] + [
                 ("timesync_to_network", qton.Conf(msg_type="dunedaq::dfmessages::TimeSync",
                                 msg_module_name="TimeSyncNQ",
                                 sender_config=nos.Conf(ipm_plugin_type="ZmqPublisher",
                                                         address=NETWORK_ENDPOINTS[f"timesync_{HOSTIDX}"],
                                                         topic="Timesync",
                                                         stype="msgpack")
-                                )
-                )
-            ] + [
-                ("dqm_subscriber", ntoq.Conf(msg_type="dunedaq::dfmessages::TimeSync",
-                                msg_module_name="TimeSyncNQ",
-                                receiver_config=nor.Conf(ipm_plugin_type="ZmqSubscriber",
-                                                        address=NETWORK_ENDPOINTS[f"timesync_{HOSTIDX}"],
-                                                        subscriptions=["Timesync"],
-                                                        # stype="msgpack")
-                                                         )
                                 )
                 )
             ]
@@ -451,8 +375,6 @@ def generate(NETWORK_ENDPOINTS,
             ("ssp.*", startpars),
             ("ntoq_datareq_.*", startpars),
             ("ntoq_trigdec", startpars),
-            ("trb_dqm", startpars),
-            ("dqmprocessor", startpars),
             ("qton_tp_fragments", startpars),
             (f"ntoq_tp_datarequests_.*", startpars),
             (f"tp_datahandler_.*", startpars),
@@ -468,8 +390,6 @@ def generate(NETWORK_ENDPOINTS,
             ("datahandler_.*", None),
             ("qton_timesync", None),
             ("qton_fragments", None),
-            ("trb_dqm", None),
-            ("dqmprocessor", None),
             ("qton_tp_fragments", None),
             (f"ntoq_tp_datarequests_.*", None),
             (f"tp_datahandler_.*", None),
