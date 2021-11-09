@@ -120,14 +120,14 @@ def generate(NETWORK_ENDPOINTS,
                 (f"qton_datareq_dqm_{idx}", qton.Conf(msg_type="dunedaq::dfmessages::DataRequest",
                                             msg_module_name="DataRequestNQ",
                                             sender_config=nos.Conf(ipm_plugin_type="ZmqSender",
-                                                                   address=NETWORK_ENDPOINTS[f"datareq_dqm_{idx}"],
+                                                                   address=NETWORK_ENDPOINTS[f"datareq_dqm_{HOSTIDX}_{idx}"],
                                                                    stype="msgpack")))
                                             for idx in range(MIN_LINK, MAX_LINK)
             ] + [
                 ("ntoq_fragments_dqm", ntoq.Conf(msg_type="std::unique_ptr<dunedaq::daqdataformats::Fragment>",
                                            msg_module_name="FragmentNQ",
                                            receiver_config=nor.Conf(ipm_plugin_type="ZmqReceiver",
-                                                                    address=NETWORK_ENDPOINTS[f"frags_dqm_{HOSTIDX}"])))
+                                                                    address=NETWORK_ENDPOINTS[f"fragx_dqm_{HOSTIDX}"])))
             ] + [
                 ("trb_dqm", trb.ConfParams(
                         general_queue_timeout=QUEUE_POP_WAIT_MS,

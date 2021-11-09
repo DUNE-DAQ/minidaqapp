@@ -194,9 +194,6 @@ def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowd
     for idx in range(total_number_of_data_producers):
         network_endpoints[f"datareq_{idx}"] = "tcp://{host_df}:" + f"{port}"
         port = port + 1
-        if enable_dqm:
-            network_endpoints[f"datareq_dqm_{idx}"] = "tcp://{host_df}:" + f"{port}"
-            port = port + 1
         if enable_software_tpg:
             network_endpoints[f"tp_datareq_{idx}"] = "tcp://{host_df}:" + f"{port}"
             port = port + 1
@@ -217,7 +214,10 @@ def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowd
         port = port + 1
 
         if enable_dqm:
-            network_endpoints[f"frags_dqm_{hostidx}"] = "tcp://{host_ru" + f"{hostidx}" + "}:" + f"{port}"
+            for idx in range(number_of_data_producers):
+                network_endpoints[f"datareq_dqm_{hostidx}_{idx}"] = "tcp://{host_ru" + f"{hostidx}" + "}:" + f"{port}"
+                port = port + 1
+            network_endpoints[f"fragx_dqm_{hostidx}"] = "tcp://{host_ru" + f"{hostidx}" + "}:" + f"{port}"
             port = port + 1
 
         if enable_software_tpg:
@@ -329,25 +329,25 @@ def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowd
             ) for hostidx in range(len(host_ru))]
     console.log("readout cmd data:", cmd_data_readout)
 
-    cmd_data_dqm = [ dqm_gen.generate(network_endpoints,
-            NUMBER_OF_DATA_PRODUCERS = number_of_data_producers,
-            TOTAL_NUMBER_OF_DATA_PRODUCERS=total_number_of_data_producers,
-            EMULATOR_MODE = emulator_mode,
-            RUN_NUMBER = run_number,
-            DATA_FILE = data_file,
-            CLOCK_SPEED_HZ = CLOCK_SPEED_HZ,
-            HOSTIDX = hostidx,
-            CARDID = cardid[hostidx],
-            SYSTEM_TYPE = system_type,
-            REGION_ID = region_id,
-            DQM_ENABLED=enable_dqm,
-            DQM_KAFKA_ADDRESS=dqm_kafka_address,
-            DQM_CMAP=dqm_cmap,
-            DQM_RAWDISPLAY_PARAMS=dqm_rawdisplay_params,
-            DQM_MEANRMS_PARAMS=dqm_meanrms_params,
-            DQM_FOURIER_PARAMS=dqm_fourier_params,
-            ) for hostidx in range(len(host_ru))]
     if enable_dqm:
+        cmd_data_dqm = [ dqm_gen.generate(network_endpoints,
+                NUMBER_OF_DATA_PRODUCERS = number_of_data_producers,
+                TOTAL_NUMBER_OF_DATA_PRODUCERS=total_number_of_data_producers,
+                EMULATOR_MODE = emulator_mode,
+                RUN_NUMBER = run_number,
+                DATA_FILE = data_file,
+                CLOCK_SPEED_HZ = CLOCK_SPEED_HZ,
+                HOSTIDX = hostidx,
+                CARDID = cardid[hostidx],
+                SYSTEM_TYPE = system_type,
+                REGION_ID = region_id,
+                DQM_ENABLED=enable_dqm,
+                DQM_KAFKA_ADDRESS=dqm_kafka_address,
+                DQM_CMAP=dqm_cmap,
+                DQM_RAWDISPLAY_PARAMS=dqm_rawdisplay_params,
+                DQM_MEANRMS_PARAMS=dqm_meanrms_params,
+                DQM_FOURIER_PARAMS=dqm_fourier_params,
+                ) for hostidx in range(len(host_ru))]
         console.log("dqm cmd data:", cmd_data_dqm)
 
 
@@ -424,8 +424,9 @@ def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowd
                     del cfg['apps'][app_hsi]
                 for ruapp in app_ru:
                     del cfg['apps'][ruapp]
-                for dqmapp in app_dqm:
-                    del cfg['apps'][dqmapp]
+                if enable_dqm:
+                    for dqmapp in app_dqm:
+                        del cfg['apps'][dqmapp]
                 if c == 'resume':
                     cfg['order'] = resume_order
                 elif c == 'pause':

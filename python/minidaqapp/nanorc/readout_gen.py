@@ -352,12 +352,12 @@ def generate(NETWORK_ENDPOINTS,
         conf_list.append( ("qton_fragments_dqm", qton.Conf(msg_type="std::unique_ptr<dunedaq::daqdataformats::Fragment>",
                                            msg_module_name="FragmentNQ",
                                            sender_config=nos.Conf(ipm_plugin_type="ZmqSender",
-                                                                  address=NETWORK_ENDPOINTS[f"frags_dqm_{HOSTIDX}"],
+                                                                  address=NETWORK_ENDPOINTS[f"fragx_dqm_{HOSTIDX}"],
                                                                   stype="msgpack"))) )
         conf_list.extend( (f"ntoq_datareq_dqm_{idx}", ntoq.Conf(msg_type="dunedaq::dfmessages::DataRequest",
                                         msg_module_name="DataRequestNQ",
                                         receiver_config=nor.Conf(ipm_plugin_type="ZmqReceiver",
-                                                                 address=NETWORK_ENDPOINTS[f"datareq_dqm_{idx}"])))
+                                                                 address=NETWORK_ENDPOINTS[f"datareq_dqm_{HOSTIDX}_{idx}"])))
                           for idx in range(MIN_LINK,MAX_LINK) )
 
     if SOFTWARE_TPG_ENABLED:
