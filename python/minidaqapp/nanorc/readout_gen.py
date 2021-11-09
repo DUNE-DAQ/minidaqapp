@@ -358,7 +358,7 @@ def generate(NETWORK_ENDPOINTS,
                                         msg_module_name="DataRequestNQ",
                                         receiver_config=nor.Conf(ipm_plugin_type="ZmqReceiver",
                                                                  address=NETWORK_ENDPOINTS[f"datareq_dqm_{HOSTIDX}_{idx}"])))
-                          for idx in range(MIN_LINK,MAX_LINK) )
+                          for idx in range(NUMBER_OF_DATA_PRODUCERS) )
 
     if SOFTWARE_TPG_ENABLED:
         conf_list.extend([

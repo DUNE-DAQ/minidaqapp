@@ -122,7 +122,7 @@ def generate(NETWORK_ENDPOINTS,
                                             sender_config=nos.Conf(ipm_plugin_type="ZmqSender",
                                                                    address=NETWORK_ENDPOINTS[f"datareq_dqm_{HOSTIDX}_{idx}"],
                                                                    stype="msgpack")))
-                                            for idx in range(MIN_LINK, MAX_LINK)
+                                            for idx in range(NUMBER_OF_DATA_PRODUCERS)
             ] + [
                 ("ntoq_fragments_dqm", ntoq.Conf(msg_type="std::unique_ptr<dunedaq::daqdataformats::Fragment>",
                                            msg_module_name="FragmentNQ",
