@@ -192,6 +192,9 @@ def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowd
     for idx in range(total_number_of_data_producers):
         network_endpoints[f"datareq_{idx}"] = "tcp://{host_df}:" + f"{port}"
         port = port + 1
+        if enable_dqm:
+            network_endpoints[f"datareq_dqm_{idx}"] = "tcp://{host_df}:" + f"{port}"
+            port = port + 1
         if enable_software_tpg:
             network_endpoints[f"tp_datareq_{idx}"] = "tcp://{host_df}:" + f"{port}"
             port = port + 1
@@ -210,6 +213,10 @@ def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowd
         port = port + 1
         network_endpoints[f"frags_{hostidx}"] = "tcp://{host_ru" + f"{hostidx}" + "}:" + f"{port}"
         port = port + 1
+
+        if enable_dqm:
+            network_endpoints[f"frags_dqm_{hostidx}"] = "tcp://{host_ru" + f"{hostidx}" + "}:" + f"{port}"
+            port = port + 1
 
         if enable_software_tpg:
             network_endpoints[f"tp_frags_{hostidx}"] = "tcp://{host_ru" + f"{hostidx}" + "}:" + f"{port}"
@@ -500,7 +507,6 @@ def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowd
             appport = appport + 1
         if enable_dqm:
             for hostidx in range(len(host_ru)):
-                cfg["hosts"][f"host_ru{hostidx}"] = host_ru[hostidx]
                 cfg["hosts"][f"host_dqm{hostidx}"] = host_ru[hostidx]
                 cfg["apps"][app_dqm[hostidx]] = {
                         "exec": "daq_application",
