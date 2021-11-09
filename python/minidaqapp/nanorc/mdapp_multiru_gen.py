@@ -96,8 +96,14 @@ def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowd
     """
       JSON_DIR: Json file output folder
     """
+
+    if exists(json_dir):
+        raise RuntimeError(f"Directory {json_dir} already exists")
+
     console.log("Loading dataflow config generator")
     from . import dataflow_gen
+    console.log("Loading dqm config generator")
+    from . import dqm_gen
     console.log("Loading readout config generator")
     from . import readout_gen
     console.log("Loading trigger config generator")
@@ -108,7 +114,7 @@ def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowd
     from . import fake_hsi_gen
     console.log("Loading timing hardware config generator")
     from . import thi_gen
-    console.log(f"Generating configs for hosts trigger={host_trigger} dataflow={host_df} readout={host_ru} hsi={host_hsi}")
+    console.log(f"Generating configs for hosts trigger={host_trigger} dataflow={host_df} readout={host_ru} hsi={host_hsi} dqm={host_ru}")
 
     total_number_of_data_producers = 0
 
@@ -207,6 +213,13 @@ def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowd
         port = port + 1
         network_endpoints[f"frags_{hostidx}"] = "tcp://{host_ru" + f"{hostidx}" + "}:" + f"{port}"
         port = port + 1
+
+        if enable_dqm:
+            for idx in range(number_of_data_producers):
+                network_endpoints[f"datareq_dqm_{hostidx}_{idx}"] = "tcp://{host_ru" + f"{hostidx}" + "}:" + f"{port}"
+                port = port + 1
+            network_endpoints[f"fragx_dqm_{hostidx}"] = "tcp://{host_ru" + f"{hostidx}" + "}:" + f"{port}"
+            port = port + 1
 
         if enable_software_tpg:
             network_endpoints[f"tp_frags_{hostidx}"] = "tcp://{host_ru" + f"{hostidx}" + "}:" + f"{port}"
@@ -313,18 +326,32 @@ def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowd
             SYSTEM_TYPE = system_type,
             REGION_ID = region_id,
             DQM_ENABLED=enable_dqm,
-            DQM_KAFKA_ADDRESS=dqm_kafka_address,
-            DQM_CMAP=dqm_cmap,
-            DQM_RAWDISPLAY_PARAMS=dqm_rawdisplay_params,
-            DQM_MEANRMS_PARAMS=dqm_meanrms_params,
-            DQM_FOURIER_PARAMS=dqm_fourier_params,
             SOFTWARE_TPG_ENABLED = enable_software_tpg,
             USE_FAKE_DATA_PRODUCERS = use_fake_data_producers
             ) for hostidx in range(len(host_ru))]
     console.log("readout cmd data:", cmd_data_readout)
 
-    if exists(json_dir):
-        raise RuntimeError(f"Directory {json_dir} already exists")
+    if enable_dqm:
+        cmd_data_dqm = [ dqm_gen.generate(network_endpoints,
+                NUMBER_OF_DATA_PRODUCERS = number_of_data_producers,
+                TOTAL_NUMBER_OF_DATA_PRODUCERS=total_number_of_data_producers,
+                EMULATOR_MODE = emulator_mode,
+                RUN_NUMBER = run_number,
+                DATA_FILE = data_file,
+                CLOCK_SPEED_HZ = CLOCK_SPEED_HZ,
+                HOSTIDX = hostidx,
+                CARDID = cardid[hostidx],
+                SYSTEM_TYPE = system_type,
+                REGION_ID = region_id,
+                DQM_ENABLED=enable_dqm,
+                DQM_KAFKA_ADDRESS=dqm_kafka_address,
+                DQM_CMAP=dqm_cmap,
+                DQM_RAWDISPLAY_PARAMS=dqm_rawdisplay_params,
+                DQM_MEANRMS_PARAMS=dqm_meanrms_params,
+                DQM_FOURIER_PARAMS=dqm_fourier_params,
+                ) for hostidx in range(len(host_ru))]
+        console.log("dqm cmd data:", cmd_data_dqm)
+
 
     data_dir = join(json_dir, 'data')
     os.makedirs(data_dir)
@@ -333,6 +360,7 @@ def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowd
     app_hsi = "hsi"
     app_trigger = "trigger"
     app_df = "dataflow"
+    app_dqm = [f"dqm{idx}" for idx in range(len(host_ru))]
     app_ru = [f"ruflx{idx}" if use_felix else f"ruemu{idx}" for idx in range(len(host_ru))]
     if use_ssp:
         app_ru = [f"russp{idx}" if use_ssp else f"ruemu{idx}" for idx in range(len(host_ru))]
@@ -340,14 +368,19 @@ def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowd
     jf_hsi = join(data_dir, app_hsi)
     jf_trigemu = join(data_dir, app_trigger)
     jf_df = join(data_dir, app_df)
+    jf_dqm = [join(data_dir, app_dqm[idx]) for idx in range(len(host_ru))]
     jf_ru = [join(data_dir, app_ru[idx]) for idx in range(len(host_ru))]
     if control_timing_hw:
         jf_thi=join(data_dir, app_thi)
 
     cmd_set = ["init", "conf", "start", "stop", "pause", "resume", "scrap", "record"]
     
-    apps =  [app_hsi, app_trigger, app_df] + app_ru
-    cmds_data =  [cmd_data_hsi, cmd_data_trigger, cmd_data_dataflow] + cmd_data_readout
+    apps = [app_hsi, app_trigger, app_df] + app_ru
+    if enable_dqm:
+        apps += app_dqm
+    cmds_data = [cmd_data_hsi, cmd_data_trigger, cmd_data_dataflow] + cmd_data_readout
+    if enable_dqm:
+        cmds_data += cmd_data_dqm
     if control_timing_hw:
         apps.append(app_thi)
         cmds_data.append(cmd_data_thi)
@@ -361,7 +394,7 @@ def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowd
 
     console.log(f"Generating top-level command json files")
 
-    start_order = [app_df] + [app_trigger] + app_ru + [app_hsi]
+    start_order = [app_df] + [app_trigger] + app_ru + [app_hsi] + app_dqm
     if not control_timing_hw and use_hsi_hw:
         resume_order = [app_trigger]
     else:
@@ -393,6 +426,9 @@ def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowd
                     del cfg['apps'][app_hsi]
                 for ruapp in app_ru:
                     del cfg['apps'][ruapp]
+                if enable_dqm:
+                    for dqmapp in app_dqm:
+                        del cfg['apps'][dqmapp]
                 if c == 'resume':
                     cfg['order'] = resume_order
                 elif c == 'pause':
@@ -438,7 +474,7 @@ def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowd
             "hosts": {
                 "host_df": host_df,
                 "host_trigger": host_trigger,
-                "host_hsi": host_hsi
+                "host_hsi": host_hsi,
             },
             "apps" : {
                 app_hsi: {
@@ -474,6 +510,14 @@ def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowd
                     "host": f"host_ru{hostidx}",
                     "port": appport }
             appport = appport + 1
+        if enable_dqm:
+            for hostidx in range(len(host_ru)):
+                cfg["hosts"][f"host_dqm{hostidx}"] = host_ru[hostidx]
+                cfg["apps"][app_dqm[hostidx]] = {
+                        "exec": "daq_application",
+                        "host": f"host_dqm{hostidx}",
+                        "port": appport }
+                appport = appport + 1
         
         if control_timing_hw:
             cfg["hosts"][f"host_timing_hw"] = host_timing_hw
