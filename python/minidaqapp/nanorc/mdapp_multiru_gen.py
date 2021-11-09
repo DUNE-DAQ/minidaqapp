@@ -2,7 +2,6 @@ import json
 import os
 import math
 import sys
-import glob
 import rich.traceback
 from rich.console import Console
 from os.path import exists, join
@@ -482,27 +481,9 @@ def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowd
 
         json.dump(cfg, f, indent=4, sort_keys=True)
 
-    console.log("Generating metadata file")
-    with open(join(json_dir, 'mdapp_multiru_gen.info'), 'w') as f:
-        mdapp_dir = os.path.dirname(os.path.abspath(__file__))
-        buildinfo_files = glob.glob('**/minidaqapp_build_info.txt', recursive=True)
-        buildinfo = {}
-        for buildinfo_file in buildinfo_files:
-            if(os.path.dirname(os.path.abspath(buildinfo_file)) in mdapp_dir):
-                with open(buildinfo_file, 'r') as ff:
-                    line = ff.readline()
-                    while line: 
-                        line_parse = line.split(':')
-                        buildinfo[line_parse[0].strip()]=':'.join(line_parse[1:]).strip()
-                        line = ff.readline()
-                    
-                break
-        mdapp_info = {
-            "command_line": ' '.join(sys.argv),
-            "mdapp_dir": mdapp_dir,
-            "build_info": buildinfo
-        }
-        json.dump(mdapp_info, f, indent=4, sort_keys=True)
+    console.log("Generating text file with command line arguments")
+    with open(join(json_dir, 'mdapp_multiru_gen.txt'), 'w') as f:
+        f.write(' '.join(sys.argv) + "\n")
 
     console.log(f"MDAapp config generated in {json_dir}")
 
