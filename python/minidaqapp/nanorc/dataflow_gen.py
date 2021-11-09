@@ -53,7 +53,8 @@ def generate(NETWORK_ENDPOINTS,
         REGION_ID=0,
         SOFTWARE_TPG_ENABLED=False,
         TPSET_WRITING_ENABLED=False,
-        OPERATIONAL_ENVIRONMENT="swtest"):
+        OPERATIONAL_ENVIRONMENT="swtest",
+        TPC_REGION_NAME_PREFIX="APA"):
     """Generate the json configuration for the readout and DF process"""
 
     if SOFTWARE_TPG_ENABLED:
@@ -175,7 +176,7 @@ def generate(NETWORK_ENDPOINTS,
                                     digits_for_trigger_number = 5,
                                     path_param_list = hdf5ds.PathParamList([hdf5ds.PathParams(detector_group_type="TPC",
                                                                                               detector_group_name="TPC",
-                                                                                              region_name_prefix="APA",
+                                                                                              region_name_prefix=TPC_REGION_NAME_PREFIX,
                                                                                               element_name_prefix="Link"),
                                                                             hdf5ds.PathParams(detector_group_type="PDS",
                                                                                               detector_group_name="PDS"),
