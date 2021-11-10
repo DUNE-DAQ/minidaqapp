@@ -6,14 +6,15 @@ moo.io.default_load_path = get_moo_model_path()
 # Load configuration types
 import moo.otypes
 moo.otypes.load_types('flxlibs/felixcardreader.jsonnet')
-moo.otypes.load_types('readout/fakecardreader.jsonnet')
+moo.otypes.load_types('readout/sourceemulatorconfig.jsonnet')
 moo.otypes.load_types('readout/datalinkhandler.jsonnet')
 moo.otypes.load_types('readout/datarecorder.jsonnet')
 moo.otypes.load_types('dqm/dqmprocessor.jsonnet')
 moo.otypes.load_types('dfmodules/fakedataprod.jsonnet')
 
 # Import new types
-import dunedaq.readout.fakecardreader as fakecr
+
+import dunedaq.readout.sourceemulatorconfig as sec
 import dunedaq.flxlibs.felixcardreader as flxcr
 import dunedaq.readout.datalinkhandler as dlh
 import dunedaq.readout.datarecorder as dr
@@ -62,7 +63,7 @@ def generate(# NETWORK_ENDPOINTS,
         modules["fake_source"] = Module(plugin = "FakeCardReader",
                                         connections = { f"output_{idx-MIN_LINK}" : Conn(f"datahandler_{idx}.raw_input")
                                                         for idx in range(MIN_LINK,MAX_LINK) },
-                                        conf = fakecr.Conf(link_confs = [ fakecr.LinkConfiguration(geoid=fakecr.GeoID(system = SYSTEM_TYPE, region = 0, element = idx),
+                                        conf = sec.Conf(link_confs = [ sec.LinkConfiguration(geoid=sec.GeoID(system = SYSTEM_TYPE, region = 0, element = idx),
                                                                                                    slowdown=DATA_RATE_SLOWDOWN_FACTOR,
                                                                                                    queue_name=f"output_{idx-MIN_LINK}",
                                                                                                    data_filename = DATA_FILE)

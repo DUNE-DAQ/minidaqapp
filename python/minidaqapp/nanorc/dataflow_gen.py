@@ -8,14 +8,14 @@ moo.otypes.load_types('dfmodules/datawriter.jsonnet')
 moo.otypes.load_types('dfmodules/hdf5datastore.jsonnet')
 moo.otypes.load_types('dfmodules/tpsetwriter.jsonnet')
 moo.otypes.load_types('flxlibs/felixcardreader.jsonnet')
-moo.otypes.load_types('readout/fakecardreader.jsonnet')
+
 moo.otypes.load_types('readout/datalinkhandler.jsonnet')
 
 import dunedaq.dfmodules.triggerrecordbuilder as trb
 import dunedaq.dfmodules.datawriter as dw
 import dunedaq.dfmodules.hdf5datastore as hdf5ds
 import dunedaq.dfmodules.tpsetwriter as tpsw
-import dunedaq.readout.fakecardreader as fakecr
+
 import dunedaq.flxlibs.felixcardreader as flxcr
 import dunedaq.readout.datalinkhandler as dlh
 
@@ -75,14 +75,12 @@ def generate(FRAGMENT_PRODUCERS,
                                                                                                   # mode = "all-per-file", # default
                                                                                                   max_file_size_bytes = 1073741824,
                                                                                                   disable_unique_filename_suffix = False,
-                                                                                                  filename_parameters = hdf5ds.HDF5DataStoreFileNameParams(overall_prefix = "swtest",
+                                                                                                  filename_parameters = hdf5ds.FileNameParams(overall_prefix = "swtest",
                                                                                                                                                          digits_for_run_number = 6,
                                                                                                                                                          file_index_prefix = "",
                                                                                                                                                          digits_for_file_index = 4,),
-                                                                                                  file_layout_parameters = hdf5ds.HDF5DataStoreFileLayoutParams(trigger_record_name_prefix = "TriggerRecord",
-                                                                                                                                                              digits_for_trigger_number = 5,
-                                                                                                                                                              digits_for_apa_number = 3,
-                                                                                                                                                              digits_for_link_number = 2,))))
+                                                                                                  file_layout_parameters = hdf5ds.FileLayoutParams(trigger_record_name_prefix = "TriggerRecord",
+                                                                                                                                                              digits_for_trigger_number = 5,))))
 
     if TPSET_WRITING_ENABLED:
         modules["tpswriter"] = Module(plugin = "TPSetWriter",
