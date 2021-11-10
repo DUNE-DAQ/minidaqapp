@@ -90,6 +90,7 @@ def generate(
 
         TOKEN_COUNT: int = 10,
         SYSTEM_TYPE = 'wib',
+        REGION_ID: int = 0,
         TTCM_S1: int = 1,
         TTCM_S2: int = 2,
         TRIGGER_WINDOW_BEFORE_TICKS: int = 1000,

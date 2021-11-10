@@ -57,10 +57,12 @@ def generate(NW_SPECS,
         OUTPUT_PATH=".",
         TOKEN_COUNT=0,
         SYSTEM_TYPE="TPC",
+        REGION_ID=0,
         SOFTWARE_TPG_ENABLED=False,
         TPSET_WRITING_ENABLED=False,
         PARTITION="UNKNOWN",
-        OPERATIONAL_ENVIRONMENT="swtest"):
+        OPERATIONAL_ENVIRONMENT="swtest",
+        TPC_REGION_NAME_PREFIX="APA"):
     """Generate the json configuration for the readout and DF process"""
 
     if SOFTWARE_TPG_ENABLED:
@@ -132,6 +134,7 @@ def generate(NW_SPECS,
                                             trb.geoidinst(region=idx, element=NUMBER_OF_DATA_PRODUCERS + idy, system=SYSTEM_TYPE, connection_name=f"{PARTITION}.tp_datareq_{idx}") for idx in range(NUMBER_OF_RU_HOSTS) for idy in range(NUMBER_OF_RAW_TP_PRODUCERS)
                                         ] + [
                                             trb.geoidinst(region=idx, element=idy, system="DataSelection", connection_name=f"{PARTITION}.ds_tp_datareq_0")  for idx in range(NUMBER_OF_RU_HOSTS) for idy in range(NUMBER_OF_DATA_PRODUCERS)
+
                                         ]
                                                               ) )),
                 ("datawriter", dw.ConfParams(initial_token_count=TOKEN_COUNT,
@@ -140,7 +143,7 @@ def generate(NW_SPECS,
                                 version = 3,
                                 operational_environment = OPERATIONAL_ENVIRONMENT,
                                 directory_path = OUTPUT_PATH,
-                                max_file_size_bytes = 1073741824,
+                                max_file_size_bytes = 4294967296,
                                 disable_unique_filename_suffix = False,
                                 filename_parameters = hdf5ds.FileNameParams(overall_prefix = OPERATIONAL_ENVIRONMENT,
                                     digits_for_run_number = 6,
@@ -150,7 +153,7 @@ def generate(NW_SPECS,
                                     digits_for_trigger_number = 5,
                                     path_param_list = hdf5ds.PathParamList([hdf5ds.PathParams(detector_group_type="TPC",
                                                                                               detector_group_name="TPC",
-                                                                                              region_name_prefix="APA",
+                                                                                              region_name_prefix=TPC_REGION_NAME_PREFIX,
                                                                                               element_name_prefix="Link"),
                                                                             hdf5ds.PathParams(detector_group_type="PDS",
                                                                                               detector_group_name="PDS"),
