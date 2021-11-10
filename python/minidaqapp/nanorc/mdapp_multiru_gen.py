@@ -255,6 +255,29 @@ def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowd
 
     console.log("trigger module graph:", mgraph_trigger)
 
+    mgraphs_readout = []
+    for hostidx in range(len(host_ru)):
+        this_readout_mgraph = readout_gen.generate(NUMBER_OF_DATA_PRODUCERS = number_of_data_producers,
+                                                    TOTAL_NUMBER_OF_DATA_PRODUCERS=total_number_of_data_producers,
+                                                    EMULATOR_MODE = emulator_mode,
+                                                    DATA_RATE_SLOWDOWN_FACTOR = data_rate_slowdown_factor,
+                                                    # RUN_NUMBER = run_number,
+                                                    DATA_FILE = data_file,
+                                                    FLX_INPUT = use_felix,
+                                                    CLOCK_SPEED_HZ = CLOCK_SPEED_HZ,
+                                                    HOSTIDX = hostidx,
+                                                    CARDID = cardid[hostidx],
+                                                    RAW_RECORDING_ENABLED = enable_raw_recording,
+                                                    RAW_RECORDING_OUTPUT_DIR = raw_recording_output_dir,
+                                                    FRONTEND_TYPE = frontend_type,
+                                                    SYSTEM_TYPE = system_type,
+                                                    DQM_ENABLED=enable_dqm,
+                                                    DQM_KAFKA_ADDRESS=dqm_kafka_address,
+                                                    SOFTWARE_TPG_ENABLED = enable_software_tpg,
+                                                    USE_FAKE_DATA_PRODUCERS = use_fake_data_producers)
+        console.log("readout mgraph:", this_readout_mgraph)
+        mgraphs_readout.append(this_readout_mgraph)
+
     if use_hsi_hw:
         mgraph_hsi = hsi_gen.generate(# the_system.network_endpoints,
             # RUN_NUMBER = run_number,
@@ -280,7 +303,10 @@ def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowd
             ENABLED_SIGNALS =  enabled_hsi_signals,)
 
     fragment_producers = mgraph_trigger.fragment_producers
-
+    for mgraph in mgraphs_readout:
+        assert all([key not in fragment_producers.keys() for key in mgraph.fragment_producers])
+        fragment_producers.update(mgraph.fragment_producers)
+        
     # Manually add the readout fragment producers
     # for hostidx in range(len(host_ru)):
     #     for dataprod in range(number_of_data_producers):
@@ -305,7 +331,7 @@ def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowd
         "dataflow": util.App(modulegraph=mgraph_dataflow, host=host_df),
     }
 
-    apps.update({ru_name: util.App(host=host_ru[i]) for i,ru_name in enumerate(ru_app_names)})
+    apps.update({ru_name: util.App(modulegraph=mgraphs_readout[i], host=host_ru[i]) for i,ru_name in enumerate(ru_app_names)})
 
     if control_timing_hw:
         apps["thi"] = util.App()
@@ -339,16 +365,18 @@ def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowd
 
 
     util.connect_fragment_producers("trigger", the_system, verbose=True)
+    for ru_app_name in ru_app_names:
+        util.connect_fragment_producers(ru_app_name, the_system, verbose=True)
 
     console.log("After connecting fragment producers, trigger mgraph:", the_system.apps['trigger'].modulegraph)
     console.log("After connecting fragment producers, the_system.app_connections:", the_system.app_connections)
     
     util.add_network("trigger", the_system, verbose=True)
     util.add_network("hsi", the_system, verbose=True)
+    for ru_app_name in ru_app_names:
+        util.add_network(ru_app_name, the_system, verbose=True)
 
-    console.log("Before add_network(), dataflow mgraph:", the_system.apps['dataflow'].modulegraph)
     util.add_network("dataflow", the_system, verbose=True)
-    console.log("After add_network(), dataflow mgraph:", the_system.apps['dataflow'].modulegraph)
     
     console.log(f"before assign_manual_endpoints(), the_system.network_endpoints = {the_system.network_endpoints}")
     
@@ -371,34 +399,13 @@ def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowd
             HSI_DEVICE_NAME=hsi_device_name,
         )
         console.log("thi cmd data:", cmd_data_thi)
-
-
-
-
-    cmd_data_readout = [ readout_gen.generate(the_system.network_endpoints,
-            NUMBER_OF_DATA_PRODUCERS = number_of_data_producers,
-            TOTAL_NUMBER_OF_DATA_PRODUCERS=total_number_of_data_producers,
-            EMULATOR_MODE = emulator_mode,
-            DATA_RATE_SLOWDOWN_FACTOR = data_rate_slowdown_factor,
-            RUN_NUMBER = run_number,
-            DATA_FILE = data_file,
-            FLX_INPUT = use_felix,
-            CLOCK_SPEED_HZ = CLOCK_SPEED_HZ,
-            HOSTIDX = hostidx,
-            CARDID = cardid[hostidx],
-            RAW_RECORDING_ENABLED = enable_raw_recording,
-            RAW_RECORDING_OUTPUT_DIR = raw_recording_output_dir,
-            FRONTEND_TYPE = frontend_type,
-            SYSTEM_TYPE = system_type,
-            DQM_ENABLED=enable_dqm,
-            DQM_KAFKA_ADDRESS=dqm_kafka_address,
-            SOFTWARE_TPG_ENABLED = enable_software_tpg,
-            USE_FAKE_DATA_PRODUCERS = use_fake_data_producers
-            ) for hostidx in range(len(host_ru))]
-    console.log("readout cmd data:", cmd_data_readout)
-
     
     cmd_data_trigger = util.make_app_command_data(apps["trigger"], verbose=True)
+
+    cmd_datas_readout = []
+    for ru_app_name in ru_app_names:
+        cmd_datas_readout.append(util.make_app_command_data(apps[ru_app_name], verbose=True))
+        
     cmd_data_hsi = util.make_app_command_data(apps["hsi"], verbose=True)
     
     cmd_data_dataflow = util.make_app_command_data(apps["dataflow"], verbose=True)
@@ -409,7 +416,7 @@ def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowd
         "trigger": cmd_data_trigger,
         "dataflow": cmd_data_dataflow,
     }
-    for name, cmd_data in zip(ru_app_names, cmd_data_readout):
+    for name, cmd_data in zip(ru_app_names, cmd_datas_readout):
         app_command_datas[name]=cmd_data
 
     if control_timing_hw:
