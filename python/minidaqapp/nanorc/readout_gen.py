@@ -357,8 +357,8 @@ def generate(NETWORK_ENDPOINTS,
         conf_list.extend( (f"ntoq_datareq_dqm_{idx}", ntoq.Conf(msg_type="dunedaq::dfmessages::DataRequest",
                                         msg_module_name="DataRequestNQ",
                                         receiver_config=nor.Conf(ipm_plugin_type="ZmqReceiver",
-                                                                 address=NETWORK_ENDPOINTS[f"datareq_dqm_{HOSTIDX}_{idx}"])))
-                          for idx in range(NUMBER_OF_DATA_PRODUCERS) )
+                                                                 address=NETWORK_ENDPOINTS[f"datareq_dqm_{idx}"])))
+                          for idx in range(MIN_LINK,MAX_LINK) )
 
     if SOFTWARE_TPG_ENABLED:
         conf_list.extend([

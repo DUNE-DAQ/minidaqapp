@@ -110,7 +110,7 @@ def generate(NETWORK_ENDPOINTS,
               [app.QueueInfo(name="output", inst="data_fragments_q_dqm", dir="output")
                ])]
     mod_specs += [
-        mspec(f"qton_datareq_dqm_{idx}", "QueueToNetwork",
+        mspec(f"qton_datareq_dqm_{idx+MIN_LINK}", "QueueToNetwork",
               [app.QueueInfo(name="input", inst=f"data_requests_dqm_{idx+MIN_LINK}", dir="input")
                ]) for idx in range(NUMBER_OF_DATA_PRODUCERS)]
 
@@ -120,9 +120,9 @@ def generate(NETWORK_ENDPOINTS,
                 (f"qton_datareq_dqm_{idx}", qton.Conf(msg_type="dunedaq::dfmessages::DataRequest",
                                             msg_module_name="DataRequestNQ",
                                             sender_config=nos.Conf(ipm_plugin_type="ZmqSender",
-                                                                   address=NETWORK_ENDPOINTS[f"datareq_dqm_{HOSTIDX}_{idx}"],
+                                                                   address=NETWORK_ENDPOINTS[f"datareq_dqm_{idx}"],
                                                                    stype="msgpack")))
-                                            for idx in range(NUMBER_OF_DATA_PRODUCERS)
+                                            for idx in range(MIN_LINK, MAX_LINK)
             ] + [
                 ("ntoq_fragments_dqm", ntoq.Conf(msg_type="std::unique_ptr<dunedaq::daqdataformats::Fragment>",
                                            msg_module_name="FragmentNQ",
