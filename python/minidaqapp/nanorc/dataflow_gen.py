@@ -51,31 +51,17 @@ QUEUE_POP_WAIT_MS = 100
 # CLOCK_SPEED_HZ = 50000000;
 
 def generate(NW_SPECS,
-        NUMBER_OF_DATA_PRODUCERS=2,
-        NUMBER_OF_RU_HOSTS=1,
+        RU_CONFIG=[],
         RUN_NUMBER=333,
         OUTPUT_PATH=".",
         TOKEN_COUNT=0,
         SYSTEM_TYPE="TPC",
-        REGION_ID=0,
         SOFTWARE_TPG_ENABLED=False,
         TPSET_WRITING_ENABLED=False,
         PARTITION="UNKNOWN",
         OPERATIONAL_ENVIRONMENT="swtest",
         TPC_REGION_NAME_PREFIX="APA"):
     """Generate the json configuration for the readout and DF process"""
-
-    if SOFTWARE_TPG_ENABLED:
-        NUMBER_OF_RAW_TP_PRODUCERS = NUMBER_OF_DATA_PRODUCERS
-        NUMBER_OF_DS_TP_PRODUCERS = NUMBER_OF_DATA_PRODUCERS
-    else:
-        NUMBER_OF_RAW_TP_PRODUCERS = 0
-        NUMBER_OF_DS_TP_PRODUCERS = 0
-
-    if TPSET_WRITING_ENABLED:
-        NUMBER_OF_TP_SUBSCRIBERS = NUMBER_OF_DATA_PRODUCERS
-    else:
-        NUMBER_OF_TP_SUBSCRIBERS = 0
 
     cmd_data = {}
 
@@ -110,8 +96,8 @@ def generate(NW_SPECS,
         mspec("datawriter", "DataWriter", [ app.QueueInfo(name="trigger_record_input_queue", inst="trigger_record_q", dir="input")]),
 
     ] + ([        
-        mspec(f"tpset_subscriber_{idx}", "NetworkToQueue", [app.QueueInfo(name="output", inst=f"tpsets_from_netq", dir="output")])  for idx in range(NUMBER_OF_TP_SUBSCRIBERS)
-    ]) + ([
+        mspec(f"tpset_subscriber_{idx}", "NetworkToQueue", [app.QueueInfo(name="output", inst=f"tpsets_from_netq", dir="output")])  for idx in range(len(RU_CONFIG))
+    ] if TPSET_WRITING_ENABLED else []) + ([
         mspec("tpswriter", "TPSetWriter", [app.QueueInfo(name="tpset_source", inst="tpsets_from_netq", dir="input")])
     ] if TPSET_WRITING_ENABLED else []) + ([
         mspec("tp_fragment_receiver", "FragmentReceiver", [app.QueueInfo(name="output", inst="data_fragments_q", dir="output")]),
@@ -129,13 +115,13 @@ def generate(NW_SPECS,
                 ("trb", trb.ConfParams( general_queue_timeout=QUEUE_POP_WAIT_MS,
                                         reply_connection_name = PARTITION+".frags_0",
                                         map=trb.mapgeoidconnections([
-                                                trb.geoidinst(region=idx, element=idy, system=SYSTEM_TYPE, connection_name=f"{PARTITION}.datareq_{idx}")  for idx in range(NUMBER_OF_RU_HOSTS) for idy in range(NUMBER_OF_DATA_PRODUCERS)
-                                        ] + [
-                                            trb.geoidinst(region=idx, element=NUMBER_OF_DATA_PRODUCERS + idy, system=SYSTEM_TYPE, connection_name=f"{PARTITION}.tp_datareq_{idx}") for idx in range(NUMBER_OF_RU_HOSTS) for idy in range(NUMBER_OF_RAW_TP_PRODUCERS)
-                                        ] + [
-                                            trb.geoidinst(region=idx, element=idy, system="DataSelection", connection_name=f"{PARTITION}.ds_tp_datareq_0")  for idx in range(NUMBER_OF_RU_HOSTS) for idy in range(NUMBER_OF_DATA_PRODUCERS)
+                                                trb.geoidinst(region=RU_CONFIG[ru]["region_id"], element=idx + RU_CONFIG[ru]["start_channel"], system=SYSTEM_TYPE, connection_name=f"{PARTITION}.datareq_{idx}") for ru in range(len(RU_CONFIG)) for idx in range(RU_CONFIG[ru]["channel_count"])
+                                        ] + ([
+                                            trb.geoidinst(region=RU_CONFIG[ru]["region_id"], element=idx + RU_CONFIG[ru]["start_channel"] + RU_CONFIG[ru]["channel_count"], system=SYSTEM_TYPE, connection_name=f"{PARTITION}.tp_datareq_{idx}") for ru in range(len(RU_CONFIG)) for idx in range(RU_CONFIG[ru]["channel_count"])
+                                        ] if SOFTWARE_TPG_ENABLED else []) + ([
+                                            trb.geoidinst(region=RU_CONFIG[ru]["region_id"], element=idx + RU_CONFIG[ru]["start_channel"], system="DataSelection", connection_name=f"{PARTITION}.ds_tp_datareq_0") for ru in range(len(RU_CONFIG)) for idx in range(RU_CONFIG[ru]["channel_count"])
 
-                                        ]
+                                        ] if SOFTWARE_TPG_ENABLED else [])
                                                               ) )),
                 ("datawriter", dw.ConfParams(initial_token_count=TOKEN_COUNT,
                                              token_connection=PARTITION+".triginh",
@@ -186,7 +172,7 @@ def generate(NW_SPECS,
                     receiver_config=nor.Conf(name=f'{PARTITION}.tpsets_{idx}',
                                              subscriptions=["TPSets"])
                 ))
-                for idx in range(NUMBER_OF_TP_SUBSCRIBERS)
+                for idx in range(len(RU_CONFIG))
             ] + ([
                 ("tpswriter", tpsw.ConfParams(
                     max_file_size_bytes=1000000000,

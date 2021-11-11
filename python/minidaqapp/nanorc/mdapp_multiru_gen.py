@@ -49,7 +49,7 @@ import click
 @click.option('--host-timing-hw', default='np04-srv-012.cern.ch', help='Host to run the timing hardware interface app on')
 @click.option('--control-timing-hw', is_flag=True, default=False, help='Flag to control whether we are controlling timing hardware')
 @click.option('--timing-hw-connections-file', default="${TIMING_SHARE}/config/etc/connections.xml", help='Real timing hardware only: path to hardware connections file')
-@click.option('--region-id', default=0)
+@click.option('--region-id', multiple=True, default=[0], help="Define the Region IDs for the RUs. If only specified once, will apply to all RUs.")
 # hsi readout options
 @click.option('--hsi-device-name', default="BOREAS_TLU", help='Real HSI hardware only: device name of HSI hw')
 @click.option('--hsi-readout-period', default=1e3, help='Real HSI hardware only: Period between HSI hardware polling [us]')
@@ -153,6 +153,8 @@ def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowd
         df_token_count = -1 * token_count
         trigemu_token_count = 0
 
+    if (len(region_id) != len(host_ru)) and (len(region_id) != 1):
+        raise Exception("--region-id should be specified either once only or once for each --host-ru!")
 
     if frontend_type == 'wib' or frontend_type == 'wib2':
         system_type = 'TPC'
@@ -208,14 +210,24 @@ def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowd
         nw_specs.append(nwmgr.Connection(name=f"{partition_name}.ds_tp_datareq_0",topics=[],   address="tcp://{host_trigger}:" + f"{port}"))
         port = port + 1
 
-    cardid = {}
     host_id_dict = {}
+    ru_configs = []
+    ru_channel_counts = {}
+    for region in region_id: ru_channel_counts[region] = 0
+    regionidx = 0
 
     for hostidx in range(len(host_ru)):
         if enable_software_tpg:
             nw_specs.append(nwmgr.Connection(name=f"{partition_name}.tp_datareq_{hostidx}",topics=[], address="tcp://{host_ru" + f"{hostidx}" + "}:" + f"{port}"))
             port = port + 1
             nw_specs.append(nwmgr.Connection(name=f"{partition_name}.tpsets_{hostidx}", topics=["TPSets"], address = "tcp://{host_ru" + f"{hostidx}" + "}:" + f"{port}"))
+            port = port + 1
+
+
+        if enable_dqm:
+            nw_specs.append(nwmgr.Connection(name=f"{partition_name}.datareq_dqm_{hostidx}", topics=[], address="tcp://{host_ru" + f"{hostidx}"+ "}:" + f"{port}"))
+            port = port + 1
+            nw_specs.append(nwmgr.Connection(name=f"{partition_name}.fragx_dqm_{hostidx}", topics=[], address="tcp://{host_ru" + f"{hostidx}" + "}:" + f"{port}"))
             port = port + 1
 
         nw_specs.append(nwmgr.Connection(name=f"{partition_name}.datareq_{hostidx}", topics=[], address="tcp://{host_ru" + f"{hostidx}" + "}:" + f"{port}"))
@@ -226,29 +238,15 @@ def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowd
         nw_specs.append(nwmgr.Connection(name=f"{partition_name}.timesync_{hostidx}", topics=["Timesync"], address= "tcp://{host_ru" + f"{hostidx}" + "}:" + f"{port}"))
         port = port + 1
 
-<<<<<<< HEAD
-=======
-        if enable_dqm:
-            for idx in range(number_of_data_producers):
-                network_endpoints[f"datareq_dqm_{hostidx}_{idx}"] = "tcp://{host_ru" + f"{hostidx}" + "}:" + f"{port}"
-                port = port + 1
-            network_endpoints[f"fragx_dqm_{hostidx}"] = "tcp://{host_ru" + f"{hostidx}" + "}:" + f"{port}"
-            port = port + 1
-
-        if enable_software_tpg:
-            network_endpoints[f"tp_frags_{hostidx}"] = "tcp://{host_ru" + f"{hostidx}" + "}:" + f"{port}"
-            port = port + 1
-            for idx in range(number_of_data_producers):
-                network_endpoints[f"tpsets_{hostidx*number_of_data_producers+idx}"] = "tcp://{host_ru" + f"{hostidx}" + "}:" + f"{port}"
-                port = port + 1
->>>>>>> origin/patch/2.8.2
+        cardid = 0
         if host_ru[hostidx] in host_id_dict:
             host_id_dict[host_ru[hostidx]] = host_id_dict[host_ru[hostidx]] + 1
-            cardid[hostidx] = host_id_dict[host_ru[hostidx]]
+            cardid = host_id_dict[host_ru[hostidx]]
         else:
-            cardid[hostidx] = 0
             host_id_dict[host_ru[hostidx]] = 0
-        hostidx = hostidx + 1
+        ru_configs.append( {"host": host_ru[hostidx], "card_id": cardid, "region_id": region_id[regionidx], "start_channel": ru_channel_counts[region_id[regionidx]], "channel_count": number_of_data_producers} )
+        ru_channel_counts[region_id[regionidx]] += number_of_data_producers + number_of_data_producers # double for TPSets
+        if len(region_id) != 1: regionidx = regionidx + 1
     
     if control_timing_hw:
         timing_cmd_network_endpoints = set()
@@ -293,16 +291,14 @@ def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowd
     console.log("hsi cmd data:", cmd_data_hsi)
 
     cmd_data_trigger = trigger_gen.generate(nw_specs,
-        NUMBER_OF_RAWDATA_PRODUCERS = number_of_data_producers,
-        NUMBER_OF_TPSET_PRODUCERS = number_of_data_producers if enable_software_tpg else 0,
-        NUMBER_OF_REGIONS = len(host_ru),
+        SOFTWARE_TPG_ENABLED = enable_software_tpg,
+        RU_CONFIG = ru_configs,
         ACTIVITY_PLUGIN = trigger_activity_plugin,
         ACTIVITY_CONFIG = eval(trigger_activity_config),
         CANDIDATE_PLUGIN = trigger_candidate_plugin,
         CANDIDATE_CONFIG = eval(trigger_candidate_config),
         TOKEN_COUNT = trigemu_token_count,
         SYSTEM_TYPE = system_type,
-        REGION_ID = region_id,
         TTCM_S1=ttcm_s1,
         TTCM_S2=ttcm_s2,
         TRIGGER_WINDOW_BEFORE_TICKS = trigger_window_before_ticks,
@@ -313,26 +309,20 @@ def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowd
     console.log("trigger cmd data:", cmd_data_trigger)
 
     cmd_data_dataflow = dataflow_gen.generate(nw_specs,
-        NUMBER_OF_DATA_PRODUCERS = number_of_data_producers,
-        NUMBER_OF_RU_HOSTS = len(host_ru),
+        RU_CONFIG = ru_configs,
         RUN_NUMBER = run_number,
         OUTPUT_PATH = output_path,
         TOKEN_COUNT = df_token_count,
         SYSTEM_TYPE = system_type,
-        REGION_ID = region_id,
         SOFTWARE_TPG_ENABLED = enable_software_tpg,
         TPSET_WRITING_ENABLED = enable_tpset_writing,
-<<<<<<< HEAD
         PARTITION=partition_name,
-        OPERATIONAL_ENVIRONMENT = op_env)
-=======
         OPERATIONAL_ENVIRONMENT = op_env,
         TPC_REGION_NAME_PREFIX = tpc_region_name_prefix)
->>>>>>> origin/patch/2.8.2
     console.log("dataflow cmd data:", cmd_data_dataflow)
 
     cmd_data_readout = [ readout_gen.generate(nw_specs,
-            NUMBER_OF_DATA_PRODUCERS = number_of_data_producers,
+            RU_CONFIG = ru_configs,
             EMULATOR_MODE = emulator_mode,
             DATA_RATE_SLOWDOWN_FACTOR = data_rate_slowdown_factor,
             RUN_NUMBER = run_number,
@@ -340,13 +330,11 @@ def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowd
             FLX_INPUT = use_felix,
             SSP_INPUT = use_ssp,
             CLOCK_SPEED_HZ = CLOCK_SPEED_HZ,
-            HOSTIDX = hostidx,
-            CARDID = cardid[hostidx],
+            RUIDX = hostidx,
             RAW_RECORDING_ENABLED = enable_raw_recording,
             RAW_RECORDING_OUTPUT_DIR = raw_recording_output_dir,
             FRONTEND_TYPE = frontend_type,
             SYSTEM_TYPE = system_type,
-            REGION_ID = region_id,
             DQM_ENABLED=enable_dqm,
             SOFTWARE_TPG_ENABLED = enable_software_tpg,
             USE_FAKE_DATA_PRODUCERS = use_fake_data_producers,
@@ -354,23 +342,21 @@ def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowd
     console.log("readout cmd data:", cmd_data_readout)
 
     if enable_dqm:
-        cmd_data_dqm = [ dqm_gen.generate(network_endpoints,
-                NUMBER_OF_DATA_PRODUCERS = number_of_data_producers,
-                TOTAL_NUMBER_OF_DATA_PRODUCERS=total_number_of_data_producers,
+        cmd_data_dqm = [ dqm_gen.generate(nw_specs,
+                RU_CONFIG = ru_configs,
                 EMULATOR_MODE = emulator_mode,
                 RUN_NUMBER = run_number,
                 DATA_FILE = data_file,
                 CLOCK_SPEED_HZ = CLOCK_SPEED_HZ,
-                HOSTIDX = hostidx,
-                CARDID = cardid[hostidx],
+                RUIDX = hostidx,
                 SYSTEM_TYPE = system_type,
-                REGION_ID = region_id,
                 DQM_ENABLED=enable_dqm,
                 DQM_KAFKA_ADDRESS=dqm_kafka_address,
                 DQM_CMAP=dqm_cmap,
                 DQM_RAWDISPLAY_PARAMS=dqm_rawdisplay_params,
                 DQM_MEANRMS_PARAMS=dqm_meanrms_params,
                 DQM_FOURIER_PARAMS=dqm_fourier_params,
+                PARTITION=partition_name
                 ) for hostidx in range(len(host_ru))]
         console.log("dqm cmd data:", cmd_data_dqm)
 
@@ -398,15 +384,11 @@ def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowd
     cmd_set = ["init", "conf", "start", "stop", "pause", "resume", "scrap", "record"]
     
     apps = [app_hsi, app_trigger, app_df] + app_ru
-<<<<<<< HEAD
-    cmds_data = [cmd_data_hsi, cmd_data_trigger, cmd_data_dataflow] + cmd_data_readout
-=======
     if enable_dqm:
         apps += app_dqm
     cmds_data = [cmd_data_hsi, cmd_data_trigger, cmd_data_dataflow] + cmd_data_readout
     if enable_dqm:
         cmds_data += cmd_data_dqm
->>>>>>> origin/patch/2.8.2
     if control_timing_hw:
         apps.append(app_thi)
         cmds_data.append(cmd_data_thi)

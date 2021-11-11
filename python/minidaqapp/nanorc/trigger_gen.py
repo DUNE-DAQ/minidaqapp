@@ -77,10 +77,9 @@ def make_moo_record(conf_dict,name,path='temptypes'):
 #===============================================================================
 def generate(
         NW_SPECS: list,
-
-        NUMBER_OF_RAWDATA_PRODUCERS: int = 2,
-        NUMBER_OF_TPSET_PRODUCERS: int = 2,
-        NUMBER_OF_REGIONS: int = 1,
+        
+        SOFTWARE_TPG_ENABLED: bool = False,
+        RU_CONFIG: list = [],
 
         ACTIVITY_PLUGIN: str = 'TriggerActivityMakerPrescalePlugin',
         ACTIVITY_CONFIG: dict = dict(prescale=10000),
@@ -90,7 +89,6 @@ def generate(
 
         TOKEN_COUNT: int = 10,
         SYSTEM_TYPE = 'wib',
-        REGION_ID: int = 0,
         TTCM_S1: int = 1,
         TTCM_S2: int = 2,
         TRIGGER_WINDOW_BEFORE_TICKS: int = 1000,
@@ -104,24 +102,24 @@ def generate(
 
     # Define modules and queues
     queue_bare_specs = [
-        ] + ([
-            app.QueueSpec(inst="tpsets_from_netq", kind='FollyMPMCQueue', capacity=1000),
-            app.QueueSpec(inst='zipped_tpset_q', kind='FollySPSCQueue', capacity=1000),
-            app.QueueSpec(inst='taset_q', kind='FollySPSCQueue', capacity=1000),
-        ] if NUMBER_OF_TPSET_PRODUCERS else []) + [
         app.QueueSpec(inst='trigger_candidate_q', kind='FollyMPMCQueue', capacity=1000),
         app.QueueSpec(inst="hsievent_from_netq", kind='FollyMPMCQueue', capacity=1000),
     ]
 
-    if NUMBER_OF_TPSET_PRODUCERS:
+    if SOFTWARE_TPG_ENABLED:
         queue_bare_specs.extend([
                 app.QueueSpec(inst=f"fragment_q", kind='FollyMPMCQueue', capacity=1000),
         ])
-        for idx in range(NUMBER_OF_REGIONS):
-            for idy in range(NUMBER_OF_TPSET_PRODUCERS):
+        for ru in range(len(RU_CONFIG)):
+            queue_bare_specs.extend([
+                app.QueueSpec(inst=f"tpsets_from_netq_{ru}", kind='FollySPSCQueue', capacity=1000),
+                app.QueueSpec(inst=f'zipped_tpset_q_{ru}', kind='FollySPSCQueue', capacity=1000),
+                app.QueueSpec(inst=f'taset_q_{ru}', kind='FollySPSCQueue', capacity=1000),
+            ])
+            for idx in range(RU_CONFIG[ru]["channel_count"]):
                 queue_bare_specs.extend([
-                    app.QueueSpec(inst=f"tpset_q_for_buf{idx}_{idy}", kind='FollySPSCQueue', capacity=1000),
-                    app.QueueSpec(inst=f"data_request_q{idx}_{idy}", kind='FollySPSCQueue', capacity=1000),
+                    app.QueueSpec(inst=f"tpset_q_for_buf{ru}_{idx}", kind='FollySPSCQueue', capacity=1000),
+                    app.QueueSpec(inst=f"data_request_q{ru}_{idx}", kind='FollySPSCQueue', capacity=1000),
                 ])
 
     # Only needed to reproduce the same order as when using jsonnet
@@ -129,48 +127,46 @@ def generate(
 
     mod_specs = []
 
-    if NUMBER_OF_TPSET_PRODUCERS:
+    if SOFTWARE_TPG_ENABLED:
         mod_specs.extend([
-            mspec(f"request_receiver", "RequestReceiver", [app.QueueInfo(name="output", inst=f"data_request_q{idx}_{idy}", dir="output")]) for idx in range(NUMBER_OF_REGIONS) for idy in range(NUMBER_OF_TPSET_PRODUCERS) 
+            mspec(f"request_receiver", "RequestReceiver", [app.QueueInfo(name="output", inst=f"data_request_q{ru}_{idy}", dir="output")]) for ru in range(len(RU_CONFIG)) for idy in range(RU_CONFIG[ru]["channel_count"]) 
         ] + [
-            mspec(f"tpset_receiver", "TPSetReceiver", [app.QueueInfo(name="output", inst=f"tpset_q_for_buf{idx}_{idy}", dir="output")]) for idx in range(NUMBER_OF_REGIONS) for idy in range(NUMBER_OF_TPSET_PRODUCERS)
+            mspec(f"tpset_receiver", "TPSetReceiver", [app.QueueInfo(name="output", inst=f"tpset_q_for_buf{ru}_{idy}", dir="output")]) for ru in range(len(RU_CONFIG)) for idy in range(RU_CONFIG[ru]["channel_count"])
         ] + [
             mspec(f"qton_fragments", "QueueToNetwork", [app.QueueInfo(name="input", inst=f"fragment_q", dir="input")])
         ])
-        for idx in range(NUMBER_OF_REGIONS):
+        for ru in range(len(RU_CONFIG)):
             mod_specs.extend([
-                mspec(f"tpset_subscriber_{idx}", "NetworkToQueue", [
-                    app.QueueInfo(name="output", inst=f"tpsets_from_netq", dir="output")
+                mspec(f"tpset_subscriber_{ru}", "NetworkToQueue", [
+                    app.QueueInfo(name="output", inst=f"tpsets_from_netq_{ru}", dir="output")
+                ]),
+                mspec(f"zip_{ru}", "TPZipper", [
+                    app.QueueInfo(name="input", inst=f"tpsets_from_netq_{ru}", dir="input"),
+                    app.QueueInfo(name="output", inst=f"zipped_tpset_q_{ru}", dir="output"), #FIXME need to fanout this zipped_tpset_q if using multiple algorithms
+                ]),
+
+                ### Algorithm(s)
+
+                mspec(f'tam_{ru}', 'TriggerActivityMaker', [ # TPSet -> TASet
+                    app.QueueInfo(name='input', inst=f'zipped_tpset_q_{ru}', dir='input'),
+                    app.QueueInfo(name='output', inst=f'taset_q_{ru}', dir='output'),
+                ]),
+
+                mspec(f'tcm_{ru}', 'TriggerCandidateMaker', [ # TASet -> TC
+                    app.QueueInfo(name='input', inst=f'taset_q_{ru}', dir='input'),
+                    app.QueueInfo(name='output', inst=f'trigger_candidate_q', dir='output'),
                 ])
             ])
-            for idy in range(NUMBER_OF_TPSET_PRODUCERS):
+            for idy in range(RU_CONFIG[ru]["channel_count"]):
                 mod_specs.extend([
-                mspec(f"buf{idx}_{idy}", "TPSetBufferCreator", [
-                    app.QueueInfo(name="tpset_source", inst=f"tpset_q_for_buf{idx}_{idy}", dir="input"),
-                    app.QueueInfo(name="data_request_source", inst=f"data_request_q{idx}_{idy}", dir="input"),
+                mspec(f"buf{ru}_{idy}", "TPSetBufferCreator", [
+                    app.QueueInfo(name="tpset_source", inst=f"tpset_q_for_buf{ru}_{idy}", dir="input"),
+                    app.QueueInfo(name="data_request_source", inst=f"data_request_q{ru}_{idy}", dir="input"),
                     app.QueueInfo(name="fragment_sink", inst=f"fragment_q", dir="output"),
                 ])
             ])
 
     mod_specs += ([
-            mspec("zip", "TPZipper", [
-                app.QueueInfo(name="input", inst="tpsets_from_netq", dir="input"),
-                app.QueueInfo(name="output", inst="zipped_tpset_q", dir="output"), #FIXME need to fanout this zipped_tpset_q if using multiple algorithms
-            ]),
-
-            ### Algorithm(s)
-
-            mspec('tam', 'TriggerActivityMaker', [ # TPSet -> TASet
-                app.QueueInfo(name='input', inst='zipped_tpset_q', dir='input'),
-                app.QueueInfo(name='output', inst='taset_q', dir='output'),
-            ]),
-
-            mspec('tcm', 'TriggerCandidateMaker', [ # TASet -> TC
-                app.QueueInfo(name='input', inst='taset_q', dir='input'),
-                app.QueueInfo(name='output', inst='trigger_candidate_q', dir='output'),
-            ])
-
-        ] if NUMBER_OF_TPSET_PRODUCERS else []) + [
 
         ### Timing TCs
         mspec("ntoq_hsievent", "NetworkToQueue", [
@@ -188,7 +184,7 @@ def generate(
             app.QueueInfo(name="trigger_candidate_source", inst="trigger_candidate_q", dir="input"),
         ]),
 
-    ]
+    ])
 
     cmd_data['init'] = app.Init(queues=queue_specs, modules=mod_specs, nwconnections=NW_SPECS)
 
@@ -199,59 +195,59 @@ def generate(
 
     tp_confs = []
 
-    if NUMBER_OF_TPSET_PRODUCERS:
+    if SOFTWARE_TPG_ENABLED:
         tp_confs.extend([
-                            ("request_receiver", rrcv.ConfParams(
-                                        map = [rrcv.geoidinst(region=idx , element=idy, system="DataSelection" , queueinstance=f"data_request_q{idx}_{idy}") for idx in range(NUMBER_OF_REGIONS) for idy in range(NUMBER_OF_TPSET_PRODUCERS)],
-                                        general_queue_timeout = 100,
-                                        connection_name = f"{PARTITION}.ds_tp_datareq_0")),
-                            ("tpset_receiver", tpsrcv.ConfParams(
-                                        map = [tpsrcv.geoidinst(region=idx , element=idy, system=SYSTEM_TYPE , queueinstance=f"tpset_q_for_buf{idx}_{idy}") for idx in range(NUMBER_OF_REGIONS) for idy in range(NUMBER_OF_TPSET_PRODUCERS)],
-                                        general_queue_timeout = 100,
-                                        topic = f"TPSets")),
-                            (f"qton_fragments", qton.Conf(msg_type="std::unique_ptr<dunedaq::dataformats::Fragment>",
-                                            msg_module_name="FragmentNQ",
-                                            sender_config=nos.Conf(name=f"{PARTITION}.frags_tpset_ds_0",
-                                                               stype="msgpack")))
-                        ])
-        for idx in range(NUMBER_OF_REGIONS):
+            ("request_receiver", rrcv.ConfParams(
+                                                 map = [rrcv.geoidinst(region=RU_CONFIG[ru]["region_id"], element=idy + RU_CONFIG[ru]["start_channel"], system="DataSelection" , queueinstance=f"data_request_q{ru}_{idy}") for ru in range(len(RU_CONFIG)) for idy in range(RU_CONFIG[ru]["channel_count"])],
+                                                 general_queue_timeout = 100,
+                                                 connection_name = f"{PARTITION}.ds_tp_datareq_0")),
+            ("tpset_receiver", tpsrcv.ConfParams(
+                                                 map = [tpsrcv.geoidinst(region=RU_CONFIG[ru]["region_id"] , element=idy + RU_CONFIG[ru]["start_channel"], system=SYSTEM_TYPE , queueinstance=f"tpset_q_for_buf{ru}_{idy}") for idx in range(len(RU_CONFIG)) for idy in range(RU_CONFIG[ru]["channel_count"])],
+                                                 general_queue_timeout = 100,
+                                                 topic = f"TPSets")),
+            (f"qton_fragments", qton.Conf(msg_type="std::unique_ptr<dunedaq::daqdataformats::Fragment>",
+                                          msg_module_name="FragmentNQ",
+                                          sender_config=nos.Conf(name=f"{PARTITION}.frags_tpset_ds_0",
+                                                                 stype="msgpack")))
+        ])
+        for idx in range(len(RU_CONFIG)):
             tp_confs.extend([
-                    (f"tpset_subscriber_{idx}", ntoq.Conf(
+                (f"tpset_subscriber_{idx}", ntoq.Conf(
                     msg_type="dunedaq::trigger::TPSet",
                     msg_module_name="TPSetNQ",
                     receiver_config=nor.Conf(name=f'{PARTITION}.tpsets_{idx}',
                                              subscriptions=["TPSets"])
-                ))
+                )),
+                (f"zip_{idx}", tzip.ConfParams(
+                    cardinality=RU_CONFIG[idx]["channel_count"],
+                    max_latency_ms=1000,
+                    region_id=0, # Fake placeholder
+                    element_id=0 # Fake placeholder
+                )),
+
+                ### Algorithms
+
+                (f'tam_{idx}', tam.Conf(
+                    activity_maker=ACTIVITY_PLUGIN,
+                    geoid_region=0, # Fake placeholder
+                    geoid_element=0, # Fake placeholder
+                    window_time=10000, # should match whatever makes TPSets, in principle
+                    buffer_time=625000, # 10ms in 62.5 MHz ticks
+                    activity_maker_config=temptypes.ActivityConf(**ACTIVITY_CONFIG)
+                )),
+
+                (f'tcm_{idx}', tcm.Conf(
+                    candidate_maker=CANDIDATE_PLUGIN,
+                    candidate_maker_config=temptypes.CandidateConf(**CANDIDATE_CONFIG)
+                )),
             ])
-            for idy in range(NUMBER_OF_TPSET_PRODUCERS):
+            for idy in range(RU_CONFIG[idx]["channel_count"]):
                 tp_confs.extend([
-                    (f"buf{idx}_{idy}", buf.Conf(tpset_buffer_size=10000, region=idx, element=idy))                
+                    (f"buf{idx}_{idy}", buf.Conf(tpset_buffer_size=10000, region=RU_CONFIG[idx]["region_id"], element=idy + RU_CONFIG[idx]["start_channel"])) 
                 ])
 
     cmd_data['conf'] = acmd(tp_confs + [
 
-        ("zip", tzip.ConfParams(
-             cardinality=NUMBER_OF_TPSET_PRODUCERS,
-             max_latency_ms=1000,
-             region_id=0, # Fake placeholder
-             element_id=0 # Fake placeholder
-        )),
-
-        ### Algorithms
-
-        ('tam', tam.Conf(
-            activity_maker=ACTIVITY_PLUGIN,
-            geoid_region=0, # Fake placeholder
-            geoid_element=0, # Fake placeholder
-            window_time=10000, # should match whatever makes TPSets, in principle
-            buffer_time=625000, # 10ms in 62.5 MHz ticks
-            activity_maker_config=temptypes.ActivityConf(**ACTIVITY_CONFIG)
-        )),
-
-        ('tcm', tcm.Conf(
-            candidate_maker=CANDIDATE_PLUGIN,
-            candidate_maker_config=temptypes.CandidateConf(**CANDIDATE_CONFIG)
-        )),
 
         ### Timing TCs
 
@@ -271,17 +267,16 @@ def generate(
             )
         ),
 
-
         # Module level trigger
         ("mlt", mlt.ConfParams(
             # This line requests the raw data from upstream DAQ _and_ the raw TPs from upstream DAQ
             td_connection_name=PARTITION+".trigdec",
             token_connection_name=PARTITION+".triginh",
             links=[
-                mlt.GeoID(system=SYSTEM_TYPE, region=rdx, element=idx)
-                for idx in range(NUMBER_OF_RAWDATA_PRODUCERS + NUMBER_OF_TPSET_PRODUCERS) for rdx in range(NUMBER_OF_REGIONS)
+                mlt.GeoID(system=SYSTEM_TYPE, region=RU_CONFIG[ru]["region_id"], element=idx)
+                for ru in range(len(RU_CONFIG)) for idx in range(RU_CONFIG[ru]["channel_count"] * 2)
             ] + [
-                mlt.GeoID(system="DataSelection", region=rdx, element=idx) for idx in range(NUMBER_OF_TPSET_PRODUCERS) for rdx in range(NUMBER_OF_REGIONS)
+                mlt.GeoID(system="DataSelection", region=RU_CONFIG[ru]["region_id"], element=idx) for ru in range(len(RU_CONFIG)) for idx in range(RU_CONFIG[ru]["channel_count"])
                 ],
             initial_token_count=TOKEN_COUNT
         )),
@@ -300,12 +295,12 @@ def generate(
         "ntoq_token"
     ]
 
-    if NUMBER_OF_TPSET_PRODUCERS:
+    if SOFTWARE_TPG_ENABLED:
         start_order += [
             "qton_fragments",
             "tcm",
             "tam",
-            "zip",
+            "zip_.*",
             "tpset_subscriber_.*",
             "tpset_receiver",
             "request_receiver"
