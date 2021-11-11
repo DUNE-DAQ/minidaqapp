@@ -1,6 +1,8 @@
 import json
 import os
 import math
+import sys
+import glob
 import rich.traceback
 from rich.console import Console
 from os.path import exists, join
@@ -38,6 +40,7 @@ import click
 @click.option('--host-timing-hw', default='np04-srv-012.cern.ch', help='Host to run the timing hardware interface app on')
 @click.option('--control-timing-hw', is_flag=True, default=False, help='Flag to control whether we are controlling timing hardware')
 @click.option('--timing-hw-connections-file', default="${TIMING_SHARE}/config/etc/connections.xml", help='Real timing hardware only: path to hardware connections file')
+@click.option('--region-id', default=0)
 # hsi readout options
 @click.option('--hsi-device-name', default="BOREAS_TLU", help='Real HSI hardware only: device name of HSI hw')
 @click.option('--hsi-readout-period', default=1e3, help='Real HSI hardware only: Period between HSI hardware polling [us]')
@@ -77,23 +80,30 @@ import click
 @click.option('--dqm-rawdisplay-params', nargs=3, default=[60, 10, 50], help="Parameters that control the data sent for the raw display plot")
 @click.option('--dqm-meanrms-params', nargs=3, default=[10, 1, 100], help="Parameters that control the data sent for the mean/rms plot")
 @click.option('--dqm-fourier-params', nargs=3, default=[600, 60, 100], help="Parameters that control the data sent for the fourier transform plot")
+@click.option('--tpc-region-name-prefix', default='APA', help="Prefix to be used for the 'Region' Group name inside the HDF5 file")
 @click.option('--op-env', default='swtest', help="Operational environment - used for raw data filename prefix and HDF5 Attribute inside the files")
 @click.argument('json_dir', type=click.Path())
 
 def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowdown_factor, run_number, trigger_rate_hz, trigger_window_before_ticks, trigger_window_after_ticks,
-        token_count, data_file, output_path, disable_trace, use_felix, use_ssp, host_df, host_ru, host_trigger, host_hsi, host_timing_hw, control_timing_hw, timing_hw_connections_file,
+        token_count, data_file, output_path, disable_trace, use_felix, use_ssp, host_df, host_ru, host_trigger, host_hsi, host_timing_hw, control_timing_hw, timing_hw_connections_file, region_id,
         hsi_device_name, hsi_readout_period, hsi_endpoint_address, hsi_endpoint_partition, hsi_re_mask, hsi_fe_mask, hsi_inv_mask, hsi_source,
         use_hsi_hw, hsi_device_id, mean_hsi_signal_multiplicity, hsi_signal_emulation_mode, enabled_hsi_signals,
         ttcm_s1, ttcm_s2, trigger_activity_plugin, trigger_activity_config, trigger_candidate_plugin, trigger_candidate_config,
         enable_raw_recording, raw_recording_output_dir, frontend_type, opmon_impl, enable_dqm, ers_impl, dqm_impl, pocket_url, enable_software_tpg, enable_tpset_writing, use_fake_data_producers, dqm_cmap,
         dqm_rawdisplay_params, dqm_meanrms_params, dqm_fourier_params,
-        op_env, json_dir):
+        op_env, tpc_region_name_prefix, json_dir):
 
     """
       JSON_DIR: Json file output folder
     """
+
+    if exists(json_dir):
+        raise RuntimeError(f"Directory {json_dir} already exists")
+
     console.log("Loading dataflow config generator")
     from . import dataflow_gen
+    console.log("Loading dqm config generator")
+    from . import dqm_gen
     console.log("Loading readout config generator")
     from . import readout_gen
     console.log("Loading trigger config generator")
@@ -104,7 +114,7 @@ def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowd
     from . import fake_hsi_gen
     console.log("Loading timing hardware config generator")
     from . import thi_gen
-    console.log(f"Generating configs for hosts trigger={host_trigger} dataflow={host_df} readout={host_ru} hsi={host_hsi}")
+    console.log(f"Generating configs for hosts trigger={host_trigger} dataflow={host_df} readout={host_ru} hsi={host_hsi} dqm={host_ru}")
 
     total_number_of_data_producers = 0
 
@@ -204,6 +214,13 @@ def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowd
         network_endpoints[f"frags_{hostidx}"] = "tcp://{host_ru" + f"{hostidx}" + "}:" + f"{port}"
         port = port + 1
 
+        if enable_dqm:
+            for idx in range(number_of_data_producers):
+                network_endpoints[f"datareq_dqm_{hostidx}_{idx}"] = "tcp://{host_ru" + f"{hostidx}" + "}:" + f"{port}"
+                port = port + 1
+            network_endpoints[f"fragx_dqm_{hostidx}"] = "tcp://{host_ru" + f"{hostidx}" + "}:" + f"{port}"
+            port = port + 1
+
         if enable_software_tpg:
             network_endpoints[f"tp_frags_{hostidx}"] = "tcp://{host_ru" + f"{hostidx}" + "}:" + f"{port}"
             port = port + 1
@@ -269,6 +286,7 @@ def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowd
         CANDIDATE_CONFIG = eval(trigger_candidate_config),
         TOKEN_COUNT = trigemu_token_count,
         SYSTEM_TYPE = system_type,
+        REGION_ID = region_id,
         TTCM_S1=ttcm_s1,
         TTCM_S2=ttcm_s2,
         TRIGGER_WINDOW_BEFORE_TICKS = trigger_window_before_ticks,
@@ -283,9 +301,11 @@ def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowd
         OUTPUT_PATH = output_path,
         TOKEN_COUNT = df_token_count,
         SYSTEM_TYPE = system_type,
+        REGION_ID = region_id,
         SOFTWARE_TPG_ENABLED = enable_software_tpg,
         TPSET_WRITING_ENABLED = enable_tpset_writing,
-        OPERATIONAL_ENVIRONMENT = op_env)
+        OPERATIONAL_ENVIRONMENT = op_env,
+        TPC_REGION_NAME_PREFIX = tpc_region_name_prefix)
     console.log("dataflow cmd data:", cmd_data_dataflow)
 
     cmd_data_readout = [ readout_gen.generate(network_endpoints,
@@ -304,19 +324,34 @@ def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowd
             RAW_RECORDING_OUTPUT_DIR = raw_recording_output_dir,
             FRONTEND_TYPE = frontend_type,
             SYSTEM_TYPE = system_type,
+            REGION_ID = region_id,
             DQM_ENABLED=enable_dqm,
-            DQM_KAFKA_ADDRESS=dqm_kafka_address,
-            DQM_CMAP=dqm_cmap,
-            DQM_RAWDISPLAY_PARAMS=dqm_rawdisplay_params,
-            DQM_MEANRMS_PARAMS=dqm_meanrms_params,
-            DQM_FOURIER_PARAMS=dqm_fourier_params,
             SOFTWARE_TPG_ENABLED = enable_software_tpg,
             USE_FAKE_DATA_PRODUCERS = use_fake_data_producers
             ) for hostidx in range(len(host_ru))]
     console.log("readout cmd data:", cmd_data_readout)
 
-    if exists(json_dir):
-        raise RuntimeError(f"Directory {json_dir} already exists")
+    if enable_dqm:
+        cmd_data_dqm = [ dqm_gen.generate(network_endpoints,
+                NUMBER_OF_DATA_PRODUCERS = number_of_data_producers,
+                TOTAL_NUMBER_OF_DATA_PRODUCERS=total_number_of_data_producers,
+                EMULATOR_MODE = emulator_mode,
+                RUN_NUMBER = run_number,
+                DATA_FILE = data_file,
+                CLOCK_SPEED_HZ = CLOCK_SPEED_HZ,
+                HOSTIDX = hostidx,
+                CARDID = cardid[hostidx],
+                SYSTEM_TYPE = system_type,
+                REGION_ID = region_id,
+                DQM_ENABLED=enable_dqm,
+                DQM_KAFKA_ADDRESS=dqm_kafka_address,
+                DQM_CMAP=dqm_cmap,
+                DQM_RAWDISPLAY_PARAMS=dqm_rawdisplay_params,
+                DQM_MEANRMS_PARAMS=dqm_meanrms_params,
+                DQM_FOURIER_PARAMS=dqm_fourier_params,
+                ) for hostidx in range(len(host_ru))]
+        console.log("dqm cmd data:", cmd_data_dqm)
+
 
     data_dir = join(json_dir, 'data')
     os.makedirs(data_dir)
@@ -325,6 +360,7 @@ def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowd
     app_hsi = "hsi"
     app_trigger = "trigger"
     app_df = "dataflow"
+    app_dqm = [f"dqm{idx}" for idx in range(len(host_ru))]
     app_ru = [f"ruflx{idx}" if use_felix else f"ruemu{idx}" for idx in range(len(host_ru))]
     if use_ssp:
         app_ru = [f"russp{idx}" if use_ssp else f"ruemu{idx}" for idx in range(len(host_ru))]
@@ -332,14 +368,19 @@ def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowd
     jf_hsi = join(data_dir, app_hsi)
     jf_trigemu = join(data_dir, app_trigger)
     jf_df = join(data_dir, app_df)
+    jf_dqm = [join(data_dir, app_dqm[idx]) for idx in range(len(host_ru))]
     jf_ru = [join(data_dir, app_ru[idx]) for idx in range(len(host_ru))]
     if control_timing_hw:
         jf_thi=join(data_dir, app_thi)
 
     cmd_set = ["init", "conf", "start", "stop", "pause", "resume", "scrap", "record"]
     
-    apps =  [app_hsi, app_trigger, app_df] + app_ru
-    cmds_data =  [cmd_data_hsi, cmd_data_trigger, cmd_data_dataflow] + cmd_data_readout
+    apps = [app_hsi, app_trigger, app_df] + app_ru
+    if enable_dqm:
+        apps += app_dqm
+    cmds_data = [cmd_data_hsi, cmd_data_trigger, cmd_data_dataflow] + cmd_data_readout
+    if enable_dqm:
+        cmds_data += cmd_data_dqm
     if control_timing_hw:
         apps.append(app_thi)
         cmds_data.append(cmd_data_thi)
@@ -353,7 +394,7 @@ def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowd
 
     console.log(f"Generating top-level command json files")
 
-    start_order = [app_df] + [app_trigger] + app_ru + [app_hsi]
+    start_order = [app_df] + [app_trigger] + app_ru + [app_hsi] + app_dqm
     if not control_timing_hw and use_hsi_hw:
         resume_order = [app_trigger]
     else:
@@ -385,6 +426,9 @@ def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowd
                     del cfg['apps'][app_hsi]
                 for ruapp in app_ru:
                     del cfg['apps'][ruapp]
+                if enable_dqm:
+                    for dqmapp in app_dqm:
+                        del cfg['apps'][dqmapp]
                 if c == 'resume':
                     cfg['order'] = resume_order
                 elif c == 'pause':
@@ -404,7 +448,8 @@ def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowd
                     "TIMING_SHARE": "getenv",
                     "LD_LIBRARY_PATH": "getenv",
                     "PATH": "getenv",
-                    "READOUT_SHARE": "getenv"
+                    "READOUT_SHARE": "getenv",
+                    "DETCHANNELMAPS_SHARE": "getenv"
                 },
                 "cmd": ["CMD_FAC=rest://localhost:${APP_PORT}",
                     "INFO_SVC=" + info_svc_uri,
@@ -429,7 +474,7 @@ def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowd
             "hosts": {
                 "host_df": host_df,
                 "host_trigger": host_trigger,
-                "host_hsi": host_hsi
+                "host_hsi": host_hsi,
             },
             "apps" : {
                 app_hsi: {
@@ -465,6 +510,14 @@ def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowd
                     "host": f"host_ru{hostidx}",
                     "port": appport }
             appport = appport + 1
+        if enable_dqm:
+            for hostidx in range(len(host_ru)):
+                cfg["hosts"][f"host_dqm{hostidx}"] = host_ru[hostidx]
+                cfg["apps"][app_dqm[hostidx]] = {
+                        "exec": "daq_application",
+                        "host": f"host_dqm{hostidx}",
+                        "port": appport }
+                appport = appport + 1
         
         if control_timing_hw:
             cfg["hosts"][f"host_timing_hw"] = host_timing_hw
@@ -474,6 +527,29 @@ def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowd
                     "port": appport+len(host_ru) }
 
         json.dump(cfg, f, indent=4, sort_keys=True)
+
+    console.log("Generating metadata file")
+    with open(join(json_dir, 'mdapp_multiru_gen.info'), 'w') as f:
+        mdapp_dir = os.path.dirname(os.path.abspath(__file__))
+        buildinfo_files = glob.glob('**/minidaqapp_build_info.txt', recursive=True)
+        buildinfo = {}
+        for buildinfo_file in buildinfo_files:
+            if(os.path.dirname(os.path.abspath(buildinfo_file)) in mdapp_dir):
+                with open(buildinfo_file, 'r') as ff:
+                    line = ff.readline()
+                    while line: 
+                        line_parse = line.split(':')
+                        buildinfo[line_parse[0].strip()]=':'.join(line_parse[1:]).strip()
+                        line = ff.readline()
+                    
+                break
+        mdapp_info = {
+            "command_line": ' '.join(sys.argv),
+            "mdapp_dir": mdapp_dir,
+            "build_info": buildinfo
+        }
+        json.dump(mdapp_info, f, indent=4, sort_keys=True)
+
     console.log(f"MDAapp config generated in {json_dir}")
 
 
