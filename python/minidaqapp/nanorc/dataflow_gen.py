@@ -50,8 +50,11 @@ def generate(NETWORK_ENDPOINTS,
         OUTPUT_PATH=".",
         TOKEN_COUNT=0,
         SYSTEM_TYPE="TPC",
+        REGION_ID=0,
         SOFTWARE_TPG_ENABLED=False,
-        TPSET_WRITING_ENABLED=False):
+        TPSET_WRITING_ENABLED=False,
+        OPERATIONAL_ENVIRONMENT="swtest",
+        TPC_REGION_NAME_PREFIX="APA"):
     """Generate the json configuration for the readout and DF process"""
 
     if SOFTWARE_TPG_ENABLED:
@@ -151,28 +154,41 @@ def generate(NETWORK_ENDPOINTS,
 
                 ("trb", trb.ConfParams( general_queue_timeout=QUEUE_POP_WAIT_MS,
                                         map=trb.mapgeoidqueue([
-                                                trb.geoidinst(region=0, element=idx, system=SYSTEM_TYPE, queueinstance=f"data_requests_{idx}")  for idx in range(NUMBER_OF_DATA_PRODUCERS)
+                                                trb.geoidinst(region=REGION_ID, element=idx, system=SYSTEM_TYPE, queueinstance=f"data_requests_{idx}")  for idx in range(NUMBER_OF_DATA_PRODUCERS)
                                         ] + [
-                                            trb.geoidinst(region=0, element=NUMBER_OF_DATA_PRODUCERS + idx, system=SYSTEM_TYPE, queueinstance=f"tp_data_requests_{idx}")  for idx in range(NUMBER_OF_RAW_TP_PRODUCERS)
+                                            trb.geoidinst(region=REGION_ID, element=NUMBER_OF_DATA_PRODUCERS + idx, system=SYSTEM_TYPE, queueinstance=f"tp_data_requests_{idx}")  for idx in range(NUMBER_OF_RAW_TP_PRODUCERS)
                                         ] + [
-                                            trb.geoidinst(region=0, element=idx, system="DataSelection", queueinstance=f"ds_tp_data_requests_{idx}")  for idx in range(NUMBER_OF_DS_TP_PRODUCERS)
+                                            trb.geoidinst(region=REGION_ID, element=idx, system="DataSelection", queueinstance=f"ds_tp_data_requests_{idx}")  for idx in range(NUMBER_OF_DS_TP_PRODUCERS)
                                         ]
                                                               ))),
                 ("datawriter", dw.ConfParams(initial_token_count=TOKEN_COUNT,
-                            data_store_parameters=hdf5ds.ConfParams(name="data_store",
-                                # type = "HDF5DataStore", # default
-                                directory_path = OUTPUT_PATH, # default
-                                # mode = "all-per-file", # default
-                                max_file_size_bytes = 1073741824,
+                                data_store_parameters=hdf5ds.ConfParams(name="data_store",
+                                version = 3,
+                                operational_environment = OPERATIONAL_ENVIRONMENT,
+                                directory_path = OUTPUT_PATH,
+                                max_file_size_bytes = 4294967296,
                                 disable_unique_filename_suffix = False,
-                                filename_parameters = hdf5ds.HDF5DataStoreFileNameParams(overall_prefix = "swtest",
+                                filename_parameters = hdf5ds.FileNameParams(overall_prefix = OPERATIONAL_ENVIRONMENT,
                                     digits_for_run_number = 6,
                                     file_index_prefix = "",
                                     digits_for_file_index = 4,),
-                                file_layout_parameters = hdf5ds.HDF5DataStoreFileLayoutParams(trigger_record_name_prefix= "TriggerRecord",
+                                file_layout_parameters = hdf5ds.FileLayoutParams(trigger_record_name_prefix= "TriggerRecord",
                                     digits_for_trigger_number = 5,
-                                    digits_for_apa_number = 3,
-                                    digits_for_link_number = 2,)))),
+                                    path_param_list = hdf5ds.PathParamList([hdf5ds.PathParams(detector_group_type="TPC",
+                                                                                              detector_group_name="TPC",
+                                                                                              region_name_prefix=TPC_REGION_NAME_PREFIX,
+                                                                                              element_name_prefix="Link"),
+                                                                            hdf5ds.PathParams(detector_group_type="PDS",
+                                                                                              detector_group_name="PDS"),
+                                                                            hdf5ds.PathParams(detector_group_type="NDLArTPC",
+                                                                                              detector_group_name="NDLArTPC"),
+                                                                            hdf5ds.PathParams(detector_group_type="Trigger",
+                                                                                              detector_group_name="Trigger"),
+                                                                            hdf5ds.PathParams(detector_group_type="TPC_TP",
+                                                                                              detector_group_name="TPC",
+                                                                                              region_name_prefix="TP_APA",
+                                                                                              element_name_prefix="Link")])
+                                )))),
             ] + [
                 (f"qton_datareq_{idx}", qton.Conf(msg_type="dunedaq::dfmessages::DataRequest",
                                            msg_module_name="DataRequestNQ",
@@ -197,7 +213,7 @@ def generate(NETWORK_ENDPOINTS,
                 for idx in range(NUMBER_OF_RAW_TP_PRODUCERS)
 
             ] + [
-                (f"ntoq_fragments_{idx}", ntoq.Conf(msg_type="std::unique_ptr<dunedaq::dataformats::Fragment>",
+                (f"ntoq_fragments_{idx}", ntoq.Conf(msg_type="std::unique_ptr<dunedaq::daqdataformats::Fragment>",
                                            msg_module_name="FragmentNQ",
                                            receiver_config=nor.Conf(ipm_plugin_type="ZmqReceiver",
                                                                     address=NETWORK_ENDPOINTS[inst])))
