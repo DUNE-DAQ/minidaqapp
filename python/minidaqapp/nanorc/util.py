@@ -10,7 +10,8 @@ from collections import namedtuple, defaultdict
 import json
 import os
 from enum import Enum
-
+from graphviz import Digraph
+import networkx as nx
 import moo.otypes
 
 moo.otypes.load_types('rcif/cmd.jsonnet')
@@ -181,19 +182,18 @@ def make_module_deps(module_dict):
     upstream ends begin with a '!' are not considered dependencies, to
     allow us to break cycles in the DAG.
 
-    Returns a dictionary where each key is a module name, and the
-    corresponding value is a list of names of modules connected "downstream" of
-    that module.
+    Returns a networkx DiGraph object where nodes are module names
 
     """
 
-    deps = {}
+    deps = nx.DiGraph()
+    for mod_name in module_dict.keys():
+        deps.add_node(mod_name)
     for name, mod in module_dict.items():
-        deps[name] = []
         for upstream_name, downstream_connection in mod.connections.items():
             if downstream_connection.toposort:
                 other_mod = downstream_connection.to.split(".")[0]
-                deps[name].append(other_mod)
+                deps.add_edge(name, other_mod)
     return deps
 
 
@@ -201,74 +201,25 @@ def make_app_deps(the_system, verbose=False):
     """Produce a dictionary giving
     the dependencies between a set of applications, given their connections.
 
-    Returns a dictionary analogous to the return value of
-    make_module_deps: each key is an application name, and the
-    corresponding value is a list of names of applications connected
-    "downstream" of that app.
+    Returns a networkx DiGraph object where nodes are app names
 
     """
 
-    deps = {}
+    deps = nx.DiGraph()
+    
     for app in the_system.apps.keys():
-        deps[app] = []
+        deps.add_node(app)
 
     for from_endpoint, conn in the_system.app_connections.items():
         from_app = from_endpoint.split(".")[0]
         if hasattr(conn, "subscribers"):
-            deps[from_app] += [ds.split(".")[0] for ds in conn.subscribers]
+            for to_app in [ds.split(".")[0] for ds in conn.subscribers]:
+                deps.add_edge(from_app, to_app)
         elif hasattr(conn, "receiver"):
-            deps[from_app].append(conn.receiver.split(".")[0])
+            to_app = conn.receiver.split(".")[0]
+            deps.add_edge(from_app, to_app)
+
     return deps
-
-
-def toposort(deps_orig):
-    """Perform a topological sort of a dependency dictionary as produced
-    by make_module_deps or make_app_deps. Throws ValueError if a cycle is
-    found in the graph"""
-
-    # Kahn's algorithm for topological sort, from Wikipedia:
-
-    # L <- Empty list that will contain the sorted elements
-    # S <- Set of all nodes with no incoming edge
-
-    # while S is not empty do
-    #     remove a node n from S
-    #     add n to L
-    #     for each node m with an edge e from n to m do
-    #         remove edge e from the graph
-    #         if m has no other incoming edges then
-    #             insert m into S
-
-    # if graph has edges then
-    #     return error   (graph has at least one cycle)
-    # else
-    #     return L   (a topologically sorted order)
-
-    deps = deepcopy(deps_orig)
-    L = []
-    S = set([name for name, d in deps.items() if d == []])
-    # console.log("Initial nodes with no incoming edges:")
-    # console.log(S)
-
-    while S:
-        n = S.pop()
-        # console.log(f"Popped item {n} from S")
-        L.append(n)
-        # console.log(f"List so far is {L}")
-        tmp = [name for name, d in deps.items() if n in d]
-        # console.log(f"Nodes with edge from n: {tmp}")
-        for m in tmp:
-            # console.log(f"Removing {n} from deps[{m}]")
-            deps[m].remove(n)
-            if deps[m] == []:
-                S.add(m)
-
-    # Are there any cycles?
-    if any(deps.values()):
-        # TODO: Give some more helpful output about the cycles that exist
-        raise ValueError(deps)
-
-    return L
 
 
 def make_app_command_data(app, verbose=False):
@@ -283,7 +234,7 @@ def make_app_command_data(app, verbose=False):
     if verbose:
         console.log(f"inter-module dependencies are: {module_deps}")
 
-    start_order = toposort(module_deps)
+    start_order = list(nx.algorithms.dag.topological_sort(module_deps))
     stop_order = start_order[::-1]
 
     if verbose:
@@ -642,7 +593,7 @@ def make_system_command_datas(the_system, verbose=False):
     
     if the_system.app_start_order is None:
         app_deps = make_app_deps(the_system, verbose)
-        the_system.app_start_order = toposort(app_deps)
+        the_system.app_start_order = list(nx.algorithms.dag.topological_sort(app_deps))
 
     system_command_datas=dict()
 
