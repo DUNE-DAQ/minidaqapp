@@ -109,12 +109,12 @@ def generate(
     if SOFTWARE_TPG_ENABLED:
         queue_bare_specs.extend([
                 app.QueueSpec(inst=f"fragment_q", kind='FollyMPMCQueue', capacity=1000),
+                app.QueueSpec(inst=f'taset_q', kind='FollyMPMCQueue', capacity=1000),
         ])
         for ru in range(len(RU_CONFIG)):
             queue_bare_specs.extend([
                 app.QueueSpec(inst=f"tpsets_from_netq_{ru}", kind='FollySPSCQueue', capacity=1000),
                 app.QueueSpec(inst=f'zipped_tpset_q_{ru}', kind='FollySPSCQueue', capacity=1000),
-                app.QueueSpec(inst=f'taset_q_{ru}', kind='FollySPSCQueue', capacity=1000),
             ])
             for idx in range(RU_CONFIG[ru]["channel_count"]):
                 queue_bare_specs.extend([
@@ -133,7 +133,11 @@ def generate(
         ] + [
             mspec(f"tpset_receiver", "TPSetReceiver", [app.QueueInfo(name="output", inst=f"tpset_q_for_buf{ru}_{idy}", dir="output")]) for ru in range(len(RU_CONFIG)) for idy in range(RU_CONFIG[ru]["channel_count"])
         ] + [
-            mspec(f"qton_fragments", "QueueToNetwork", [app.QueueInfo(name="input", inst=f"fragment_q", dir="input")])
+            mspec(f"qton_fragments", "QueueToNetwork", [app.QueueInfo(name="input", inst=f"fragment_q", dir="input")]),
+                mspec(f'tcm', 'TriggerCandidateMaker', [ # TASet -> TC
+                    app.QueueInfo(name='input', inst=f'taset_q', dir='input'),
+                    app.QueueInfo(name='output', inst=f'trigger_candidate_q', dir='output'),
+                ])
         ])
         for ru in range(len(RU_CONFIG)):
             mod_specs.extend([
@@ -149,13 +153,9 @@ def generate(
 
                 mspec(f'tam_{ru}', 'TriggerActivityMaker', [ # TPSet -> TASet
                     app.QueueInfo(name='input', inst=f'zipped_tpset_q_{ru}', dir='input'),
-                    app.QueueInfo(name='output', inst=f'taset_q_{ru}', dir='output'),
+                    app.QueueInfo(name='output', inst=f'taset_q', dir='output'),
                 ]),
 
-                mspec(f'tcm_{ru}', 'TriggerCandidateMaker', [ # TASet -> TC
-                    app.QueueInfo(name='input', inst=f'taset_q_{ru}', dir='input'),
-                    app.QueueInfo(name='output', inst=f'trigger_candidate_q', dir='output'),
-                ])
             ])
             for idy in range(RU_CONFIG[ru]["channel_count"]):
                 mod_specs.extend([
@@ -202,13 +202,17 @@ def generate(
                                                  general_queue_timeout = 100,
                                                  connection_name = f"{PARTITION}.ds_tp_datareq_0")),
             ("tpset_receiver", tpsrcv.ConfParams(
-                                                 map = [tpsrcv.geoidinst(region=RU_CONFIG[ru]["region_id"] , element=idy + RU_CONFIG[ru]["start_channel"], system=SYSTEM_TYPE , queueinstance=f"tpset_q_for_buf{ru}_{idy}") for idx in range(len(RU_CONFIG)) for idy in range(RU_CONFIG[ru]["channel_count"])],
+                                                 map = [tpsrcv.geoidinst(region=RU_CONFIG[ru]["region_id"] , element=idy + RU_CONFIG[ru]["start_channel"], system=SYSTEM_TYPE , queueinstance=f"tpset_q_for_buf{ru}_{idy}") for ru in range(len(RU_CONFIG)) for idy in range(RU_CONFIG[ru]["channel_count"])],
                                                  general_queue_timeout = 100,
                                                  topic = f"TPSets")),
             (f"qton_fragments", qton.Conf(msg_type="std::unique_ptr<dunedaq::daqdataformats::Fragment>",
                                           msg_module_name="FragmentNQ",
                                           sender_config=nos.Conf(name=f"{PARTITION}.frags_tpset_ds_0",
-                                                                 stype="msgpack")))
+                                                                 stype="msgpack"))),
+                (f'tcm', tcm.Conf(
+                    candidate_maker=CANDIDATE_PLUGIN,
+                    candidate_maker_config=temptypes.CandidateConf(**CANDIDATE_CONFIG)
+                )),
         ])
         for idx in range(len(RU_CONFIG)):
             tp_confs.extend([
@@ -236,15 +240,16 @@ def generate(
                     activity_maker_config=temptypes.ActivityConf(**ACTIVITY_CONFIG)
                 )),
 
-                (f'tcm_{idx}', tcm.Conf(
-                    candidate_maker=CANDIDATE_PLUGIN,
-                    candidate_maker_config=temptypes.CandidateConf(**CANDIDATE_CONFIG)
-                )),
             ])
             for idy in range(RU_CONFIG[idx]["channel_count"]):
                 tp_confs.extend([
                     (f"buf{idx}_{idy}", buf.Conf(tpset_buffer_size=10000, region=RU_CONFIG[idx]["region_id"], element=idy + RU_CONFIG[idx]["start_channel"])) 
                 ])
+
+
+    total_link_count = 0
+    for ru in range(len(RU_CONFIG)):
+        total_link_count += RU_CONFIG[ru]["channel_count"]
 
     cmd_data['conf'] = acmd(tp_confs + [
 
@@ -273,11 +278,15 @@ def generate(
             td_connection_name=PARTITION+".trigdec",
             token_connection_name=PARTITION+".triginh",
             links=[
-                mlt.GeoID(system=SYSTEM_TYPE, region=RU_CONFIG[ru]["region_id"], element=idx)
-                for ru in range(len(RU_CONFIG)) for idx in range(RU_CONFIG[ru]["channel_count"] * 2)
-            ] + [
-                mlt.GeoID(system="DataSelection", region=RU_CONFIG[ru]["region_id"], element=idx) for ru in range(len(RU_CONFIG)) for idx in range(RU_CONFIG[ru]["channel_count"])
-                ],
+                mlt.GeoID(system=SYSTEM_TYPE, region=RU_CONFIG[ru]["region_id"], element=RU_CONFIG[ru]["start_channel"] + idx)
+                    for ru in range(len(RU_CONFIG)) for idx in range(RU_CONFIG[ru]["channel_count"])
+            ] + ([
+                mlt.GeoID(system="DataSelection", region=RU_CONFIG[ru]["region_id"], element=RU_CONFIG[ru]["start_channel"] + idx) 
+                    for ru in range(len(RU_CONFIG)) for idx in range(RU_CONFIG[ru]["channel_count"])
+            ] if SOFTWARE_TPG_ENABLED else []) + ([
+                mlt.GeoID(system=SYSTEM_TYPE, region=RU_CONFIG[ru]["region_id"], element=RU_CONFIG[ru]["start_channel"] + idx + total_link_count)
+                    for ru in range(len(RU_CONFIG)) for idx in range(RU_CONFIG[ru]["channel_count"])
+            ] if SOFTWARE_TPG_ENABLED else []),
             initial_token_count=TOKEN_COUNT
         )),
     ])
@@ -299,7 +308,7 @@ def generate(
         start_order += [
             "qton_fragments",
             "tcm",
-            "tam",
+            "tam_.*",
             "zip_.*",
             "tpset_subscriber_.*",
             "tpset_receiver",

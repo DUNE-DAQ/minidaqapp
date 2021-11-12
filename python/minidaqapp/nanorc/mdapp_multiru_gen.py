@@ -246,7 +246,7 @@ def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowd
         else:
             host_id_dict[host_ru[hostidx]] = 0
         ru_configs.append( {"host": host_ru[hostidx], "card_id": cardid, "region_id": region_id[regionidx], "start_channel": ru_channel_counts[region_id[regionidx]], "channel_count": number_of_data_producers} )
-        ru_channel_counts[region_id[regionidx]] += number_of_data_producers + number_of_data_producers # double for TPSets
+        ru_channel_counts[region_id[regionidx]] += number_of_data_producers
         if len(region_id) != 1: regionidx = regionidx + 1
     
     if control_timing_hw:

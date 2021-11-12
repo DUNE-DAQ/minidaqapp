@@ -287,16 +287,16 @@ def generate(
                             source_queue_timeout_ms= QUEUE_POP_WAIT_MS,
                             # fake_trigger_flag=0, default
                             region_id = RU_CONFIG[RUIDX]["region_id"],
-                            element_id = RU_CONFIG[RUIDX]["start_channel"] + RU_CONFIG[RUIDX]["channel_count"] + idx,
+                            element_id = idx,
                         ),
                         latencybufferconf= rconf.LatencyBufferConf(
                             latency_buffer_size = LATENCY_BUFFER_SIZE,
                             region_id = RU_CONFIG[RUIDX]["region_id"],
-                            element_id = RU_CONFIG[RUIDX]["start_channel"] + RU_CONFIG[RUIDX]["channel_count"] + idx,
+                            element_id =  idx,
                         ),
                         rawdataprocessorconf= rconf.RawDataProcessorConf(
                             region_id = RU_CONFIG[RUIDX]["region_id"],
-                            element_id = RU_CONFIG[RUIDX]["start_channel"] + RU_CONFIG[RUIDX]["channel_count"] + idx,
+                            element_id =  idx,
                             enable_software_tpg = False,
                         ),
                         requesthandlerconf= rconf.RequestHandlerConf(
@@ -304,12 +304,12 @@ def generate(
                             pop_limit_pct = 0.8,
                             pop_size_pct = 0.1,
                             region_id = RU_CONFIG[RUIDX]["region_id"],
-                            element_id = RU_CONFIG[RUIDX]["start_channel"] + RU_CONFIG[RUIDX]["channel_count"] + idx,
+                            element_id = idx,
                             # output_file = f"output_{idx + MIN_LINK}.out",
                             stream_buffer_size = 100 if FRONTEND_TYPE=='pacman' else 8388608,
                             enable_raw_recording = False,
                         )
-                        )) for idx in range(RU_CONFIG[RUIDX]["channel_count"])
+                        )) for idx in range(MIN_LINK,MAX_LINK)
             ]
 
     if DQM_ENABLED:
@@ -326,6 +326,10 @@ def generate(
             ]  )
 
     if SOFTWARE_TPG_ENABLED:
+        total_link_count = 0
+        for ru in range(len(RU_CONFIG)):
+            total_link_count += RU_CONFIG[ru]["channel_count"]
+
         conf_list.extend([
                             ("qton_tp_fragments", qton.Conf(msg_type="std::unique_ptr<dunedaq::daqdataformats::Fragment>",
                                                             msg_module_name="FragmentNQ",
@@ -333,7 +337,7 @@ def generate(
                                                                                    stype="msgpack")))
                         ] + [
                             ("tp_request_receiver", rrcv.ConfParams(
-                                        map = [rrcv.geoidinst(region=RU_CONFIG[RUIDX]["region_id"] , element=RU_CONFIG[RUIDX]["channel_count"]+idx , system=SYSTEM_TYPE , queueinstance=f"tp_requests_{idx}") for idx in range(MIN_LINK,MAX_LINK)],
+                                        map = [rrcv.geoidinst(region=RU_CONFIG[RUIDX]["region_id"] , element=idx + total_link_count, system=SYSTEM_TYPE , queueinstance=f"tp_requests_{idx}") for idx in range(MIN_LINK,MAX_LINK)],
                                         general_queue_timeout = QUEUE_POP_WAIT_MS,
                                         connection_name = f"{PARTITION}.tp_datareq_{RUIDX}")) 
                         ] + [

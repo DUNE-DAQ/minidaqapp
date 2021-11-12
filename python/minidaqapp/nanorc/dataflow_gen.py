@@ -108,6 +108,9 @@ def generate(NW_SPECS,
 
     cmd_data['init'] = app.Init(queues=queue_specs, modules=mod_specs, nwconnections=NW_SPECS)
 
+    total_link_count = 0
+    for ru in range(len(RU_CONFIG)):
+        total_link_count += RU_CONFIG[ru]["channel_count"]
 
     cmd_data['conf'] = acmd([
                 ("trigdec_receiver", tdrcv.ConfParams(general_queue_timeout=QUEUE_POP_WAIT_MS,
@@ -116,9 +119,9 @@ def generate(NW_SPECS,
                 ("trb", trb.ConfParams( general_queue_timeout=QUEUE_POP_WAIT_MS,
                                         reply_connection_name = PARTITION+".frags_0",
                                         map=trb.mapgeoidconnections([
-                                                trb.geoidinst(region=RU_CONFIG[ru]["region_id"], element=idx + RU_CONFIG[ru]["start_channel"], system=SYSTEM_TYPE, connection_name=f"{PARTITION}.datareq_{idx}") for ru in range(len(RU_CONFIG)) for idx in range(RU_CONFIG[ru]["channel_count"])
+                                                trb.geoidinst(region=RU_CONFIG[ru]["region_id"], element=idx + RU_CONFIG[ru]["start_channel"], system=SYSTEM_TYPE, connection_name=f"{PARTITION}.datareq_{ru}") for ru in range(len(RU_CONFIG)) for idx in range(RU_CONFIG[ru]["channel_count"])
                                         ] + ([
-                                            trb.geoidinst(region=RU_CONFIG[ru]["region_id"], element=idx + RU_CONFIG[ru]["start_channel"] + RU_CONFIG[ru]["channel_count"], system=SYSTEM_TYPE, connection_name=f"{PARTITION}.tp_datareq_{idx}") for ru in range(len(RU_CONFIG)) for idx in range(RU_CONFIG[ru]["channel_count"])
+                                            trb.geoidinst(region=RU_CONFIG[ru]["region_id"], element=idx + RU_CONFIG[ru]["start_channel"] + total_link_count, system=SYSTEM_TYPE, connection_name=f"{PARTITION}.tp_datareq_{ru}") for ru in range(len(RU_CONFIG)) for idx in range(RU_CONFIG[ru]["channel_count"])
                                         ] if SOFTWARE_TPG_ENABLED else []) + ([
                                             trb.geoidinst(region=RU_CONFIG[ru]["region_id"], element=idx + RU_CONFIG[ru]["start_channel"], system="DataSelection", connection_name=f"{PARTITION}.ds_tp_datareq_0") for ru in range(len(RU_CONFIG)) for idx in range(RU_CONFIG[ru]["channel_count"])
 

@@ -66,9 +66,7 @@ def generate(NW_SPECS,
     MIN_LINK = RU_CONFIG[RUIDX]["start_channel"]
     MAX_LINK = MIN_LINK + RU_CONFIG[RUIDX]["channel_count"]
     # Define modules and queues
-    queue_bare_specs = []
-
-    queue_bare_specs += [
+    queue_bare_specs =  [
         app.QueueSpec(inst=f"time_sync_dqm_q", kind='FollyMPMCQueue', capacity=1000),
         app.QueueSpec(inst="data_fragments_q_dqm", kind='FollyMPMCQueue', capacity=1000),
         app.QueueSpec(inst="trigger_decision_q_dqm", kind='FollySPSCQueue', capacity=20),
@@ -78,11 +76,7 @@ def generate(NW_SPECS,
     # Only needed to reproduce the same order as when using jsonnet
     queue_specs = app.QueueSpecs(sorted(queue_bare_specs, key=lambda x: x.inst))
 
-    mod_specs = [
-        
-    ]
-
-    mod_specs += [mspec("trb_dqm", "TriggerRecordBuilder", [
+    mod_specs = [mspec("trb_dqm", "TriggerRecordBuilder", [
                     app.QueueInfo(name="trigger_decision_input_queue", inst="trigger_decision_q_dqm", dir="input"),
                     app.QueueInfo(name="trigger_record_output_queue", inst="trigger_record_q_dqm", dir="output"),
                     app.QueueInfo(name="data_fragment_input_queue", inst="data_fragments_q_dqm", dir="input")
@@ -114,7 +108,7 @@ def generate(NW_SPECS,
             ] + [
                 ("trb_dqm", trb.ConfParams(
                         general_queue_timeout=QUEUE_POP_WAIT_MS,
-                        reply_connection_name = PARTITION+".frax_dqm_{RUIDX}",
+                        reply_connection_name = f"{PARTITION}.fragx_dqm_{RUIDX}",
                         map=trb.mapgeoidconnections([
                                 trb.geoidinst(region=RU_CONFIG[RUIDX]["region_id"], element=idx, system=SYSTEM_TYPE, connection_name=f"{PARTITION}.datareq_dqm_{RUIDX}") for idx in range(MIN_LINK, MAX_LINK)
                             ]),
@@ -144,18 +138,19 @@ def generate(NW_SPECS,
     cmd_data['conf'] = acmd(conf_list)
 
     startpars = rccmd.StartParams(run=RUN_NUMBER)
-    cmd_data['start'] = acmd([("ntoq_fragments_dqm", startpars),
-            ("qton_datareq_dqm_.*", startpars),
-            ("trb_dqm", startpars),
+    cmd_data['start'] = acmd([
+            ("ntoq_fragments_dqm", startpars),
             ("dqmprocessor", startpars),
+            ("trb_dqm", startpars),
             ("dqm_subscriber", startpars),
             ])
 
-    cmd_data['stop'] = acmd([("ntoq_fragments_dqm", None),
-            ("qton_datareq_dqm_.*", None),
-            ("trb_dqm", None),
+    cmd_data['stop'] = acmd([
+            ("dqm_subscriber", None),
+            ("trb_dqm", None), 
             ("dqmprocessor", None),
-            ("dqm_subscriber", None), ])
+            ("ntoq_fragments_dqm", None),
+            ])
 
     cmd_data['pause'] = acmd([("", None)])
 
