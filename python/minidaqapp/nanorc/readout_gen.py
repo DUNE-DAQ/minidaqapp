@@ -61,7 +61,8 @@ def generate(# NETWORK_ENDPOINTS,
 
     if not USE_FAKE_DATA_PRODUCERS and not FLX_INPUT:
         modules["fake_source"] = Module(plugin = "FakeCardReader",
-                                        connections = { f"output_{idx-MIN_LINK}" : Conn(f"datahandler_{idx}.raw_input")
+                                        connections = { f"output_{idx-MIN_LINK}" : Conn(f"datahandler_{idx}.raw_input",
+                                                                                        queue_name=f"{FRONTEND_TYPE}_{idx}")
                                                         for idx in range(MIN_LINK,MAX_LINK) },
                                         conf = sec.Conf(link_confs = [ sec.LinkConfiguration(geoid=sec.GeoID(system = SYSTEM_TYPE, region = 0, element = idx),
                                                                                                    slowdown=DATA_RATE_SLOWDOWN_FACTOR,
@@ -95,25 +96,27 @@ def generate(# NETWORK_ENDPOINTS,
                                                         num_links = max(0, NUMBER_OF_DATA_PRODUCERS - 5)))
 
     if SOFTWARE_TPG_ENABLED:
-        for idx in range(MIN_LINK, MAX_LINK):
-            modules[f"tp_datahandler_{TOTAL_NUMBER_OF_DATA_PRODUCERS + idx}"] = Module(plugin="DataLinkHandler",
-                                                                                       connections = {},
-                                                                                       conf = dlh.Conf(emulator_mode = False,
-                                                                                                       enable_software_tpg = False,
-                                                                                                       # fake_trigger_flag=0, # default
-                                                                                                       source_queue_timeout_ms= QUEUE_POP_WAIT_MS,
-                                                                                                       latency_buffer_size = LATENCY_BUFFER_SIZE,
-                                                                                                       pop_limit_pct = 0.8,
-                                                                                                       pop_size_pct = 0.1,
-                                                                                                       apa_number = 0,
-                                                                                                       link_number = TOTAL_NUMBER_OF_DATA_PRODUCERS + idx))
+        for idx in range(NUMBER_OF_DATA_PRODUCERS):
+            mod_name = f"tp_datahandler_{idx}"
+            modules[mod_name] = Module(plugin="DataLinkHandler",
+                                       connections = {},
+                                       conf = dlh.Conf(emulator_mode = False,
+                                                       enable_software_tpg = False,
+                                                       # fake_trigger_flag=0, # default
+                                                       source_queue_timeout_ms= QUEUE_POP_WAIT_MS,
+                                                       latency_buffer_size = LATENCY_BUFFER_SIZE,
+                                                       pop_limit_pct = 0.8,
+                                                       pop_size_pct = 0.1,
+                                                       apa_number = 0,
+                                                       link_number = TOTAL_NUMBER_OF_DATA_PRODUCERS + idx))
 
 
     if not USE_FAKE_DATA_PRODUCERS:
         for idx in range(NUMBER_OF_DATA_PRODUCERS):
             modules[f"datahandler_{idx}"] = Module(plugin = "DataLinkHandler",
                                                    connections = {"raw_recording": Conn(f"data_recorder_{idx}.raw_recording"),
-                                                                  "tp_out": Conn(f"tp_datahandler_{idx}.raw_input")},
+                                                                  "tp_out": Conn(f"tp_datahandler_{idx}.raw_input",
+                                                                                 queue_name=f"tp_link_{idx}")},
                                                    conf = dlh.Conf(emulator_mode = EMULATOR_MODE,
                                                                    enable_software_tpg = SOFTWARE_TPG_ENABLED,
                                                                    # fake_trigger_flag=0, # default
@@ -165,6 +168,7 @@ def generate(# NETWORK_ENDPOINTS,
         mgraph.add_endpoint(f"tpsets_{idx}", f"datahandler_{idx}.tpset_out",    Direction.OUT)
         # TODO: Should we just have one timesync outgoing endpoint?
         mgraph.add_endpoint(f"timesync_{idx}", f"datahandler_{idx}.timesync",    Direction.OUT)
+        mgraph.add_endpoint(f"timesync_{idx+NUMBER_OF_DATA_PRODUCERS}", f"tp_datahandler_{idx}.timesync",    Direction.OUT)
         
         mgraph.add_fragment_producer(region = 0, element = idx, system = SYSTEM_TYPE,
                                      requests_in   = f"datahandler_{idx}.data_requests_0",

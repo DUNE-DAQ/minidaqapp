@@ -62,7 +62,7 @@ class Module:
         yield "conf", self.conf
         yield "connections", self.connections
 
-Connection = namedtuple("Connection", ['to', 'queue_kind', 'queue_capacity', 'toposort'], defaults=("FollyMPMCQueue", 1000, True))
+Connection = namedtuple("Connection", ['to', 'queue_kind', 'queue_capacity', 'queue_name', 'toposort'], defaults=("FollyMPMCQueue", 1000, None, True))
 
 class Direction(Enum):
     IN = 1
@@ -277,6 +277,7 @@ def make_app_command_data(app, verbose=False):
 
             if not (found_from or found_to):
                 if verbose:
+                    queue_inst = queue_inst if downstream_connection.queue_name is None else downstream_connection.queue_name
                     console.log(f"Creating {downstream_connection.queue_kind}({downstream_connection.queue_capacity}) queue with name {queue_inst} connecting {from_endpoint} to {to_endpoint}")
                 queue_specs.append(appfwk.QueueSpec(
                     inst=queue_inst, kind=downstream_connection.queue_kind, capacity=downstream_connection.queue_capacity))
