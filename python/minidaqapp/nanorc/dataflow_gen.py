@@ -54,7 +54,8 @@ def generate(NETWORK_ENDPOINTS,
         SOFTWARE_TPG_ENABLED=False,
         TPSET_WRITING_ENABLED=False,
         OPERATIONAL_ENVIRONMENT="swtest",
-        TPC_REGION_NAME_PREFIX="APA"):
+        TPC_REGION_NAME_PREFIX="APA",
+        MAX_FILE_SIZE=4*1024*1024*1024):
     """Generate the json configuration for the readout and DF process"""
 
     if SOFTWARE_TPG_ENABLED:
@@ -166,7 +167,7 @@ def generate(NETWORK_ENDPOINTS,
                                 version = 3,
                                 operational_environment = OPERATIONAL_ENVIRONMENT,
                                 directory_path = OUTPUT_PATH,
-                                max_file_size_bytes = 4294967296,
+                                max_file_size_bytes = MAX_FILE_SIZE,
                                 disable_unique_filename_suffix = False,
                                 filename_parameters = hdf5ds.FileNameParams(overall_prefix = OPERATIONAL_ENVIRONMENT,
                                     digits_for_run_number = 6,
