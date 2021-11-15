@@ -96,8 +96,8 @@ def generate(
         ]
     if SOFTWARE_TPG_ENABLED:
         queue_bare_specs += [
-            app.QueueSpec(inst=f"tp_link_{idx}", kind='FollySPSCQueue', capacity=100000)
-                for idx in range(MIN_LINK,MAX_LINK)
+            app.QueueSpec(inst=f"sw_tp_link_{idx}", kind='FollySPSCQueue', capacity=100000)
+                for idx in range(MIN_LINK, MAX_LINK)
         ] + [
             app.QueueSpec(inst=f"tp_fragments_q", kind='FollyMPMCQueue', capacity=100)
         ] + [
@@ -105,6 +105,11 @@ def generate(
         ] + [
             app.QueueSpec(inst=f"tp_requests_{idx}", kind='FollySPSCQueue', capacity=100)
                 for idx in range(MIN_LINK,MAX_LINK)
+        ]
+
+    if FRONTEND_TYPE == 'wib':
+        queue_bare_specs += [
+            app.QueueSpec(inst="errored_frames_q", kind="FollyMPMCQueue", capacity=10000)
         ]
 
     if DQM_ENABLED:
@@ -136,7 +141,7 @@ def generate(
             mspec(f"tp_request_receiver", "RequestReceiver", [app.QueueInfo(name="output", inst=f"tp_requests_{idx}", dir="output")]) for idx in range(MIN_LINK,MAX_LINK)
         ] + [
             mspec(f"tp_datahandler_{idx}", "DataLinkHandler", [
-                app.QueueInfo(name="raw_input", inst=f"tp_link_{idx}", dir="input"),
+                app.QueueInfo(name="raw_input", inst=f"sw_tp_link_{idx}", dir="input"),
                 app.QueueInfo(name="data_requests_0", inst=f"tp_requests_{idx}", dir="input"),
                 app.QueueInfo(name="data_response_0", inst="tp_fragments_q", dir="output")
             ]) for idx in range(MIN_LINK,MAX_LINK)
@@ -145,6 +150,12 @@ def generate(
                 app.QueueInfo(name="input", inst=f"tpset_queue", dir="input")
             ])
         ]
+
+    if FRONTEND_TYPE == 'wib':
+        mod_specs += [
+            mspec("errored_frame_consumer", "ErroredFrameConsumer", [app.QueueInfo(name="input_queue", inst="errored_frames_q", dir="input")])
+        ]
+
 
     # There are two flags to be checked so I think a for loop
     # is the closest way to the blocks that are being used here
@@ -168,8 +179,13 @@ def generate(
 
             if SOFTWARE_TPG_ENABLED:
                 ls.extend([
-                    app.QueueInfo(name="tp_out", inst=f"tp_link_{idx}", dir="output"),
+                    app.QueueInfo(name="tp_out", inst=f"sw_tp_link_{idx}", dir="output"),
                     app.QueueInfo(name="tpset_out", inst=f"tpset_queue", dir="output")
+                ])
+
+            if FRONTEND_TYPE == 'wib':
+                ls.extend([
+                    app.QueueInfo(name="errored_frames", inst="errored_frames_q", dir="output")
                 ])
 
             mod_specs += [mspec(f"datahandler_{idx}", "DataLinkHandler", ls)]
@@ -210,7 +226,8 @@ def generate(
                             geoid=sec.GeoID(system=SYSTEM_TYPE, region=RU_CONFIG[RUIDX]["region_id"], element=idx),
                                 slowdown=DATA_RATE_SLOWDOWN_FACTOR,
                                 queue_name=f"output_{idx}",
-                                data_filename = DATA_FILE
+                                data_filename = DATA_FILE,
+                                emu_frame_error_rate=0,
                                 ) for idx in range(MIN_LINK,MAX_LINK)],
                             # input_limit=10485100, # default
                             queue_timeout_ms = QUEUE_POP_WAIT_MS)),
@@ -268,7 +285,9 @@ def generate(
                             region_id = RU_CONFIG[RUIDX]["region_id"],
                             element_id = idx,
                             enable_software_tpg = SOFTWARE_TPG_ENABLED,
-                            emulator_mode = EMULATOR_MODE
+                            emulator_mode = EMULATOR_MODE,
+                            error_counter_threshold=100,
+                            error_reset_freq=10000
                         ),
                         requesthandlerconf= rconf.RequestHandlerConf(
                             latency_buffer_size = LATENCY_BUFFER_SIZE,
@@ -379,7 +398,8 @@ def generate(
             ("qton_tp_fragments", startpars),
             (f"tp_datahandler_.*", startpars),
             (f"tpset_publisher", startpars),
-            ("fakedataprod_.*", startpars)])
+            ("fakedataprod_.*", startpars),
+            ("errored_frame_consumer", startpars)])
 
     cmd_data['stop'] = acmd([
             ("request_receiver", None),
@@ -392,8 +412,8 @@ def generate(
             ("qton_tp_fragments", None),
             (f"tp_datahandler_.*", None),
             (f"tpset_publisher", None),
-            ("tp_request_receiver", None),
-            ("fakedataprod_.*", None)])
+            ("fakedataprod_.*", None),
+            ("errored_frame_consumer", None)])
 
     cmd_data['pause'] = acmd([("", None)])
 
