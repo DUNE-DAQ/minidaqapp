@@ -96,7 +96,7 @@ def generate(NETWORK_ENDPOINTS,
 
     if SOFTWARE_TPG_ENABLED:
         queue_bare_specs += [
-            app.QueueSpec(inst=f"tp_link_{idx}", kind='FollySPSCQueue', capacity=100000)
+            app.QueueSpec(inst=f"sw_tp_link_{idx}", kind='FollySPSCQueue', capacity=100000)
                 for idx in range(MIN_LINK, MAX_LINK)
         ] + [
             app.QueueSpec(inst=f"tp_fragments_q", kind='FollyMPMCQueue', capacity=100)
@@ -106,6 +106,11 @@ def generate(NETWORK_ENDPOINTS,
         ] + [
             app.QueueSpec(inst=f"tp_requests_{idx}", kind='FollySPSCQueue', capacity=100)
                 for idx in range(MIN_LINK, MAX_LINK)
+        ]
+
+    if FRONTEND_TYPE == 'wib':
+        queue_bare_specs += [
+            app.QueueSpec(inst="errored_frames_q", kind="FollyMPMCQueue", capacity=10000)
         ]
 
     if DQM_ENABLED:
@@ -143,7 +148,7 @@ def generate(NETWORK_ENDPOINTS,
             mspec(f"ntoq_tp_datarequests_{idx}", "NetworkToQueue", [app.QueueInfo(name="output", inst=f"tp_requests_{idx}", dir="output")]) for idx in range(MIN_LINK,MAX_LINK)
         ] + [
             mspec(f"tp_datahandler_{TOTAL_NUMBER_OF_DATA_PRODUCERS + idx}", "DataLinkHandler", [
-                app.QueueInfo(name="raw_input", inst=f"tp_link_{idx}", dir="input"),
+                app.QueueInfo(name="raw_input", inst=f"sw_tp_link_{idx}", dir="input"),
                 app.QueueInfo(name="data_requests_0", inst=f"tp_requests_{idx}", dir="input"),
                 app.QueueInfo(name="data_response_0", inst="tp_fragments_q", dir="output"),
                 app.QueueInfo(name="timesync", inst="time_sync_q", dir="output")
@@ -153,6 +158,12 @@ def generate(NETWORK_ENDPOINTS,
                 app.QueueInfo(name="input", inst=f"tpset_queue_{idx}", dir="input")
             ]) for idx in range(MIN_LINK, MAX_LINK)
         ]
+
+    if FRONTEND_TYPE == 'wib':
+        mod_specs += [
+            mspec("errored_frame_consumer", "ErroredFrameConsumer", [app.QueueInfo(name="input_queue", inst="errored_frames_q", dir="input")])
+        ]
+
 
     # There are two flags to be checked so I think a for loop
     # is the closest way to the blocks that are being used here
@@ -171,7 +182,7 @@ def generate(NETWORK_ENDPOINTS,
                     app.QueueInfo(name="raw_input", inst=f"{FRONTEND_TYPE}_link_{idx}", dir="input"),
                     app.QueueInfo(name="timesync", inst="time_sync_q", dir="output"),
                     app.QueueInfo(name="data_requests_0", inst=f"data_requests_{idx + MIN_LINK}", dir="input"),
-                    app.QueueInfo(name="data_response_0", inst="data_fragments_q", dir="output"),
+                    app.QueueInfo(name="data_response_0", inst="data_fragments_q", dir="output")
                 ]
             if DQM_ENABLED:
                 ls.extend([
@@ -180,8 +191,13 @@ def generate(NETWORK_ENDPOINTS,
 
             if SOFTWARE_TPG_ENABLED:
                 ls.extend([
-                    app.QueueInfo(name="tp_out", inst=f"tp_link_{idx+MIN_LINK}", dir="output"),
+                    app.QueueInfo(name="tp_out", inst=f"sw_tp_link_{idx+MIN_LINK}", dir="output"),
                     app.QueueInfo(name="tpset_out", inst=f"tpset_queue_{idx+MIN_LINK}", dir="output")
+                ])
+
+            if FRONTEND_TYPE == 'wib':
+                ls.extend([
+                    app.QueueInfo(name="errored_frames", inst="errored_frames_q", dir="output")
                 ])
 
             mod_specs += [mspec(f"datahandler_{idx + MIN_LINK}", "DataLinkHandler", ls)]
@@ -240,7 +256,8 @@ def generate(NETWORK_ENDPOINTS,
                             geoid=sec.GeoID(system=SYSTEM_TYPE, region=REGION_ID, element=idx),
                                 slowdown=DATA_RATE_SLOWDOWN_FACTOR,
                                 queue_name=f"output_{idx-MIN_LINK}",
-                                data_filename = DATA_FILE
+                                data_filename = DATA_FILE,
+                                emu_frame_error_rate=0,
                                 ) for idx in range(MIN_LINK,MAX_LINK)],
                             # input_limit=10485100, # default
                             queue_timeout_ms = QUEUE_POP_WAIT_MS)),
@@ -295,7 +312,9 @@ def generate(NETWORK_ENDPOINTS,
                             region_id = REGION_ID,
                             element_id = idx,
                             enable_software_tpg = SOFTWARE_TPG_ENABLED,
-                            emulator_mode = EMULATOR_MODE
+                            emulator_mode = EMULATOR_MODE,
+                            error_counter_threshold=100,
+                            error_reset_freq=10000
                         ),
                         requesthandlerconf= rconf.RequestHandlerConf(
                             latency_buffer_size = LATENCY_BUFFER_SIZE,
@@ -411,7 +430,8 @@ def generate(NETWORK_ENDPOINTS,
             (f"ntoq_tp_datarequests_.*", startpars),
             (f"tp_datahandler_.*", startpars),
             (f"tpset_publisher_.*", startpars),
-            ("fakedataprod_.*", startpars)])
+            ("fakedataprod_.*", startpars),
+            ("errored_frame_consumer", startpars)])
 
     cmd_data['stop'] = acmd([("ntoq_trigdec", None),
             ("ntoq_datareq_.*", None),
@@ -427,7 +447,8 @@ def generate(NETWORK_ENDPOINTS,
             (f"ntoq_tp_datarequests_.*", None),
             (f"tp_datahandler_.*", None),
             (f"tpset_publisher_.*", None),
-            ("fakedataprod_.*", None)])
+            ("fakedataprod_.*", None),
+            ("errored_frame_consumer", None)])
 
     cmd_data['pause'] = acmd([("", None)])
 
