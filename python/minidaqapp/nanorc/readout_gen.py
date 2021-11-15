@@ -96,7 +96,7 @@ def generate(NETWORK_ENDPOINTS,
 
     if SOFTWARE_TPG_ENABLED:
         queue_bare_specs += [
-            app.QueueSpec(inst=f"tp_link_{idx}", kind='FollySPSCQueue', capacity=100000)
+            app.QueueSpec(inst=f"sw_tp_link_{idx}", kind='FollySPSCQueue', capacity=100000)
                 for idx in range(MIN_LINK, MAX_LINK)
         ] + [
             app.QueueSpec(inst=f"tp_fragments_q", kind='FollyMPMCQueue', capacity=100)
@@ -148,7 +148,7 @@ def generate(NETWORK_ENDPOINTS,
             mspec(f"ntoq_tp_datarequests_{idx}", "NetworkToQueue", [app.QueueInfo(name="output", inst=f"tp_requests_{idx}", dir="output")]) for idx in range(MIN_LINK,MAX_LINK)
         ] + [
             mspec(f"tp_datahandler_{TOTAL_NUMBER_OF_DATA_PRODUCERS + idx}", "DataLinkHandler", [
-                app.QueueInfo(name="raw_input", inst=f"tp_link_{idx}", dir="input"),
+                app.QueueInfo(name="raw_input", inst=f"sw_tp_link_{idx}", dir="input"),
                 app.QueueInfo(name="data_requests_0", inst=f"tp_requests_{idx}", dir="input"),
                 app.QueueInfo(name="data_response_0", inst="tp_fragments_q", dir="output"),
                 app.QueueInfo(name="timesync", inst="time_sync_q", dir="output")
@@ -191,7 +191,7 @@ def generate(NETWORK_ENDPOINTS,
 
             if SOFTWARE_TPG_ENABLED:
                 ls.extend([
-                    app.QueueInfo(name="tp_out", inst=f"tp_link_{idx+MIN_LINK}", dir="output"),
+                    app.QueueInfo(name="tp_out", inst=f"sw_tp_link_{idx+MIN_LINK}", dir="output"),
                     app.QueueInfo(name="tpset_out", inst=f"tpset_queue_{idx+MIN_LINK}", dir="output")
                 ])
 
