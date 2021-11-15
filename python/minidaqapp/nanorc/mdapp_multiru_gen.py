@@ -458,7 +458,7 @@ def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowd
                     "TIMING_SHARE": "getenv",
                     "LD_LIBRARY_PATH": "getenv",
                     "PATH": "getenv",
-                    "READOUT_SHARE": "getenv",
+                    "READOUTLIBS_SHARE": "getenv",
                     "DETCHANNELMAPS_SHARE": "getenv"
                 },
                 "cmd": ["CMD_FAC=rest://localhost:${APP_PORT}",
