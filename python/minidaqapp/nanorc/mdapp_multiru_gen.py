@@ -217,7 +217,7 @@ def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowd
 
         if enable_dqm:
             for idx in range(number_of_data_producers):
-                network_endpoints[f"datareq_dqm_{hostidx}_{idx}"] = "tcp://{host_ru" + f"{hostidx}" + "}:" + f"{port}"
+                network_endpoints[f"datareq_dqm_{hostidx*number_of_data_producers+idx}"] = "tcp://{host_ru" + f"{hostidx}" + "}:" + f"{port}"
                 port = port + 1
             network_endpoints[f"fragx_dqm_{hostidx}"] = "tcp://{host_ru" + f"{hostidx}" + "}:" + f"{port}"
             port = port + 1
