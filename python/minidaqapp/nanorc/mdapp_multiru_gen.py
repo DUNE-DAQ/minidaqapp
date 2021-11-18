@@ -14,42 +14,6 @@ CONTEXT_SETTINGS = dict(help_option_names=['-h', '--help'])
 
 console = Console()
 
-# Map from application name to the list of endpoint names that are
-# connected to that application (specifically, which must be assigned
-# on its host)
-app_endpoints = defaultdict(list)
-
-def add_manual_endpoint(endpoint_name, app_name):
-    app_endpoints[app_name].append(endpoint_name)
-
-def assign_manual_endpoints(the_system):
-    # It would seem like we should be able to reuse port numbers for
-    # each app, but {host_app1} and {host_app2} might be the same
-    # physical host, so the ports would collide. We don't have the app
-    # -> physical host mapping here, so just up the port by one each
-    # time for the moment
-    #
-    # This function gets called after util.assign_network_endpoints
-    # has populated the_system.network_endpoints, so we have to check
-    # what ports it has already assigned, and not reuse them
-
-    taken_ports=set()
-    
-    for endpoint in the_system.network_endpoints.values():
-        port=endpoint.rsplit(":", maxsplit=1)[-1]
-        taken_ports.add(int(port))
-
-    candidate_port=12345
-    for app, endpoints in app_endpoints.items():
-        for endpoint in endpoints:
-            name=f"{app}.{endpoint}"
-            if name not in the_system.network_endpoints: # Don't overwrite existing endpoints in map
-                while candidate_port in taken_ports:
-                    candidate_port+=1
-                new_endpoint = f"tcp://{{host_{app}}}:{candidate_port}"
-                the_system.network_endpoints[name] = new_endpoint
-                taken_ports.add(candidate_port)
-
 import click
 
 @click.command(context_settings=CONTEXT_SETTINGS)
@@ -168,23 +132,17 @@ def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowd
         df_token_count = -1 * token_count
         trigemu_token_count = 0
 
-    ru_app_names=[f"ruflx{idx}" if use_felix else f"ruemu{idx}" for idx in range(len(host_ru))]
-
-    # add_manual_endpoint("hsievent", "hsi")
-    # add_manual_endpoint("tokens",  "dataflow")
-    # add_manual_endpoint("hsicmds",  "hsi")
-
-    if frontend_type == 'wib' or frontend_type == 'wib2':
-        system_type = 'TPC'
-    else:
-        system_type = 'PDS'
-
     if opmon_impl == 'cern':
         info_svc_uri = "influx://188.185.88.195:80/write?db=db1"
     elif opmon_impl == 'pocket':
         info_svc_uri = "influx://" + pocket_url + ":31002/write?db=influxdb"
     else:
         info_svc_uri = "file://info_${APP_NAME}_${APP_PORT}.json"
+
+    if frontend_type == 'wib' or frontend_type == 'wib2':
+        system_type = 'TPC'
+    else:
+        system_type = 'PDS'
 
     ers_settings=dict()
 
@@ -210,36 +168,16 @@ def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowd
     dqm_kafka_address = "dqmbroadcast:9092" if dqm_impl == 'cern' else pocket_url + ":30092" if dqm_impl == 'pocket' else ''
 
     ####################################################################
-    # Assigning network endpoints
+    # Generating apps
     ####################################################################
 
-    for idx in range(total_number_of_data_producers):
-        add_manual_endpoint(f"datareq_{idx}", "dataflow")
-        if enable_software_tpg:
-            add_manual_endpoint(f"tp_datareq_{idx}", "dataflow")
-            add_manual_endpoint(f'frags_tpset_ds_{idx}', "trigger")
-            add_manual_endpoint(f"ds_tp_datareq_{idx}", "dataflow")
+    from . import util
+    
+    the_system = util.System()
 
-    cardid = {}
-    host_id_dict = {}
-
-    for hostidx in range(len(host_ru)):
-        add_manual_endpoint(f"timesync_{hostidx}",  ru_app_names[hostidx])
-        add_manual_endpoint(f"frags_{hostidx}",  ru_app_names[hostidx])
-
-        if enable_software_tpg:
-            add_manual_endpoint(f"tp_frags_{hostidx}", ru_app_names[hostidx])
-            for idx in range(number_of_data_producers):
-                add_manual_endpoint(f"tpsets_{hostidx*number_of_data_producers+idx}", ru_app_names[hostidx])
-
-        if host_ru[hostidx] in host_id_dict:
-            host_id_dict[host_ru[hostidx]] = host_id_dict[host_ru[hostidx]] + 1
-            cardid[hostidx] = host_id_dict[host_ru[hostidx]]
-        else:
-            cardid[hostidx] = 0
-            host_id_dict[host_ru[hostidx]] = 0
-        hostidx = hostidx + 1
-
+    #-------------------------------------------------------------------
+    # Trigger app
+    
     mgraph_trigger = trigger_gen.generate(
         NUMBER_OF_RAWDATA_PRODUCERS = total_number_of_data_producers,
         NUMBER_OF_TPSET_PRODUCERS = total_number_of_data_producers if enable_software_tpg else 0,
@@ -254,8 +192,26 @@ def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowd
         TRIGGER_WINDOW_BEFORE_TICKS = trigger_window_before_ticks,
         TRIGGER_WINDOW_AFTER_TICKS = trigger_window_after_ticks)
 
-
+    the_system.apps["trigger"] = util.App(modulegraph=mgraph_trigger, host=host_trigger)
+    
     console.log("trigger module graph:", mgraph_trigger)
+
+    #-------------------------------------------------------------------
+    # Readout apps
+    
+    cardid = {}
+    host_id_dict = {}
+
+    ru_app_names=[f"ruflx{idx}" if use_felix else f"ruemu{idx}" for idx in range(len(host_ru))]
+
+    for hostidx in range(len(host_ru)):
+        if host_ru[hostidx] in host_id_dict:
+            host_id_dict[host_ru[hostidx]] = host_id_dict[host_ru[hostidx]] + 1
+            cardid[hostidx] = host_id_dict[host_ru[hostidx]]
+        else:
+            cardid[hostidx] = 0
+            host_id_dict[host_ru[hostidx]] = 0
+        hostidx = hostidx + 1
 
     mgraphs_readout = []
     for hostidx in range(len(host_ru)):
@@ -263,7 +219,6 @@ def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowd
                                                     TOTAL_NUMBER_OF_DATA_PRODUCERS=total_number_of_data_producers,
                                                     EMULATOR_MODE = emulator_mode,
                                                     DATA_RATE_SLOWDOWN_FACTOR = data_rate_slowdown_factor,
-                                                    # RUN_NUMBER = run_number,
                                                     DATA_FILE = data_file,
                                                     FLX_INPUT = use_felix,
                                                     CLOCK_SPEED_HZ = CLOCK_SPEED_HZ,
@@ -281,9 +236,13 @@ def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowd
         console.log("readout mgraph:", this_readout_mgraph)
         mgraphs_readout.append(this_readout_mgraph)
 
+    for i,ru_name in enumerate(ru_app_names):
+        the_system.apps[ru_name] = util.App(modulegraph=mgraphs_readout[i], host=host_ru[i])
+    #-------------------------------------------------------------------
+    # (Fake) HSI app
+    
     if use_hsi_hw:
-        mgraph_hsi = hsi_gen.generate(# the_system.network_endpoints,
-            # RUN_NUMBER = run_number,
+        mgraph_hsi = hsi_gen.generate(
             CONTROL_HSI_HARDWARE=control_timing_hw,
             READOUT_PERIOD_US = hsi_readout_period,
             HSI_DEVICE_NAME = hsi_device_name,
@@ -295,8 +254,6 @@ def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowd
             HSI_SOURCE=hsi_source,)
     else:
         mgraph_hsi = fake_hsi_gen.generate(
-            # the_system.network_endpoints,
-            # RUN_NUMBER = run_number,
             CLOCK_SPEED_HZ = CLOCK_SPEED_HZ,
             DATA_RATE_SLOWDOWN_FACTOR = data_rate_slowdown_factor,
             TRIGGER_RATE_HZ = trigger_rate_hz,
@@ -305,21 +262,21 @@ def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowd
             SIGNAL_EMULATION_MODE = hsi_signal_emulation_mode,
             ENABLED_SIGNALS =  enabled_hsi_signals,)
 
-    # Before we run dataflow generate, we need a list of all the
-    # fragment producers from other apps to pass to it. Create that
-    # here
-    all_fragment_producers = deepcopy(mgraph_trigger.fragment_producers)
-    for mgraph in mgraphs_readout:
-        assert all([key not in all_fragment_producers.keys() for key in mgraph.fragment_producers])
-        all_fragment_producers.update(mgraph.fragment_producers)
-        
-    # Manually add the readout fragment producers
-    # for hostidx in range(len(host_ru)):
-    #     for dataprod in range(number_of_data_producers):
-    #         fragment_producers[geoid] = FragmentProducer(geoid, requests_in, fragments_out, queue_name)    
+    the_system.apps["hsi"] = util.App(modulegraph=mgraph_hsi, host=host_hsi)
 
+    # TODO: Actually deal with "thi" properly
+    if control_timing_hw:
+        the_system.apps["thi"] = util.App()
+    
+    #-------------------------------------------------------------------
+    # Dataflow app
+    #
+    # This has to be last, because it needs to know all of the
+    # fragment producers that exist in the system, which are defined
+    # by the other apps' generate functions
+    
     mgraph_dataflow = dataflow_gen.generate(
-        FRAGMENT_PRODUCERS = all_fragment_producers,
+        FRAGMENT_PRODUCERS = the_system.get_fragment_producers(),
         NUMBER_OF_DATA_PRODUCERS = total_number_of_data_producers,
         OUTPUT_PATH = output_path,
         TOKEN_COUNT = df_token_count,
@@ -327,22 +284,9 @@ def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowd
         SOFTWARE_TPG_ENABLED = enable_software_tpg,
         TPSET_WRITING_ENABLED = enable_tpset_writing)
 
+    the_system.apps["dataflow"] = util.App(modulegraph=mgraph_dataflow, host=host_df)
+    
     console.log("dataflow module graph:", mgraph_dataflow)
-    # Make partially-dummy system data. Do this before old-style app command generation so
-    # we can get the network endpoints as we want
-
-    from . import util
-    apps = {
-        "hsi":      util.App(modulegraph=mgraph_hsi, host=host_hsi),
-        "trigger":  util.App(modulegraph=mgraph_trigger, host=host_trigger),
-        "dataflow": util.App(modulegraph=mgraph_dataflow, host=host_df),
-    }
-
-    apps.update({ru_name: util.App(modulegraph=mgraphs_readout[i], host=host_ru[i]) for i,ru_name in enumerate(ru_app_names)})
-
-    if control_timing_hw:
-        apps["thi"] = util.App()
-
 
     app_connections = {
         "trigger.trigger_decisions": util.Sender(msg_type="dunedaq::dfmessages::TriggerDecision",
@@ -372,13 +316,10 @@ def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowd
                                                                       subscribers=["hsi.time_sync"])
                              for idx in range(total_number_of_data_producers) })
 
-    the_system = util.System(apps, app_connections=app_connections,
-                             app_start_order=["dataflow", "trigger"]+ru_app_names+["hsi"])
+    the_system.app_connections=app_connections
+    the_system.app_start_order=["dataflow", "trigger"]+ru_app_names+["hsi"]
 
-
-    util.connect_fragment_producers("trigger", the_system, verbose=True)
-    for ru_app_name in ru_app_names:
-        util.connect_fragment_producers(ru_app_name, the_system, verbose=True)
+    util.connect_all_fragment_producers(the_system, verbose=True)
 
     console.log("After connecting fragment producers, trigger mgraph:", the_system.apps['trigger'].modulegraph)
     console.log("After connecting fragment producers, the_system.app_connections:", the_system.app_connections)
@@ -393,11 +334,6 @@ def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowd
 
     util.add_network("dataflow", the_system, verbose=True)
     
-    console.log(f"before assign_manual_endpoints(), the_system.network_endpoints = {the_system.network_endpoints}")
-    
-    assign_manual_endpoints(the_system)
-    
-    console.log(f"after  assign_manual_endpoints(), the_system.network_endpoints = {the_system.network_endpoints}")
 
     ####################################################################
     # Application command data generation
@@ -415,15 +351,15 @@ def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowd
         )
         console.log("thi cmd data:", cmd_data_thi)
     
-    cmd_data_trigger = util.make_app_command_data(apps["trigger"], verbose=True)
+    cmd_data_trigger = util.make_app_command_data(the_system.apps["trigger"], verbose=True)
 
     cmd_datas_readout = []
     for ru_app_name in ru_app_names:
-        cmd_datas_readout.append(util.make_app_command_data(apps[ru_app_name], verbose=True))
+        cmd_datas_readout.append(util.make_app_command_data(the_system.apps[ru_app_name], verbose=True))
         
-    cmd_data_hsi = util.make_app_command_data(apps["hsi"], verbose=True)
+    cmd_data_hsi = util.make_app_command_data(the_system.apps["hsi"], verbose=True)
     
-    cmd_data_dataflow = util.make_app_command_data(apps["dataflow"], verbose=True)
+    cmd_data_dataflow = util.make_app_command_data(the_system.apps["dataflow"], verbose=True)
 
     # Arrange per-app command data into the format used by util.write_json_files()
     app_command_datas = {

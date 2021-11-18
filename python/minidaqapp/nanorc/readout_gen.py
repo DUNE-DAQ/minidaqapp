@@ -213,11 +213,13 @@ def generate(# NETWORK_ENDPOINTS,
         # TODO: Should we just have one timesync outgoing endpoint?
         mgraph.add_endpoint(f"timesync_{idx}", f"datahandler_{idx}.timesync",    Direction.OUT)
         mgraph.add_endpoint(f"timesync_{idx+NUMBER_OF_DATA_PRODUCERS}", f"tp_datahandler_{idx}.timesync",    Direction.OUT)
-        
+
+        # Add fragment producers for raw data
         mgraph.add_fragment_producer(region = REGION_ID, element = idx, system = SYSTEM_TYPE,
                                      requests_in   = f"datahandler_{idx}.data_requests_0",
                                      fragments_out = f"datahandler_{idx}.data_response_0")
 
+        # Add fragment producers for TPC TPs. Make sure the element index doesn't overlap with the ones for raw data
         mgraph.add_fragment_producer(region = REGION_ID, element = idx + NUMBER_OF_DATA_PRODUCERS, system = SYSTEM_TYPE,
                                      requests_in   = f"tp_datahandler_{idx}.data_requests_0",
                                      fragments_out = f"tp_datahandler_{idx}.data_response_0")

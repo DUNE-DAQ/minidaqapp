@@ -52,7 +52,7 @@ def generate(FRAGMENT_PRODUCERS,
 
     trb_geoid_list = []
 
-    for idx, producer in enumerate(FRAGMENT_PRODUCERS.values()):
+    for idx, producer in enumerate(FRAGMENT_PRODUCERS):
         trb_geoid_list.append(trb.geoidinst(region = producer.geoid.region,
                                             element = producer.geoid.element,
                                             system = producer.geoid.system,
@@ -111,7 +111,7 @@ def generate(FRAGMENT_PRODUCERS,
     mgraph.add_endpoint("trigger_decisions", "trb.trigger_decision_input_queue", Direction.IN)
     mgraph.add_endpoint("tokens",            "datawriter.token_output_queue",    Direction.OUT)
 
-    for i, producer in enumerate(FRAGMENT_PRODUCERS.values()):
+    for i, producer in enumerate(FRAGMENT_PRODUCERS):
         queue_name=f"data_request_{i}_output_queue"
         console.log(f"dataflow_gen adding fragment producer endpoint for {queue_name}")
         mgraph.add_endpoint(util.data_request_endpoint_name(producer),

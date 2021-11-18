@@ -50,7 +50,7 @@ class Module:
        configuration object and list of outgoing connections to other
        modules
     """
-    
+
     def __init__(self, plugin, conf=None, connections=None):
         self.plugin=plugin
         self.conf=conf
@@ -94,7 +94,7 @@ class ModuleGraph:
         self.modules=modules if modules else dict()
         self.endpoints=endpoints if endpoints else dict()
         self.fragment_producers = fragment_producers if  fragment_producers else dict()
-        
+
     def __repr__(self):
         return f"modulegraph(modules={self.modules}, endpoints={self.endpoints}, fragment_producers={self.fragment_producers})"
 
@@ -174,6 +174,19 @@ class System:
         yield "network_endpoints", self.network_endpoints
         yield "app_start_order", self.app_start_order
 
+    def get_fragment_producers(self):
+        """Get a list of all the fragment producers in the system"""
+        all_producers = []
+        all_geoids = set()
+        for app in self.apps.values():
+            console.log(app)
+            producers = app.modulegraph.fragment_producers
+            for producer in producers.values():
+                if producer.geoid in all_geoids:
+                    raise ValueError(f"GeoID {producer.geoid} has multiple fragment producers")
+                all_geoids.add(producer.geoid)
+                all_producers.append(producer)
+        return all_producers
 
 ########################################################################
 #
@@ -211,7 +224,7 @@ def make_app_deps(the_system, verbose=False):
     """
 
     deps = nx.DiGraph()
-    
+
     for app in the_system.apps.keys():
         deps.add_node(app)
 
@@ -334,11 +347,9 @@ def data_request_endpoint_name(producer):
 
 def set_mlt_links(the_system, mlt_app_name="trigger", verbose=False):
     mlt_links = []
-    for app in the_system.apps.values():
-        producers = app.modulegraph.fragment_producers
-        for producer in producers.values():
-            geoid = producer.geoid
-            mlt_links.append( mlt.GeoID(system=geoid.system, region=geoid.region, element=geoid.element) )
+    for producer in the_system.get_fragment_producers():
+        geoid = producer.geoid
+        mlt_links.append( mlt.GeoID(system=geoid.system, region=geoid.region, element=geoid.element) )
     # Now we add the full set of links to the MLT plugin conf. It
     # would be nice to just modify the `links` attribute of the
     # mlt.ConfParams object, but moo-derived objects work in a funny
@@ -352,11 +363,12 @@ def set_mlt_links(the_system, mlt_app_name="trigger", verbose=False):
                                                                       conf=mlt.ConfParams(links=mlt_links,
                                                                                           initial_token_count=old_mlt.conf.initial_token_count),
                                                                       connections=old_mlt.connections)
-            
+
+
 def connect_fragment_producers(app_name, the_system, verbose=False):
     if verbose:
         console.log(f"Connecting fragment producers in {app_name}")
-        
+
     app = the_system.apps[app_name]
     producers = app.modulegraph.fragment_producers
 
@@ -368,7 +380,7 @@ def connect_fragment_producers(app_name, the_system, verbose=False):
         the_system.app_connections[f"dataflow.{data_request_endpoint_name(producer)}"] = Sender(msg_type="dunedaq::dfmessages::DataRequest",
                                                                                msg_module_name="DataRequestNQ",
                                                                                receiver=f"{app_name}.{request_endpoint}")
-        
+
         frag_endpoint = f"fragments_{geoid_raw_str(producer.geoid)}"
         if verbose:
             console.log(f"Creating fragment endpoint {frag_endpoint}")
@@ -378,6 +390,12 @@ def connect_fragment_producers(app_name, the_system, verbose=False):
                                                                            msg_module_name="FragmentNQ",
                                                                            receiver=f"dataflow.fragments")
 
+def connect_all_fragment_producers(the_system, dataflow_name="dataflow", verbose=False):
+    for name, app in the_system.apps.items():
+        if name==dataflow_name:
+            continue
+        connect_fragment_producers(name, the_system, verbose)
+            
 def assign_network_endpoints(the_system, verbose=False):
     """Given a set of applications and connections between them, come up
     with a list of suitable zeromq endpoints. Return value is a mapping
@@ -425,15 +443,15 @@ def make_unique_name(base, dictionary):
     while f"{base}{suffix}" in dictionary:
         suffix+=1
     assert f"{base}{suffix}" not in dictionary
-    
+
     return f"{base}{suffix}"
-    
+
 def add_network(app_name, the_system, verbose=False):
     """Add the necessary QueueToNetwork and NetworkToQueue objects to the
        application named `app_name`, based on the inter-application
        connections specified in `the_system`. NB `the_system` is modified
        in-place."""
-    
+
     if the_system.network_endpoints is None:
         the_system.network_endpoints=assign_network_endpoints(the_system)
 
@@ -445,7 +463,7 @@ def add_network(app_name, the_system, verbose=False):
 
     if verbose:
         console.log(f"Endpoints to connect are: {unconnected_endpoints}")
-        
+
     for conn_name, conn in the_system.app_connections.items():
         from_app, from_endpoint = conn_name.split(".", maxsplit=1)
 
@@ -456,7 +474,7 @@ def add_network(app_name, the_system, verbose=False):
             # We're a publisher or sender. Make the queue to network
             qton_name = conn_name.replace(".", "_")
             qton_name = make_unique_name(qton_name, modules_with_network)
-                
+
             if verbose:
                 console.log(f"Adding QueueToNetwork named {qton_name} connected to {from_endpoint} in app {app_name}")
             modules_with_network[qton_name] = Module(plugin="QueueToNetwork",
@@ -470,7 +488,7 @@ def add_network(app_name, the_system, verbose=False):
             # Connect the module to the QueueToNetwork
             mod_connections = modules_with_network[from_endpoint_module].connections
             mod_connections[from_endpoint_sink] = Connection(f"{qton_name}.input")
-            
+
         if hasattr(conn, "subscribers"):
             for to_conn in conn.subscribers:
                 to_app, to_endpoint = to_conn.split(".", maxsplit=1)
@@ -509,7 +527,7 @@ def add_network(app_name, the_system, verbose=False):
             if to_endpoint in unconnected_endpoints:
                 unconnected_endpoints.remove(to_endpoint)
             to_endpoint = resolve_endpoint(app, to_endpoint, Direction.IN)
-            
+
             ntoq_name = conn.receiver.replace(".", "_")
             ntoq_name = make_unique_name(ntoq_name, modules_with_network)
 
@@ -541,7 +559,7 @@ def generate_boot(apps: list, partition_name="${USER}_test", ers_settings=None, 
             "ERROR":   "erstrace,throttle,lstdout",
             "FATAL":   "erstrace,lstdout",
         }
-        
+
     daq_app_specs = {
         "daq_application_ups" : {
             "comment": "Application profile based on a full dbt runtime environment",
@@ -626,7 +644,7 @@ def make_app_json(app_name, app_command_data, data_dir, verbose=False):
 
 def make_system_command_datas(the_system, verbose=False):
     """Generate the dictionary of commands and their data for the entire system"""
-    
+
     if the_system.app_start_order is None:
         app_deps = make_app_deps(the_system, verbose)
         the_system.app_start_order = list(nx.algorithms.dag.topological_sort(app_deps))
@@ -656,7 +674,7 @@ def make_system_command_datas(the_system, verbose=False):
 def write_json_files(app_command_datas, system_command_datas, json_dir, verbose=False):
     """Write the per-application and whole-system command data as json files in `json_dir`
     """
-    
+
     console.rule("JSON file creation")
 
     if exists(json_dir):
