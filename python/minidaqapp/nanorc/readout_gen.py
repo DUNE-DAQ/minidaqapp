@@ -225,6 +225,10 @@ def generate(
 
     cmd_data['init'] = app.Init(queues=queue_specs, modules=mod_specs, nwconnections=NW_SPECS)
 
+    total_link_count = 0
+    for ru in range(len(RU_CONFIG)):
+        total_link_count += RU_CONFIG[ru]["channel_count"]
+
     conf_list = [("fake_source",sec.Conf(
                             link_confs=[sec.LinkConfiguration(
                             geoid=sec.GeoID(system=SYSTEM_TYPE, region=RU_CONFIG[RUIDX]["region_id"], element=idx),
@@ -310,16 +314,16 @@ def generate(
                             source_queue_timeout_ms= QUEUE_POP_WAIT_MS,
                             # fake_trigger_flag=0, default
                             region_id = RU_CONFIG[RUIDX]["region_id"],
-                            element_id = idx,
+                            element_id = total_link_count+idx,
                         ),
                         latencybufferconf= rconf.LatencyBufferConf(
                             latency_buffer_size = LATENCY_BUFFER_SIZE,
                             region_id = RU_CONFIG[RUIDX]["region_id"],
-                            element_id =  idx,
+                            element_id =  total_link_count+idx,
                         ),
                         rawdataprocessorconf= rconf.RawDataProcessorConf(
                             region_id = RU_CONFIG[RUIDX]["region_id"],
-                            element_id =  idx,
+                            element_id =  total_link_count+idx,
                             enable_software_tpg = False,
                         ),
                         requesthandlerconf= rconf.RequestHandlerConf(
@@ -327,7 +331,7 @@ def generate(
                             pop_limit_pct = 0.8,
                             pop_size_pct = 0.1,
                             region_id = RU_CONFIG[RUIDX]["region_id"],
-                            element_id = idx,
+                            element_id = total_link_count+idx,
                             # output_file = f"output_{idx + MIN_LINK}.out",
                             stream_buffer_size = 100 if FRONTEND_TYPE=='pacman' else 8388608,
                             enable_raw_recording = False,
@@ -349,9 +353,6 @@ def generate(
             ]  )
 
     if SOFTWARE_TPG_ENABLED:
-        total_link_count = 0
-        for ru in range(len(RU_CONFIG)):
-            total_link_count += RU_CONFIG[ru]["channel_count"]
 
         conf_list.extend([
                             ("tp_fragment_sender", None)
@@ -400,7 +401,7 @@ def generate(
             ("tp_request_receiver", startpars),
             ("ssp.*", startpars),
             ("ntoq_trigdec", startpars),
-            ("qton_tp_fragments", startpars),
+            ("tp_fragment_sender", startpars),
             (f"tp_datahandler_.*", startpars),
             (f"tpset_publisher", startpars),
             ("fakedataprod_.*", startpars),
@@ -415,7 +416,7 @@ def generate(
             ("pacman_source", None),
             ("datahandler_.*", None),
             ("qton_fragments_dqm", None),
-            ("qton_tp_fragments", None),
+            ("tp_fragment_sender", None),
             (f"tp_datahandler_.*", None),
             (f"tpset_publisher", None),
             ("fakedataprod_.*", None),
@@ -428,7 +429,7 @@ def generate(
 
     cmd_data['scrap'] = acmd([("request_receiver", None),
             ("tp_request_receiver", None),
-            ("qton_tp_fragments", None),
+            ("tp_fragment_sender", None),
             (f"tpset_publisher", None),
             ("timesync_to_network", None)])
 
