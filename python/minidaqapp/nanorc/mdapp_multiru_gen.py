@@ -367,14 +367,8 @@ def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowd
 
     system_command_datas = util.make_system_command_datas(the_system)
     # Override the default boot.json with the one from minidaqapp
-    boot = util.generate_boot(the_system.apps, partition_name=partition_name, ers_settings=ers_settings, info_svc_uri=info_svc_uri)
-
-    if disable_trace:
-        del boot["exec"]["daq_application"]["env"]["TRACE_FILE"]
-        del boot["exec"]["daq_application_ups"]["env"]["TRACE_FILE"]
-
-    if use_kafka:
-        boot["env"]["DUNEDAQ_ERS_STREAM_LIBS"] = "erskafka"
+    boot = util.generate_boot(the_system.apps, partition_name=partition_name, ers_settings=ers_settings, info_svc_uri=info_svc_uri,
+                              disable_trace=disable_trace, use_kafka=use_kafka)
 
     system_command_datas['boot'] = boot
 

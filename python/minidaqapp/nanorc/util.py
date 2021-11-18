@@ -549,7 +549,8 @@ def add_network(app_name, the_system, verbose=False):
     app.modulegraph.modules = modules_with_network
 
 
-def generate_boot(apps: list, partition_name="${USER}_test", ers_settings=None, info_svc_uri="file://info_${APP_ID}_${APP_PORT}.json", verbose=False) -> dict:
+def generate_boot(apps: list, partition_name="${USER}_test", ers_settings=None, info_svc_uri="file://info_${APP_ID}_${APP_PORT}.json",
+                  disable_trace=False, use_kafka=False, verbose=False) -> dict:
     """Generate the dictionary that will become the boot.json file"""
 
     if ers_settings is None:
@@ -625,6 +626,13 @@ def generate_boot(apps: list, partition_name="${USER}_test", ers_settings=None, 
         },
         "exec": daq_app_specs
     }
+
+    if disable_trace:
+        del boot["exec"]["daq_application"]["env"]["TRACE_FILE"]
+        del boot["exec"]["daq_application_ups"]["env"]["TRACE_FILE"]
+
+    if use_kafka:
+        boot["env"]["DUNEDAQ_ERS_STREAM_LIBS"] = "erskafka"
 
     if verbose:
         console.log("Boot data")
