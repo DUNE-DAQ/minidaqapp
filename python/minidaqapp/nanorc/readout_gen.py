@@ -217,17 +217,7 @@ def generate(# NETWORK_ENDPOINTS,
         mgraph.add_fragment_producer(region = REGION_ID, element = idx, system = SYSTEM_TYPE,
                                      requests_in   = f"datahandler_{idx}.data_requests_0",
                                      fragments_out = f"datahandler_{idx}.data_response_0")
-        # Somehow the value of `element` in the following line
-        # determines whether the data request handler in *trigger*
-        # (TPSetBufferCreator) receives duplicate DataRequests
-        #
-        # N data producers | element value    |   repeated DataRequests?
-        # --------------------------------------------------------------
-        # 1                | idx              |   No
-        # 1                | idx + 1          |   Yes
-        # 1                | idx + 2          |   Yes
-        # 1                | idx + 3          |   Yes
-        # 1                | idx + 100        |   Yes
+
         mgraph.add_fragment_producer(region = REGION_ID, element = idx + NUMBER_OF_DATA_PRODUCERS, system = SYSTEM_TYPE,
                                      requests_in   = f"tp_datahandler_{idx}.data_requests_0",
                                      fragments_out = f"tp_datahandler_{idx}.data_response_0")
