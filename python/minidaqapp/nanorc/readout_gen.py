@@ -140,14 +140,14 @@ def generate(
 
     if SOFTWARE_TPG_ENABLED:
         mod_specs += [
-            mspec("qton_tp_fragments", "QueueToNetwork", [app.QueueInfo(name="input", inst="tp_fragments_q", dir="input")])
+            mspec("tp_fragment_sender", "FragmentSender", [app.QueueInfo(name="input_queue", inst="tp_fragments_q", dir="input")])
         ] + [
             mspec(f"tp_request_receiver", "RequestReceiver", [app.QueueInfo(name="output", inst=f"tp_requests_{idx}", dir="output")]) for idx in range(MIN_LINK,MAX_LINK)
         ] + [
             mspec(f"tp_datahandler_{idx}", "DataLinkHandler", [
                 app.QueueInfo(name="raw_input", inst=f"sw_tp_link_{idx}", dir="input"),
                 app.QueueInfo(name="data_requests_0", inst=f"tp_requests_{idx}", dir="input"),
-                app.QueueInfo(name="data_response_0", inst="tp_fragments_q", dir="output")
+                app.QueueInfo(name="fragment_queue", inst="tp_fragments_q", dir="output")
             ]) for idx in range(MIN_LINK,MAX_LINK)
         ] + [
             mspec(f"tpset_publisher", "QueueToNetwork", [
@@ -354,10 +354,7 @@ def generate(
             total_link_count += RU_CONFIG[ru]["channel_count"]
 
         conf_list.extend([
-                            ("qton_tp_fragments", qton.Conf(msg_type="std::unique_ptr<dunedaq::daqdataformats::Fragment>",
-                                                            msg_module_name="FragmentNQ",
-                                                            sender_config=nos.Conf(name=f"{PARTITION}.tp_frags_0",
-                                                                                   stype="msgpack")))
+                            ("tp_fragment_sender", None)
                         ] + [
                             ("tp_request_receiver", rrcv.ConfParams(
                                         map = [rrcv.geoidinst(region=RU_CONFIG[RUIDX]["region_id"] , element=idx + total_link_count, system=SYSTEM_TYPE , queueinstance=f"tp_requests_{idx}") for idx in range(MIN_LINK,MAX_LINK)],
