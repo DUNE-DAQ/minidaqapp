@@ -87,6 +87,8 @@ def generate(
     queue_bare_specs = [
             app.QueueSpec(inst=f"data_requests_{idx}", kind='FollySPSCQueue', capacity=100)
                 for idx in range(MIN_LINK,MAX_LINK)
+        ] + [
+            app.QueueSpec(inst="fragment_q", kind="FollyMPMCQueue", capacity=100)
         ]
 
     if not USE_FAKE_DATA_PRODUCERS:
@@ -125,6 +127,8 @@ def generate(
 
     mod_specs = [
         mspec(f"request_receiver", "RequestReceiver", [app.QueueInfo(name="output", inst=f"data_requests_{idx}", dir="output")]) for idx in range(MIN_LINK,MAX_LINK)
+    ] + [
+        mspec(f"fragment_sender", "FragmentSender", [app.QueueInfo(name="input_queue", inst="fragment_q", dir="input")])
     ]
 
     if DQM_ENABLED:
@@ -136,14 +140,14 @@ def generate(
 
     if SOFTWARE_TPG_ENABLED:
         mod_specs += [
-            mspec("qton_tp_fragments", "QueueToNetwork", [app.QueueInfo(name="input", inst="tp_fragments_q", dir="input")])
+            mspec("tp_fragment_sender", "FragmentSender", [app.QueueInfo(name="input_queue", inst="tp_fragments_q", dir="input")])
         ] + [
             mspec(f"tp_request_receiver", "RequestReceiver", [app.QueueInfo(name="output", inst=f"tp_requests_{idx}", dir="output")]) for idx in range(MIN_LINK,MAX_LINK)
         ] + [
             mspec(f"tp_datahandler_{idx}", "DataLinkHandler", [
                 app.QueueInfo(name="raw_input", inst=f"sw_tp_link_{idx}", dir="input"),
                 app.QueueInfo(name="data_requests_0", inst=f"tp_requests_{idx}", dir="input"),
-                app.QueueInfo(name="data_response_0", inst="tp_fragments_q", dir="output")
+                app.QueueInfo(name="fragment_queue", inst="tp_fragments_q", dir="output")
             ]) for idx in range(MIN_LINK,MAX_LINK)
         ] + [
             mspec(f"tpset_publisher", "QueueToNetwork", [
@@ -171,12 +175,12 @@ def generate(
             ls = [
                     app.QueueInfo(name="raw_input", inst=f"{FRONTEND_TYPE}_link_{idx}", dir="input"),
                     app.QueueInfo(name="data_requests_0", inst=f"data_requests_{idx}", dir="input"),
+                    app.QueueInfo(name="fragment_queue", inst="fragment_q", dir="output")
                 ]
             if DQM_ENABLED:
                 ls.extend([
-                    app.QueueInfo(name="data_requests_1", inst=f"data_requests_dqm_{idx}", dir="input"),
-                    app.QueueInfo(name="data_response_1", inst="data_fragments_q_dqm", dir="output")])
-
+                    app.QueueInfo(name="data_requests_1", inst=f"data_requests_dqm_{idx}", dir="input")
+                ])
             if SOFTWARE_TPG_ENABLED:
                 ls.extend([
                     app.QueueInfo(name="tp_out", inst=f"sw_tp_link_{idx}", dir="output"),
@@ -220,6 +224,10 @@ def generate(
                             ]))
 
     cmd_data['init'] = app.Init(queues=queue_specs, modules=mod_specs, nwconnections=NW_SPECS)
+
+    total_link_count = 0
+    for ru in range(len(RU_CONFIG)):
+        total_link_count += RU_CONFIG[ru]["channel_count"]
 
     conf_list = [("fake_source",sec.Conf(
                             link_confs=[sec.LinkConfiguration(
@@ -306,16 +314,16 @@ def generate(
                             source_queue_timeout_ms= QUEUE_POP_WAIT_MS,
                             # fake_trigger_flag=0, default
                             region_id = RU_CONFIG[RUIDX]["region_id"],
-                            element_id = idx,
+                            element_id = total_link_count+idx,
                         ),
                         latencybufferconf= rconf.LatencyBufferConf(
                             latency_buffer_size = LATENCY_BUFFER_SIZE,
                             region_id = RU_CONFIG[RUIDX]["region_id"],
-                            element_id =  idx,
+                            element_id =  total_link_count+idx,
                         ),
                         rawdataprocessorconf= rconf.RawDataProcessorConf(
                             region_id = RU_CONFIG[RUIDX]["region_id"],
-                            element_id =  idx,
+                            element_id =  total_link_count+idx,
                             enable_software_tpg = False,
                         ),
                         requesthandlerconf= rconf.RequestHandlerConf(
@@ -323,7 +331,7 @@ def generate(
                             pop_limit_pct = 0.8,
                             pop_size_pct = 0.1,
                             region_id = RU_CONFIG[RUIDX]["region_id"],
-                            element_id = idx,
+                            element_id = total_link_count+idx,
                             # output_file = f"output_{idx + MIN_LINK}.out",
                             stream_buffer_size = 100 if FRONTEND_TYPE=='pacman' else 8388608,
                             enable_raw_recording = False,
@@ -345,15 +353,9 @@ def generate(
             ]  )
 
     if SOFTWARE_TPG_ENABLED:
-        total_link_count = 0
-        for ru in range(len(RU_CONFIG)):
-            total_link_count += RU_CONFIG[ru]["channel_count"]
 
         conf_list.extend([
-                            ("qton_tp_fragments", qton.Conf(msg_type="std::unique_ptr<dunedaq::daqdataformats::Fragment>",
-                                                            msg_module_name="FragmentNQ",
-                                                            sender_config=nos.Conf(name=f"{PARTITION}.tp_frags_0",
-                                                                                   stype="msgpack")))
+                            ("tp_fragment_sender", None)
                         ] + [
                             ("tp_request_receiver", rrcv.ConfParams(
                                         map = [rrcv.geoidinst(region=RU_CONFIG[RUIDX]["region_id"] , element=idx + total_link_count, system=SYSTEM_TYPE , queueinstance=f"tp_requests_{idx}") for idx in range(MIN_LINK,MAX_LINK)],
@@ -381,6 +383,10 @@ def generate(
                 fragment_type = "FakeData")) for idx in range(MIN_LINK,MAX_LINK)
         ])
 
+    conf_list.extend([
+        ("fragment_sender", None)
+    ])
+
     cmd_data['conf'] = acmd(conf_list)
 
 
@@ -395,10 +401,11 @@ def generate(
             ("tp_request_receiver", startpars),
             ("ssp.*", startpars),
             ("ntoq_trigdec", startpars),
-            ("qton_tp_fragments", startpars),
+            ("tp_fragment_sender", startpars),
             (f"tp_datahandler_.*", startpars),
             (f"tpset_publisher", startpars),
             ("fakedataprod_.*", startpars),
+            ("fragment_sender", startpars),
             ("errored_frame_consumer", startpars)])
 
     cmd_data['stop'] = acmd([
@@ -409,10 +416,11 @@ def generate(
             ("pacman_source", None),
             ("datahandler_.*", None),
             ("qton_fragments_dqm", None),
-            ("qton_tp_fragments", None),
+            ("tp_fragment_sender", None),
             (f"tp_datahandler_.*", None),
             (f"tpset_publisher", None),
             ("fakedataprod_.*", None),
+            ("fragment_sender", None),
             ("errored_frame_consumer", None)])
 
     cmd_data['pause'] = acmd([("", None)])
@@ -421,7 +429,7 @@ def generate(
 
     cmd_data['scrap'] = acmd([("request_receiver", None),
             ("tp_request_receiver", None),
-            ("qton_tp_fragments", None),
+            ("tp_fragment_sender", None),
             (f"tpset_publisher", None),
             ("timesync_to_network", None)])
 
