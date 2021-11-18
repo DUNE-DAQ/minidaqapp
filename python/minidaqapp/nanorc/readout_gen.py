@@ -87,6 +87,8 @@ def generate(
     queue_bare_specs = [
             app.QueueSpec(inst=f"data_requests_{idx}", kind='FollySPSCQueue', capacity=100)
                 for idx in range(MIN_LINK,MAX_LINK)
+        ] + [
+            app.QueueSpec(inst="fragment_q", kind="FollyMPMCQueue", capacity=100)
         ]
 
     if not USE_FAKE_DATA_PRODUCERS:
@@ -125,6 +127,8 @@ def generate(
 
     mod_specs = [
         mspec(f"request_receiver", "RequestReceiver", [app.QueueInfo(name="output", inst=f"data_requests_{idx}", dir="output")]) for idx in range(MIN_LINK,MAX_LINK)
+    ] + [
+        mspec(f"fragment_sender", "FragmentSender", [app.QueueInfo(name="input_queue", inst="fragment_q", dir="input")])
     ]
 
     if DQM_ENABLED:
@@ -171,12 +175,12 @@ def generate(
             ls = [
                     app.QueueInfo(name="raw_input", inst=f"{FRONTEND_TYPE}_link_{idx}", dir="input"),
                     app.QueueInfo(name="data_requests_0", inst=f"data_requests_{idx}", dir="input"),
+                    app.QueueInfo(name="fragment_queue", inst="fragment_q", dir="output")
                 ]
             if DQM_ENABLED:
                 ls.extend([
-                    app.QueueInfo(name="data_requests_1", inst=f"data_requests_dqm_{idx}", dir="input"),
-                    app.QueueInfo(name="data_response_1", inst="data_fragments_q_dqm", dir="output")])
-
+                    app.QueueInfo(name="data_requests_1", inst=f"data_requests_dqm_{idx}", dir="input")
+                ])
             if SOFTWARE_TPG_ENABLED:
                 ls.extend([
                     app.QueueInfo(name="tp_out", inst=f"sw_tp_link_{idx}", dir="output"),
@@ -381,6 +385,10 @@ def generate(
                 fragment_type = "FakeData")) for idx in range(MIN_LINK,MAX_LINK)
         ])
 
+    conf_list.extend([
+        ("fragment_sender", None)
+    ])
+
     cmd_data['conf'] = acmd(conf_list)
 
 
@@ -399,6 +407,7 @@ def generate(
             (f"tp_datahandler_.*", startpars),
             (f"tpset_publisher", startpars),
             ("fakedataprod_.*", startpars),
+            ("fragment_sender", startpars),
             ("errored_frame_consumer", startpars)])
 
     cmd_data['stop'] = acmd([
@@ -413,6 +422,7 @@ def generate(
             (f"tp_datahandler_.*", None),
             (f"tpset_publisher", None),
             ("fakedataprod_.*", None),
+            ("fragment_sender", None),
             ("errored_frame_consumer", None)])
 
     cmd_data['pause'] = acmd([("", None)])
