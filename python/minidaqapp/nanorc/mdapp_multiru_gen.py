@@ -238,6 +238,7 @@ def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowd
 
     for i,ru_name in enumerate(ru_app_names):
         the_system.apps[ru_name] = util.App(modulegraph=mgraphs_readout[i], host=host_ru[i])
+
     #-------------------------------------------------------------------
     # (Fake) HSI app
     
@@ -351,24 +352,11 @@ def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowd
         )
         console.log("thi cmd data:", cmd_data_thi)
     
-    cmd_data_trigger = util.make_app_command_data(the_system.apps["trigger"], verbose=True)
-
-    cmd_datas_readout = []
-    for ru_app_name in ru_app_names:
-        cmd_datas_readout.append(util.make_app_command_data(the_system.apps[ru_app_name], verbose=True))
-        
-    cmd_data_hsi = util.make_app_command_data(the_system.apps["hsi"], verbose=True)
-    
-    cmd_data_dataflow = util.make_app_command_data(the_system.apps["dataflow"], verbose=True)
-
     # Arrange per-app command data into the format used by util.write_json_files()
     app_command_datas = {
-        "hsi": cmd_data_hsi,
-        "trigger": cmd_data_trigger,
-        "dataflow": cmd_data_dataflow,
+        name : util.make_app_command_data(app)
+        for name,app in the_system.apps.items()
     }
-    for name, cmd_data in zip(ru_app_names, cmd_datas_readout):
-        app_command_datas[name]=cmd_data
 
     if control_timing_hw:
         app_command_datas["thi"] = cmd_data_thi
