@@ -20,6 +20,9 @@ import dunedaq.flxlibs.felixcardreader as flxcr
 import dunedaq.readout.datalinkhandler as dlh
 
 from collections import namedtuple
+from rich.console import Console
+
+console = Console()
 
 # Time to wait on pop()
 QUEUE_POP_WAIT_MS = 100
@@ -49,11 +52,11 @@ def generate(FRAGMENT_PRODUCERS,
 
     trb_geoid_list = []
 
-    for producer in FRAGMENT_PRODUCERS.values():
+    for idx, producer in enumerate(FRAGMENT_PRODUCERS.values()):
         trb_geoid_list.append(trb.geoidinst(region = producer.geoid.region,
                                             element = producer.geoid.element,
                                             system = producer.geoid.system,
-                                            queuename = producer.queue_name))
+                                            queuename = f"data_request_{idx}_output_queue"))
         
     # trb_geoid_list += [ trb.geoidinst(region=0, element=NUMBER_OF_DATA_PRODUCERS + idx, system=SYSTEM_TYPE, queueinstance=f"tp_data_requests_{idx}")  for idx in range(NUMBER_OF_RAW_TP_PRODUCERS) ]
     # trb_geoid_list += [ trb.geoidinst(region=0, element=idx, system="DataSelection", queueinstance=f"ds_tp_data_requests_{idx}")  for idx in range(NUMBER_OF_DS_TP_PRODUCERS) ]
@@ -90,9 +93,11 @@ def generate(FRAGMENT_PRODUCERS,
                                                                                                                                                                                            hdf5ds.PathParams(detector_group_type="NDLArTPC",
                                                                                                                                                                                                              detector_group_name="NDLArTPC"),
                                                                                                                                                                                            hdf5ds.PathParams(detector_group_type="Trigger",
-                                                                                                                                                                                                             detector_group_name="Trigger"),
+                                                                                                                                                                                                             detector_group_name="Trigger",
+                                                                                                                                                                                                             region_name_prefix="APA",
+                                                                                                                                                                                                             element_name_prefix="Link"),
                                                                                                                                                                                            hdf5ds.PathParams(detector_group_type="TPC_TP",
-                                                                                                                                                                                                             detector_group_name="TPC",
+                                                                                                                                                                                                             detector_group_name="TPC_TP",
                                                                                                                                                                                                              region_name_prefix="TP_APA",
                                                                                                                                                                                                              element_name_prefix="Link")])))))
 
@@ -106,7 +111,11 @@ def generate(FRAGMENT_PRODUCERS,
     mgraph.add_endpoint("trigger_decisions", "trb.trigger_decision_input_queue", Direction.IN)
     mgraph.add_endpoint("tokens",            "datawriter.token_output_queue",    Direction.OUT)
 
-    for producer in FRAGMENT_PRODUCERS.values():
-        mgraph.add_endpoint(producer.queue_name, f"trb.{producer.queue_name}", Direction.OUT)
+    for i, producer in enumerate(FRAGMENT_PRODUCERS.values()):
+        queue_name=f"data_request_{i}_output_queue"
+        console.log(f"dataflow_gen adding fragment producer endpoint for {queue_name}")
+        mgraph.add_endpoint(util.data_request_endpoint_name(producer),
+                            f"trb.{queue_name}",
+                            Direction.OUT)
         
     return mgraph

@@ -116,14 +116,21 @@ def generate(
                              )
 
     # The full list of MLT links is the raw data from upstream DAQ _and_ the raw TPs from upstream DAQ
-    all_mlt_links = [ mlt.GeoID(system=SYSTEM_TYPE, region=0, element=idx)
-                      for idx in range(NUMBER_OF_RAWDATA_PRODUCERS + NUMBER_OF_TPSET_PRODUCERS) ]
+    # all_mlt_links = [ mlt.GeoID(system=SYSTEM_TYPE, region=0, element=idx)
+    #                   for idx in range(NUMBER_OF_RAWDATA_PRODUCERS + NUMBER_OF_TPSET_PRODUCERS) ]
 
-    all_mlt_links += [ mlt.GeoID(system="DataSelection", region=0, element=idx)
-                       for idx in range(NUMBER_OF_TPSET_PRODUCERS) ]
+    # all_mlt_links += [ mlt.GeoID(system="DataSelection", region=0, element=idx)
+    #                    for idx in range(NUMBER_OF_TPSET_PRODUCERS) ]
 
+    # We need to populate the list of links based on the fragment
+    # producers available in the system. This is a bit of a
+    # chicken-and-egg problem, because the trigger app itself creates
+    # fragment producers (see below). Eventually when the MLT is its
+    # own process, this problem will probably go away, but for now, we
+    # leave the list of links here blank, and replace it in
+    # util.connect_fragment_producers
     modules["mlt"] = Module(plugin="ModuleLevelTrigger",
-                            conf=mlt.ConfParams(links=all_mlt_links,
+                            conf=mlt.ConfParams(links=[], # To be updated later - see comment above
                                                 initial_token_count=TOKEN_COUNT),
                             connections={})
 
@@ -136,7 +143,7 @@ def generate(
 
         mgraph.add_fragment_producer(region=0, element=idx, system="DataSelection",
                                      requests_in=f"buf{idx}.data_request_source",
-                                     fragments_out= f"buf{idx}.fragment_sink")
+                                     fragments_out=f"buf{idx}.fragment_sink")
 
 
     mgraph.add_endpoint("trigger_decisions", "mlt.trigger_decision_sink", Direction.OUT)

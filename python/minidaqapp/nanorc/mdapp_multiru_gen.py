@@ -5,6 +5,7 @@ import rich.traceback
 from rich.console import Console
 from os.path import exists, join
 from collections import defaultdict
+from copy import deepcopy
 
 CLOCK_SPEED_HZ = 50000000
 
@@ -71,6 +72,7 @@ import click
 @click.option('--host-hsi', default='localhost', help='Host to run the HSI app on')
 @click.option('--host-timing-hw', default='np04-srv-012.cern.ch', help='Host to run the timing hardware interface app on')
 @click.option('--control-timing-hw', is_flag=True, default=False, help='Flag to control whether we are controlling timing hardware')
+@click.option('--region-id', default=0)
 # hsi readout options
 @click.option('--hsi-device-name', default="BOREAS_TLU", help='Real HSI hardware only: device name of HSI hw')
 @click.option('--hsi-readout-period', default=1e3, help='Real HSI hardware only: Period between HSI hardware polling [us]')
@@ -109,7 +111,7 @@ import click
 @click.argument('json_dir', type=click.Path())
 
 def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowdown_factor, run_number, trigger_rate_hz, trigger_window_before_ticks, trigger_window_after_ticks,
-        token_count, data_file, output_path, disable_trace, use_felix, host_df, host_ru, host_trigger, host_hsi, host_timing_hw, control_timing_hw,
+        token_count, data_file, output_path, disable_trace, use_felix, host_df, host_ru, host_trigger, host_hsi, host_timing_hw, control_timing_hw, region_id,
         hsi_device_name, hsi_readout_period, hsi_endpoint_address, hsi_endpoint_partition, hsi_re_mask, hsi_fe_mask, hsi_inv_mask, hsi_source,
         use_hsi_hw, hsi_device_id, mean_hsi_signal_multiplicity, hsi_signal_emulation_mode, enabled_hsi_signals,
         ttcm_s1, ttcm_s2, trigger_activity_plugin, trigger_activity_config, trigger_candidate_plugin, trigger_candidate_config,
@@ -271,6 +273,7 @@ def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowd
                                                     RAW_RECORDING_OUTPUT_DIR = raw_recording_output_dir,
                                                     FRONTEND_TYPE = frontend_type,
                                                     SYSTEM_TYPE = system_type,
+                                                    REGION_ID = region_id,
                                                     DQM_ENABLED=enable_dqm,
                                                     DQM_KAFKA_ADDRESS=dqm_kafka_address,
                                                     SOFTWARE_TPG_ENABLED = enable_software_tpg,
@@ -302,10 +305,13 @@ def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowd
             SIGNAL_EMULATION_MODE = hsi_signal_emulation_mode,
             ENABLED_SIGNALS =  enabled_hsi_signals,)
 
-    fragment_producers = mgraph_trigger.fragment_producers
+    # Before we run dataflow generate, we need a list of all the
+    # fragment producers from other apps to pass to it. Create that
+    # here
+    all_fragment_producers = deepcopy(mgraph_trigger.fragment_producers)
     for mgraph in mgraphs_readout:
-        assert all([key not in fragment_producers.keys() for key in mgraph.fragment_producers])
-        fragment_producers.update(mgraph.fragment_producers)
+        assert all([key not in all_fragment_producers.keys() for key in mgraph.fragment_producers])
+        all_fragment_producers.update(mgraph.fragment_producers)
         
     # Manually add the readout fragment producers
     # for hostidx in range(len(host_ru)):
@@ -313,7 +319,7 @@ def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowd
     #         fragment_producers[geoid] = FragmentProducer(geoid, requests_in, fragments_out, queue_name)    
 
     mgraph_dataflow = dataflow_gen.generate(
-        FRAGMENT_PRODUCERS = fragment_producers,
+        FRAGMENT_PRODUCERS = all_fragment_producers,
         NUMBER_OF_DATA_PRODUCERS = total_number_of_data_producers,
         OUTPUT_PATH = output_path,
         TOKEN_COUNT = df_token_count,
@@ -321,6 +327,7 @@ def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowd
         SOFTWARE_TPG_ENABLED = enable_software_tpg,
         TPSET_WRITING_ENABLED = enable_tpset_writing)
 
+    console.log("dataflow module graph:", mgraph_dataflow)
     # Make partially-dummy system data. Do this before old-style app command generation so
     # we can get the network endpoints as we want
 
@@ -355,9 +362,14 @@ def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowd
                                                                                  f"trigger.tpsets_into_chain_link{idx}"])
                              for idx in range(total_number_of_data_producers) })
     
-    app_connections.update({ f"ruemu0.timesync_0": util.Publisher(msg_type="dunedaq::dfmessages::TimeSync",
-                                                                  msg_module_name="TimeSyncNQ",
-                                                                  subscribers=["hsi.time_sync"])
+    app_connections.update({ f"ruemu0.timesync_{idx}": util.Publisher(msg_type="dunedaq::dfmessages::TimeSync",
+                                                                      msg_module_name="TimeSyncNQ",
+                                                                      subscribers=["hsi.time_sync"])
+                             for idx in range(total_number_of_data_producers) })
+
+    app_connections.update({ f"ruemu0.timesync_{total_number_of_data_producers+idx}": util.Publisher(msg_type="dunedaq::dfmessages::TimeSync",
+                                                                      msg_module_name="TimeSyncNQ",
+                                                                      subscribers=["hsi.time_sync"])
                              for idx in range(total_number_of_data_producers) })
 
     the_system = util.System(apps, app_connections=app_connections,
@@ -370,8 +382,11 @@ def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowd
 
     console.log("After connecting fragment producers, trigger mgraph:", the_system.apps['trigger'].modulegraph)
     console.log("After connecting fragment producers, the_system.app_connections:", the_system.app_connections)
+
+    util.set_mlt_links(the_system, "trigger", verbose=True)
     
     util.add_network("trigger", the_system, verbose=True)
+    console.log("After adding network, trigger mgraph:", the_system.apps['trigger'].modulegraph)
     util.add_network("hsi", the_system, verbose=True)
     for ru_app_name in ru_app_names:
         util.add_network(ru_app_name, the_system, verbose=True)
@@ -436,19 +451,6 @@ def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowd
 
     if use_kafka:
         boot["env"]["DUNEDAQ_ERS_STREAM_LIBS"] = "erskafka"
-
-    # PAR 2021-09-29 HACK
-    #
-    # Not all apps give us a cmd_data with all of the commands, so to
-    # be consistent, we have to remove the relevant app/command pair
-    # from the system command data, otherwise nanorc barfs. We have to
-    # find a way to modify the commands received by an app in util
-    for c in ('resume', 'pause'):
-        cmd_apps=system_command_datas[c]['apps']
-        for_removal=["dataflow", "thi", "hsi"] + ru_app_names
-        for app in for_removal:
-            if app in cmd_apps:
-                del cmd_apps[app]
 
     system_command_datas['boot'] = boot
 

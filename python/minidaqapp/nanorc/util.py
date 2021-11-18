@@ -20,6 +20,7 @@ moo.otypes.load_types('appfwk/app.jsonnet')
 
 moo.otypes.load_types('nwqueueadapters/networktoqueue.jsonnet')
 moo.otypes.load_types('nwqueueadapters/queuetonetwork.jsonnet')
+moo.otypes.load_types('trigger/moduleleveltrigger.jsonnet')
 
 from appfwk.utils import acmd, mcmd, mspec
 import dunedaq.nwqueueadapters.networkobjectsender as nos
@@ -28,6 +29,7 @@ import dunedaq.nwqueueadapters.networkobjectreceiver as nor
 import dunedaq.nwqueueadapters.networktoqueue as ntoq
 import dunedaq.appfwk.app as appfwk  # AddressedCmd,
 import dunedaq.rcif.cmd as rccmd  # AddressedCmd,
+import dunedaq.trigger.moduleleveltrigger as mlt
 
 console = Console()
 
@@ -129,7 +131,10 @@ class ModuleGraph:
 
     def add_fragment_producer(self, system, region, element, requests_in, fragments_out):
         geoid = GeoID(system, region, element)
-        queue_name = f"data_request_{len(self.fragment_producers)}_output_queue"
+        if geoid in self.fragment_producers:
+            raise ValueError(f"There is already a fragment producer for GeoID {geoid}")
+        # Can't set queue_name here, because the queue names need to be unique system-wide, but we're inside a particular app here. Instead, we create the queue names in readout_gen.generate, where all of the fragment producers are known
+        queue_name = None
         self.fragment_producers[geoid] = FragmentProducer(geoid, requests_in, fragments_out, queue_name)
 
 class App:
@@ -321,28 +326,55 @@ def make_app_command_data(app, verbose=False):
 
     return command_data
 
+def geoid_raw_str(geoid):
+    return f"geoid{geoid.system}_{geoid.region}_{geoid.element}"
+
+def data_request_endpoint_name(producer):
+    return f"data_request_{geoid_raw_str(producer.geoid)}"
+
+def set_mlt_links(the_system, mlt_app_name="trigger", verbose=False):
+    mlt_links = []
+    for app in the_system.apps.values():
+        producers = app.modulegraph.fragment_producers
+        for producer in producers.values():
+            geoid = producer.geoid
+            mlt_links.append( mlt.GeoID(system=geoid.system, region=geoid.region, element=geoid.element) )
+    # Now we add the full set of links to the MLT plugin conf. It
+    # would be nice to just modify the `links` attribute of the
+    # mlt.ConfParams object, but moo-derived objects work in a funny
+    # way (returning a copy of the attribute, not returning a
+    # reference to it), which means we have to copy and replace the
+    # whole thing
+    if verbose:
+        console.log(f"Adding {len(mlt_links)} links to mlt.links: {mlt_links}")
+    old_mlt = deepcopy(the_system.apps["trigger"].modulegraph.modules["mlt"])
+    the_system.apps[mlt_app_name].modulegraph.modules["mlt"] = Module(plugin=old_mlt.plugin,
+                                                                      conf=mlt.ConfParams(links=mlt_links,
+                                                                                          initial_token_count=old_mlt.conf.initial_token_count),
+                                                                      connections=old_mlt.connections)
+            
 def connect_fragment_producers(app_name, the_system, verbose=False):
     if verbose:
         console.log(f"Connecting fragment producers in {app_name}")
         
     app = the_system.apps[app_name]
     producers = app.modulegraph.fragment_producers
+
     for producer in producers.values():
-        geoid_str = f"geoid{producer.geoid.system}_{producer.geoid.region}_{producer.geoid.element}"
-        request_endpoint = f"data_request_{geoid_str}"
+        request_endpoint = data_request_endpoint_name(producer)
         if verbose:
             console.log(f"Creating request endpoint {request_endpoint}")
         app.modulegraph.add_endpoint(request_endpoint, producer.requests_in, Direction.IN)
-        the_system.app_connections[f"dataflow.{producer.queue_name}"] = Sender(msg_type="dunedaq::dfmessages::DataRequest",
+        the_system.app_connections[f"dataflow.{data_request_endpoint_name(producer)}"] = Sender(msg_type="dunedaq::dfmessages::DataRequest",
                                                                                msg_module_name="DataRequestNQ",
                                                                                receiver=f"{app_name}.{request_endpoint}")
         
-        frag_endpoint = f"fragments_{geoid_str}"
+        frag_endpoint = f"fragments_{geoid_raw_str(producer.geoid)}"
         if verbose:
             console.log(f"Creating fragment endpoint {frag_endpoint}")
         app.modulegraph.add_endpoint(frag_endpoint, producer.fragments_out, Direction.OUT)
 
-        the_system.app_connections[f"{app_name}.{frag_endpoint}"] = Sender(msg_type="std::unique_ptr<dunedaq::dataformats::Fragment>",
+        the_system.app_connections[f"{app_name}.{frag_endpoint}"] = Sender(msg_type="std::unique_ptr<dunedaq::daqdataformats::Fragment>",
                                                                            msg_module_name="FragmentNQ",
                                                                            receiver=f"dataflow.fragments")
 
@@ -420,7 +452,7 @@ def add_network(app_name, the_system, verbose=False):
         if from_app == app_name:
             unconnected_endpoints.remove(from_endpoint)
             from_endpoint = resolve_endpoint(app, from_endpoint, Direction.OUT)
-
+            from_endpoint_module, from_endpoint_sink = from_endpoint.split(".")
             # We're a publisher or sender. Make the queue to network
             qton_name = conn_name.replace(".", "_")
             qton_name = make_unique_name(qton_name, modules_with_network)
@@ -428,14 +460,17 @@ def add_network(app_name, the_system, verbose=False):
             if verbose:
                 console.log(f"Adding QueueToNetwork named {qton_name} connected to {from_endpoint} in app {app_name}")
             modules_with_network[qton_name] = Module(plugin="QueueToNetwork",
-                                                     connections={
-                                                         "input": Connection(from_endpoint)},
+                                                     connections={}, # No outgoing connections
                                                      conf=qton.Conf(msg_type=conn.msg_type,
                                                                     msg_module_name=conn.msg_module_name,
                                                                     sender_config=nos.Conf(ipm_plugin_type="ZmqPublisher" if type(conn) == Publisher else "ZmqSender",
                                                                                            address=the_system.network_endpoints[conn_name],
                                                                                            topic="foo",
                                                                                            stype="msgpack")))
+            # Connect the module to the QueueToNetwork
+            mod_connections = modules_with_network[from_endpoint_module].connections
+            mod_connections[from_endpoint_sink] = Connection(f"{qton_name}.input")
+            
         if hasattr(conn, "subscribers"):
             for to_conn in conn.subscribers:
                 to_app, to_endpoint = to_conn.split(".", maxsplit=1)

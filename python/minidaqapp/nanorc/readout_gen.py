@@ -7,7 +7,7 @@ moo.io.default_load_path = get_moo_model_path()
 import moo.otypes
 moo.otypes.load_types('flxlibs/felixcardreader.jsonnet')
 moo.otypes.load_types('readout/sourceemulatorconfig.jsonnet')
-moo.otypes.load_types('readout/datalinkhandler.jsonnet')
+moo.otypes.load_types('readout/readoutconfig.jsonnet')
 moo.otypes.load_types('readout/datarecorder.jsonnet')
 moo.otypes.load_types('dqm/dqmprocessor.jsonnet')
 moo.otypes.load_types('dfmodules/fakedataprod.jsonnet')
@@ -21,6 +21,7 @@ import dunedaq.readout.datarecorder as dr
 import dunedaq.dfmodules.triggerrecordbuilder as trb
 import dunedaq.dqm.dqmprocessor as dqmprocessor
 import dunedaq.dfmodules.fakedataprod as fdp
+import dunedaq.readout.readoutconfig as rconf
 
 import math
 
@@ -41,6 +42,7 @@ def generate(# NETWORK_ENDPOINTS,
         RAW_RECORDING_OUTPUT_DIR=".",
         FRONTEND_TYPE='wib',
         SYSTEM_TYPE='TPC',
+        REGION_ID=0,
         DQM_ENABLED=False,
         DQM_KAFKA_ADDRESS='',
         SOFTWARE_TPG_ENABLED=False,
@@ -62,7 +64,9 @@ def generate(# NETWORK_ENDPOINTS,
     if not USE_FAKE_DATA_PRODUCERS and not FLX_INPUT:
         modules["fake_source"] = Module(plugin = "FakeCardReader",
                                         connections = { f"output_{idx-MIN_LINK}" : Conn(f"datahandler_{idx}.raw_input",
-                                                                                        queue_name=f"{FRONTEND_TYPE}_{idx}")
+                                                                                        queue_name=f"{FRONTEND_TYPE}_{idx}",
+                                                                                        queue_kind="FollySPSCQueue",
+                                                                                        queue_capacity=100000)
                                                         for idx in range(MIN_LINK,MAX_LINK) },
                                         conf = sec.Conf(link_confs = [ sec.LinkConfiguration(geoid=sec.GeoID(system = SYSTEM_TYPE, region = 0, element = idx),
                                                                                                    slowdown=DATA_RATE_SLOWDOWN_FACTOR,
@@ -100,15 +104,33 @@ def generate(# NETWORK_ENDPOINTS,
             mod_name = f"tp_datahandler_{idx}"
             modules[mod_name] = Module(plugin="DataLinkHandler",
                                        connections = {},
-                                       conf = dlh.Conf(emulator_mode = False,
-                                                       enable_software_tpg = False,
-                                                       # fake_trigger_flag=0, # default
-                                                       source_queue_timeout_ms= QUEUE_POP_WAIT_MS,
-                                                       latency_buffer_size = LATENCY_BUFFER_SIZE,
-                                                       pop_limit_pct = 0.8,
-                                                       pop_size_pct = 0.1,
-                                                       apa_number = 0,
-                                                       link_number = TOTAL_NUMBER_OF_DATA_PRODUCERS + idx))
+                                       conf =  rconf.Conf(
+                                           readoutmodelconf= rconf.ReadoutModelConf(
+                                               source_queue_timeout_ms= QUEUE_POP_WAIT_MS,
+                                               # fake_trigger_flag=0, default
+                                               region_id = REGION_ID,
+                                               element_id = TOTAL_NUMBER_OF_DATA_PRODUCERS + idx,
+                                           ),
+                                           latencybufferconf= rconf.LatencyBufferConf(
+                                               latency_buffer_size = LATENCY_BUFFER_SIZE,
+                                               region_id = REGION_ID,
+                                               element_id = TOTAL_NUMBER_OF_DATA_PRODUCERS + idx,
+                                           ),
+                                           rawdataprocessorconf= rconf.RawDataProcessorConf(
+                                               region_id = REGION_ID,
+                                               element_id = TOTAL_NUMBER_OF_DATA_PRODUCERS + idx,
+                                               enable_software_tpg = False,
+                                           ),
+                                           requesthandlerconf= rconf.RequestHandlerConf(
+                                               latency_buffer_size = LATENCY_BUFFER_SIZE,
+                                               pop_limit_pct = 0.8,
+                                               pop_size_pct = 0.1,
+                                               region_id = REGION_ID,
+                                               element_id = TOTAL_NUMBER_OF_DATA_PRODUCERS + idx,
+                                               # output_file = f"output_{idx + MIN_LINK}.out",
+                                               stream_buffer_size = 100 if FRONTEND_TYPE=='pacman' else 8388608,
+                                               enable_raw_recording = False,
+                                           )))
 
 
     if not USE_FAKE_DATA_PRODUCERS:
@@ -116,16 +138,38 @@ def generate(# NETWORK_ENDPOINTS,
             modules[f"datahandler_{idx}"] = Module(plugin = "DataLinkHandler",
                                                    connections = {"raw_recording": Conn(f"data_recorder_{idx}.raw_recording"),
                                                                   "tp_out": Conn(f"tp_datahandler_{idx}.raw_input",
-                                                                                 queue_name=f"tp_link_{idx}")},
-                                                   conf = dlh.Conf(emulator_mode = EMULATOR_MODE,
-                                                                   enable_software_tpg = SOFTWARE_TPG_ENABLED,
-                                                                   # fake_trigger_flag=0, # default
-                                                                   source_queue_timeout_ms= QUEUE_POP_WAIT_MS,
-                                                                   latency_buffer_size = LATENCY_BUFFER_SIZE,
-                                                                   pop_limit_pct = 0.8,
-                                                                   pop_size_pct = 0.1,
-                                                                   apa_number = 0,
-                                                                   link_number = idx))
+                                                                                 queue_name=f"tp_link_{idx}",
+                                                                                 queue_kind="FollySPSCQueue",
+                                                                                 queue_capacity=100000)},
+                                                   conf = rconf.Conf(
+                                                       readoutmodelconf= rconf.ReadoutModelConf(
+                                                           source_queue_timeout_ms= QUEUE_POP_WAIT_MS,
+                                                           # fake_trigger_flag=0, # default
+                                                           region_id = REGION_ID,
+                                                           element_id = idx,
+                                                       ),
+                                                       latencybufferconf= rconf.LatencyBufferConf(
+                                                           latency_buffer_size = LATENCY_BUFFER_SIZE,
+                                                           region_id = REGION_ID,
+                                                           element_id = idx,
+                                                       ),
+                                                       rawdataprocessorconf= rconf.RawDataProcessorConf(
+                                                           region_id = REGION_ID,
+                                                           element_id = idx,
+                                                           enable_software_tpg = SOFTWARE_TPG_ENABLED,
+                                                           emulator_mode = EMULATOR_MODE
+                                                       ),
+                                                       requesthandlerconf= rconf.RequestHandlerConf(
+                                                           latency_buffer_size = LATENCY_BUFFER_SIZE,
+                                                           pop_limit_pct = 0.8,
+                                                           pop_size_pct = 0.1,
+                                                           region_id = REGION_ID,
+                                                           element_id = idx,
+                                                           output_file = f"output_{idx + MIN_LINK}.out",
+                                                           stream_buffer_size = 8388608,
+                                                           enable_raw_recording = RAW_RECORDING_ENABLED,
+                                                       )))
+            
     if RAW_RECORDING_ENABLED:
         for idx in range(NUMBER_OF_DATA_PRODUCERS):
             modules[f"data_recorder_{idx}"] = Module(plugin = "DataRecorder",
@@ -170,10 +214,21 @@ def generate(# NETWORK_ENDPOINTS,
         mgraph.add_endpoint(f"timesync_{idx}", f"datahandler_{idx}.timesync",    Direction.OUT)
         mgraph.add_endpoint(f"timesync_{idx+NUMBER_OF_DATA_PRODUCERS}", f"tp_datahandler_{idx}.timesync",    Direction.OUT)
         
-        mgraph.add_fragment_producer(region = 0, element = idx, system = SYSTEM_TYPE,
+        mgraph.add_fragment_producer(region = REGION_ID, element = idx, system = SYSTEM_TYPE,
                                      requests_in   = f"datahandler_{idx}.data_requests_0",
                                      fragments_out = f"datahandler_{idx}.data_response_0")
-        mgraph.add_fragment_producer(region = 1, element = idx, system = SYSTEM_TYPE,
+        # Somehow the value of `element` in the following line
+        # determines whether the data request handler in *trigger*
+        # (TPSetBufferCreator) receives duplicate DataRequests
+        #
+        # N data producers | element value    |   repeated DataRequests?
+        # --------------------------------------------------------------
+        # 1                | idx              |   No
+        # 1                | idx + 1          |   Yes
+        # 1                | idx + 2          |   Yes
+        # 1                | idx + 3          |   Yes
+        # 1                | idx + 100        |   Yes
+        mgraph.add_fragment_producer(region = REGION_ID, element = idx + NUMBER_OF_DATA_PRODUCERS, system = SYSTEM_TYPE,
                                      requests_in   = f"tp_datahandler_{idx}.data_requests_0",
                                      fragments_out = f"tp_datahandler_{idx}.data_response_0")
         
