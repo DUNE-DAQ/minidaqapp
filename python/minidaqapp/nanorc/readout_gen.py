@@ -101,8 +101,6 @@ def generate(
             app.QueueSpec(inst=f"sw_tp_link_{idx}", kind='FollySPSCQueue', capacity=100000)
                 for idx in range(MIN_LINK, MAX_LINK)
         ] + [
-            app.QueueSpec(inst=f"tp_fragments_q", kind='FollyMPMCQueue', capacity=100)
-        ] + [
             app.QueueSpec(inst=f"tpset_queue", kind='FollyMPMCQueue', capacity=10000)
         ] + [
             app.QueueSpec(inst=f"tp_requests_{idx}", kind='FollySPSCQueue', capacity=100)
@@ -126,7 +124,7 @@ def generate(
     queue_specs = app.QueueSpecs(sorted(queue_bare_specs, key=lambda x: x.inst))
 
     mod_specs = [
-        mspec(f"request_receiver", "RequestReceiver", [app.QueueInfo(name="output", inst=f"data_requests_{idx}", dir="output")]) for idx in range(MIN_LINK,MAX_LINK)
+        mspec(f"request_receiver", "RequestReceiver", [app.QueueInfo(name="output", inst=f"data_requests_{idx}", dir="output") for idx in range(MIN_LINK,MAX_LINK)]) 
     ] + [
         mspec(f"fragment_sender", "FragmentSender", [app.QueueInfo(name="input_queue", inst="fragment_q", dir="input")])
     ]
@@ -135,19 +133,17 @@ def generate(
         mod_specs += [
             mspec("qton_fragments_dqm", "QueueToNetwork", [app.QueueInfo(name="input", inst="data_fragments_q_dqm", dir="input")])
         ] + [
-            mspec(f"dqm_request_receiver", "RequestReceiver", [app.QueueInfo(name="output", inst=f"data_requests_dqm_{idx}", dir="output")]) for idx in range(MIN_LINK,MAX_LINK)
+            mspec(f"dqm_request_receiver", "RequestReceiver", [app.QueueInfo(name="output", inst=f"data_requests_dqm_{idx}", dir="output") for idx in range(MIN_LINK,MAX_LINK)]) 
         ]
 
     if SOFTWARE_TPG_ENABLED:
         mod_specs += [
-            mspec("tp_fragment_sender", "FragmentSender", [app.QueueInfo(name="input_queue", inst="tp_fragments_q", dir="input")])
-        ] + [
-            mspec(f"tp_request_receiver", "RequestReceiver", [app.QueueInfo(name="output", inst=f"tp_requests_{idx}", dir="output")]) for idx in range(MIN_LINK,MAX_LINK)
+            mspec(f"tp_request_receiver", "RequestReceiver", [app.QueueInfo(name="output", inst=f"tp_requests_{idx}", dir="output") for idx in range(MIN_LINK,MAX_LINK)]) 
         ] + [
             mspec(f"tp_datahandler_{idx}", "DataLinkHandler", [
                 app.QueueInfo(name="raw_input", inst=f"sw_tp_link_{idx}", dir="input"),
                 app.QueueInfo(name="data_requests_0", inst=f"tp_requests_{idx}", dir="input"),
-                app.QueueInfo(name="fragment_queue", inst="tp_fragments_q", dir="output")
+                app.QueueInfo(name="fragment_queue", inst="fragment_q", dir="output")
             ]) for idx in range(MIN_LINK,MAX_LINK)
         ] + [
             mspec(f"tpset_publisher", "QueueToNetwork", [
