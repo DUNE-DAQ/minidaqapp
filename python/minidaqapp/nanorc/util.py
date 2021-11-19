@@ -36,6 +36,8 @@ console = Console()
 ########################################################################
 #
 # Classes
+#
+########################################################################
 
 # TODO: Connections between modules are held in the module object, but
 # connections between applications are held in their own
@@ -43,7 +45,8 @@ console = Console()
 # consistent either way
 
 # TODO: Understand whether extra_commands is actually needed. Seems like "resume" is already being sent to everyone?
-#module = namedtuple("module", ['plugin', 'conf', 'connections', 'extra_commands'], defaults=(None, [], []))
+
+# TODO: Make these all dataclasses
 
 class Module:
     """An individual DAQModule within an application, along with its
@@ -64,6 +67,7 @@ class Module:
         yield "conf", self.conf
         yield "connections", self.connections
 
+
 Connection = namedtuple("Connection", ['to', 'queue_kind', 'queue_capacity', 'queue_name', 'toposort'], defaults=("FollyMPMCQueue", 1000, None, True))
 
 class Direction(Enum):
@@ -81,8 +85,7 @@ class ModuleGraph:
     knowing its (outgoing) connections to other modules in the
     modulegraph.
 
-    Connections to other modulegraphs (which may be in the same
-    application or a different application) are represented by
+    Connections to other modulegraphs are represented by
     `endpoints`. The endpoint's `external_name` is the "public" name
     of the connection, which other modulegraphs should use. The
     endpoint's `internal_name` specifies the particular module and
@@ -138,6 +141,9 @@ class ModuleGraph:
         self.fragment_producers[geoid] = FragmentProducer(geoid, requests_in, fragments_out, queue_name)
 
 class App:
+    """A single daq_application in a system, consisting of a modulegraph
+       and a hostname on which to run"""
+    
     def __init__(self, modulegraph=None, host="localhost"):
         self.modulegraph = modulegraph if modulegraph else ModuleGraph()
         self.host = host
@@ -191,7 +197,8 @@ class System:
 ########################################################################
 #
 # Functions
-
+#
+########################################################################
 
 def make_module_deps(module_dict):
     """Given a dictionary of `module` objects, produce a dictionary giving
@@ -241,11 +248,18 @@ def make_app_deps(the_system, verbose=False):
 
 
 def make_app_command_data(app, verbose=False):
-    """Convert a dictionary of `module`s into 'command data' suitable for
+    """Given an App instance, create the 'command data' suitable for
     feeding to nanorc. The needed queues are inferred from from
     connections between modules, as are the start and stop order of the
-    modules"""
+    modules
 
+    TODO: This should probably be split up into separate stages of
+    inferring/creating the queues (which can be part of validation)
+    and actually making the command data objects for nanorc.
+
+    """
+
+    
     modules = app.modulegraph.modules
 
     module_deps = make_module_deps(modules)
@@ -340,12 +354,19 @@ def make_app_command_data(app, verbose=False):
     return command_data
 
 def geoid_raw_str(geoid):
+    """Get a string representation of a GeoID suitable for using in queue names"""
     return f"geoid{geoid.system}_{geoid.region}_{geoid.element}"
 
 def data_request_endpoint_name(producer):
     return f"data_request_{geoid_raw_str(producer.geoid)}"
 
 def set_mlt_links(the_system, mlt_app_name="trigger", verbose=False):
+    """The MLT needs to know the full list of fragment producers in the
+system so it can populate the TriggerDecisions it creates. This
+function gets all the fragment producers in the system and adds their
+GeoIDs to the MLT's config. It assumes that the ModuleLevelTrigger
+lives in an application with name `mlt_app_name` and has the name
+"mlt"."""
     mlt_links = []
     for producer in the_system.get_fragment_producers():
         geoid = producer.geoid
@@ -366,6 +387,9 @@ def set_mlt_links(the_system, mlt_app_name="trigger", verbose=False):
 
 
 def connect_fragment_producers(app_name, the_system, verbose=False):
+    """Connect the data request and fragment sending queues from all of
+       the fragment producers in the app with name `app_name` to the
+       appropriate endpoints of the dataflow app."""
     if verbose:
         console.log(f"Connecting fragment producers in {app_name}")
 
@@ -391,6 +415,8 @@ def connect_fragment_producers(app_name, the_system, verbose=False):
                                                                            receiver=f"dataflow.fragments")
 
 def connect_all_fragment_producers(the_system, dataflow_name="dataflow", verbose=False):
+    """Connect all fragment producers in the system to the appropriate
+       queues in the dataflow app."""
     for name, app in the_system.apps.items():
         if name==dataflow_name:
             continue
@@ -405,6 +431,11 @@ def assign_network_endpoints(the_system, verbose=False):
     host is the hostname for the app at the upstream end of the
     connection, port starts at some fixed value, and increases by 1
     for each new endpoint.
+
+    You might think that we could reuse port numbers for different
+    apps, but that's not possible since multiple applications may run
+    on the same host, and we don't know the _actual_ host here, just,
+    eg "{host_dataflow}", which is later interpreted by nanorc.
 
     """
     endpoints = {}
