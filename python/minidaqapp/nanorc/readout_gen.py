@@ -112,14 +112,6 @@ def generate(
             app.QueueSpec(inst="errored_frames_q", kind="FollyMPMCQueue", capacity=10000)
         ]
 
-    if DQM_ENABLED:
-        queue_bare_specs += [
-            app.QueueSpec(inst="data_fragments_q_dqm", kind='FollyMPMCQueue', capacity=1000),
-        ] + [
-            app.QueueSpec(inst=f"data_requests_dqm_{idx}", kind='FollySPSCQueue', capacity=100)
-                for idx in range(MIN_LINK,MAX_LINK)
-        ]
-
     # Only needed to reproduce the same order as when using jsonnet
     queue_specs = app.QueueSpecs(sorted(queue_bare_specs, key=lambda x: x.inst))
 
@@ -128,13 +120,6 @@ def generate(
     ] + [
         mspec(f"fragment_sender", "FragmentSender", [app.QueueInfo(name="input_queue", inst="fragment_q", dir="input")])
     ]
-
-    if DQM_ENABLED:
-        mod_specs += [
-            mspec("qton_fragments_dqm", "QueueToNetwork", [app.QueueInfo(name="input", inst="data_fragments_q_dqm", dir="input")])
-        ] + [
-            mspec(f"dqm_request_receiver", "RequestReceiver", [app.QueueInfo(name="output", inst=f"data_requests_dqm_{idx}", dir="output") for idx in range(MIN_LINK,MAX_LINK)]) 
-        ]
 
     if SOFTWARE_TPG_ENABLED:
         mod_specs += [
@@ -173,10 +158,6 @@ def generate(
                     app.QueueInfo(name="data_requests_0", inst=f"data_requests_{idx}", dir="input"),
                     app.QueueInfo(name="fragment_queue", inst="fragment_q", dir="output")
                 ]
-            if DQM_ENABLED:
-                ls.extend([
-                    app.QueueInfo(name="data_requests_1", inst=f"data_requests_dqm_{idx}", dir="input")
-                ])
             if SOFTWARE_TPG_ENABLED:
                 ls.extend([
                     app.QueueInfo(name="tp_out", inst=f"sw_tp_link_{idx}", dir="output"),
@@ -335,24 +316,9 @@ def generate(
                         )) for idx in range(MIN_LINK,MAX_LINK)
             ]
 
-    if DQM_ENABLED:
-        conf_list.append( ("qton_fragments_dqm", qton.Conf(msg_type="std::unique_ptr<dunedaq::daqdataformats::Fragment>",
-                                           msg_module_name="FragmentNQ",
-                                           sender_config=nos.Conf(name=f"{PARTITION}.fragx_dqm_{RUIDX}",
-                                                                  stype="msgpack"))) )
-        conf_list.extend( [
-                 ("dqm_request_receiver", rrcv.ConfParams(
-                            map = [rrcv.geoidinst(region=RU_CONFIG[RUIDX]["region_id"] , element=idx , system=SYSTEM_TYPE , queueinstance=f"data_requests_dqm_{idx}") for idx in range(MIN_LINK, MAX_LINK)],
-                            general_queue_timeout = QUEUE_POP_WAIT_MS,
-                            connection_name = f"{PARTITION}.datareq_dqm_{RUIDX}"
-                 )) 
-            ]  )
-
     if SOFTWARE_TPG_ENABLED:
 
         conf_list.extend([
-                            ("tp_fragment_sender", None)
-                        ] + [
                             ("tp_request_receiver", rrcv.ConfParams(
                                         map = [rrcv.geoidinst(region=RU_CONFIG[RUIDX]["region_id"] , element=idx + total_link_count, system=SYSTEM_TYPE , queueinstance=f"tp_requests_{idx}") for idx in range(MIN_LINK,MAX_LINK)],
                                         general_queue_timeout = QUEUE_POP_WAIT_MS,
@@ -388,7 +354,6 @@ def generate(
 
     startpars = rccmd.StartParams(run=RUN_NUMBER)
     cmd_data['start'] = acmd([
-            ("qton_fragments_dqm", startpars),
             ("datahandler_.*", startpars),
             ("fake_source", startpars),
             ("pacman_source", startpars),
@@ -397,7 +362,6 @@ def generate(
             ("tp_request_receiver", startpars),
             ("ssp.*", startpars),
             ("ntoq_trigdec", startpars),
-            ("tp_fragment_sender", startpars),
             (f"tp_datahandler_.*", startpars),
             (f"tpset_publisher", startpars),
             ("fakedataprod_.*", startpars),
@@ -411,8 +375,6 @@ def generate(
             ("fake_source", None),
             ("pacman_source", None),
             ("datahandler_.*", None),
-            ("qton_fragments_dqm", None),
-            ("tp_fragment_sender", None),
             (f"tp_datahandler_.*", None),
             (f"tpset_publisher", None),
             ("fakedataprod_.*", None),
@@ -425,7 +387,6 @@ def generate(
 
     cmd_data['scrap'] = acmd([("request_receiver", None),
             ("tp_request_receiver", None),
-            ("tp_fragment_sender", None),
             (f"tpset_publisher", None),
             ("timesync_to_network", None)])
 

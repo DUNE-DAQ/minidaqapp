@@ -226,8 +226,6 @@ def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowd
 
 
         if enable_dqm:
-            nw_specs.append(nwmgr.Connection(name=f"{partition_name}.datareq_dqm_{hostidx}", topics=[], address="tcp://{host_ru" + f"{hostidx}"+ "}:" + f"{port}"))
-            port = port + 1
             nw_specs.append(nwmgr.Connection(name=f"{partition_name}.fragx_dqm_{hostidx}", topics=[], address="tcp://{host_ru" + f"{hostidx}" + "}:" + f"{port}"))
             port = port + 1
 
