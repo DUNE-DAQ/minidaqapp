@@ -115,14 +115,13 @@ def generate(
     queue_specs = app.QueueSpecs(sorted(queue_bare_specs, key=lambda x: x.inst))
 
     mod_specs = [
-        mspec(f"request_receiver", "RequestReceiver", [app.QueueInfo(name="output", inst=f"data_requests_{idx}", dir="output") for idx in range(MIN_LINK,MAX_LINK)]) 
-    ] + [
         mspec(f"fragment_sender", "FragmentSender", [app.QueueInfo(name="input_queue", inst="fragment_q", dir="input")])
     ]
 
     if SOFTWARE_TPG_ENABLED:
         mod_specs += [
-            mspec(f"tp_request_receiver", "RequestReceiver", [app.QueueInfo(name="output", inst=f"tp_requests_{idx}", dir="output") for idx in range(MIN_LINK,MAX_LINK)]) 
+            mspec(f"request_receiver", "RequestReceiver", [app.QueueInfo(name="output", inst=f"data_requests_{idx}", dir="output") for idx in range(MIN_LINK,MAX_LINK)] + 
+                [app.QueueInfo(name="output", inst=f"tp_requests_{idx}", dir="output") for idx in range(MIN_LINK,MAX_LINK)]) 
         ] + [
             mspec(f"tp_datahandler_{idx}", "DataLinkHandler", [
                 app.QueueInfo(name="raw_input", inst=f"sw_tp_link_{idx}", dir="input"),
@@ -134,6 +133,10 @@ def generate(
                 app.QueueInfo(name="input", inst=f"tpset_queue", dir="input")
             ])
         ]
+    else:
+        mod_specs += [
+            mspec(f"request_receiver", "RequestReceiver", [app.QueueInfo(name="output", inst=f"data_requests_{idx}", dir="output") for idx in range(MIN_LINK,MAX_LINK)]) 
+        ] 
 
     if FRONTEND_TYPE == 'wib':
         mod_specs += [
@@ -246,7 +249,8 @@ def generate(
                             num_links=RU_CONFIG[RUIDX]["channel_count"])),
             ] + [
                  ("request_receiver", rrcv.ConfParams(
-                            map = [rrcv.geoidinst(region=RU_CONFIG[RUIDX]["region_id"] , element=idx , system=SYSTEM_TYPE , queueinstance=f"data_requests_{idx}") for idx in range(MIN_LINK,MAX_LINK)],
+                            map = [rrcv.geoidinst(region=RU_CONFIG[RUIDX]["region_id"] , element=idx , system=SYSTEM_TYPE , queueinstance=f"data_requests_{idx}") for idx in range(MIN_LINK,MAX_LINK)] +
+                                [rrcv.geoidinst(region=RU_CONFIG[RUIDX]["region_id"] , element=idx + total_link_count, system=SYSTEM_TYPE , queueinstance=f"tp_requests_{idx}") for idx in range(MIN_LINK,MAX_LINK)],
                             general_queue_timeout = QUEUE_POP_WAIT_MS,
                             connection_name = f"{PARTITION}.datareq_{RUIDX}"
                  )) 
@@ -319,11 +323,6 @@ def generate(
     if SOFTWARE_TPG_ENABLED:
 
         conf_list.extend([
-                            ("tp_request_receiver", rrcv.ConfParams(
-                                        map = [rrcv.geoidinst(region=RU_CONFIG[RUIDX]["region_id"] , element=idx + total_link_count, system=SYSTEM_TYPE , queueinstance=f"tp_requests_{idx}") for idx in range(MIN_LINK,MAX_LINK)],
-                                        general_queue_timeout = QUEUE_POP_WAIT_MS,
-                                        connection_name = f"{PARTITION}.tp_datareq_{RUIDX}")) 
-                        ] + [
                             (f"tpset_publisher", qton.Conf(msg_type="dunedaq::trigger::TPSet",
                                                                  msg_module_name="TPSetNQ",
                                                                  sender_config=nos.Conf(name=f"{PARTITION}.tpsets_{RUIDX}",
@@ -359,7 +358,6 @@ def generate(
             ("pacman_source", startpars),
             ("flxcard.*", startpars),
             ("request_receiver", startpars),
-            ("tp_request_receiver", startpars),
             ("ssp.*", startpars),
             ("ntoq_trigdec", startpars),
             (f"tp_datahandler_.*", startpars),
