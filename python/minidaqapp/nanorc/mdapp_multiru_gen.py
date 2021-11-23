@@ -335,7 +335,6 @@ def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowd
             RAW_RECORDING_OUTPUT_DIR = raw_recording_output_dir,
             FRONTEND_TYPE = frontend_type,
             SYSTEM_TYPE = system_type,
-            DQM_ENABLED=enable_dqm,
             SOFTWARE_TPG_ENABLED = enable_software_tpg,
             USE_FAKE_DATA_PRODUCERS = use_fake_data_producers,
             PARTITION=partition_name) for hostidx in range(len(host_ru))]

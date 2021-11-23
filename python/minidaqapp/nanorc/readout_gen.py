@@ -66,7 +66,6 @@ def generate(
         RAW_RECORDING_OUTPUT_DIR=".",
         FRONTEND_TYPE='wib',
         SYSTEM_TYPE='TPC',
-        DQM_ENABLED=False,
         SOFTWARE_TPG_ENABLED=False,
         USE_FAKE_DATA_PRODUCERS=False,
         PARTITION="UNKNOWN"):
@@ -280,7 +279,7 @@ def generate(
                             pop_size_pct = 0.1,
                             region_id = RU_CONFIG[RUIDX]["region_id"],
                             element_id = idx,
-                            output_file = f"output_{RUIDX}_{idx}.out",
+                            output_file = path.join(RAW_RECORDING_OUTPUT_DIR, f"output_{RUIDX}_{idx}.out"),
                             stream_buffer_size = 8388608,
                             enable_raw_recording = RAW_RECORDING_ENABLED,
                         )
@@ -385,10 +384,7 @@ def generate(
 
     cmd_data['resume'] = acmd([("", None)])
 
-    cmd_data['scrap'] = acmd([("request_receiver", None),
-            ("tp_request_receiver", None),
-            (f"tpset_publisher", None),
-            ("timesync_to_network", None)])
+    cmd_data['scrap'] = acmd([("", None)])
 
     cmd_data['record'] = acmd([("", None)])
 
