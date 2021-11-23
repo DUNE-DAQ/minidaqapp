@@ -68,7 +68,8 @@ def generate(
         SYSTEM_TYPE='TPC',
         SOFTWARE_TPG_ENABLED=False,
         USE_FAKE_DATA_PRODUCERS=False,
-        PARTITION="UNKNOWN"):
+        PARTITION="UNKNOWN",
+        LATENCY_BUFFER_SIZE=499968):
     """Generate the json configuration for the readout and DF process"""
 
     cmd_data = {}
@@ -77,7 +78,6 @@ def generate(
     if not required_eps.issubset([nw.name for nw in NW_SPECS]):
         raise RuntimeError(f"ERROR: not all the required endpoints ({', '.join(required_eps)}) found in list of endpoints {' '.join([nw.name for nw in NW_SPECS])}")
 
-    LATENCY_BUFFER_SIZE = 3 * CLOCK_SPEED_HZ / (25 * 12 * DATA_RATE_SLOWDOWN_FACTOR)
     RATE_KHZ = CLOCK_SPEED_HZ / (25 * 12 * DATA_RATE_SLOWDOWN_FACTOR * 1000)
 
     MIN_LINK = RU_CONFIG[RUIDX]["start_channel"]
@@ -261,6 +261,7 @@ def generate(
                             timesync_topic_name = "Timesync",
                         ),
                         latencybufferconf= rconf.LatencyBufferConf(
+                            latency_buffer_alignment_size = 4096,
                             latency_buffer_size = LATENCY_BUFFER_SIZE,
                             region_id = RU_CONFIG[RUIDX]["region_id"],
                             element_id = idx,
