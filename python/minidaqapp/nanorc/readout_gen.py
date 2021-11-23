@@ -250,7 +250,7 @@ def generate(
             ] + [
                  ("request_receiver", rrcv.ConfParams(
                             map = [rrcv.geoidinst(region=RU_CONFIG[RUIDX]["region_id"] , element=idx , system=SYSTEM_TYPE , queueinstance=f"data_requests_{idx}") for idx in range(MIN_LINK,MAX_LINK)] +
-                                [rrcv.geoidinst(region=RU_CONFIG[RUIDX]["region_id"] , element=idx + total_link_count, system=SYSTEM_TYPE , queueinstance=f"tp_requests_{idx}") for idx in range(MIN_LINK,MAX_LINK)],
+                                [rrcv.geoidinst(region=RU_CONFIG[RUIDX]["region_id"] , element=idx + total_link_count, system=SYSTEM_TYPE , queueinstance=f"tp_requests_{idx}") for idx in range(MIN_LINK,MAX_LINK) if SOFTWARE_TPG_ENABLED],
                             general_queue_timeout = QUEUE_POP_WAIT_MS,
                             connection_name = f"{PARTITION}.datareq_{RUIDX}"
                  )) 
