@@ -103,7 +103,7 @@ def generate(NW_SPECS,
                         general_queue_timeout=QUEUE_POP_WAIT_MS,
                         reply_connection_name = f"{PARTITION}.fragx_dqm_{RUIDX}",
                         map=trb.mapgeoidconnections([
-                                trb.geoidinst(region=RU_CONFIG[RUIDX]["region_id"], element=idx, system=SYSTEM_TYPE, connection_name=f"{PARTITION}.datareq_dqm_{RUIDX}") for idx in range(MIN_LINK, MAX_LINK)
+                                trb.geoidinst(region=RU_CONFIG[RUIDX]["region_id"], element=idx, system=SYSTEM_TYPE, connection_name=f"{PARTITION}.datareq_{RUIDX}") for idx in range(MIN_LINK, MAX_LINK)
                             ]),
                         ))
             ] + [

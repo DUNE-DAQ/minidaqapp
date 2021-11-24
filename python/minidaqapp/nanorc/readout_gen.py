@@ -66,10 +66,10 @@ def generate(
         RAW_RECORDING_OUTPUT_DIR=".",
         FRONTEND_TYPE='wib',
         SYSTEM_TYPE='TPC',
-        DQM_ENABLED=False,
         SOFTWARE_TPG_ENABLED=False,
         USE_FAKE_DATA_PRODUCERS=False,
-        PARTITION="UNKNOWN"):
+        PARTITION="UNKNOWN",
+        LATENCY_BUFFER_SIZE=499968):
     """Generate the json configuration for the readout and DF process"""
 
     cmd_data = {}
@@ -78,7 +78,6 @@ def generate(
     if not required_eps.issubset([nw.name for nw in NW_SPECS]):
         raise RuntimeError(f"ERROR: not all the required endpoints ({', '.join(required_eps)}) found in list of endpoints {' '.join([nw.name for nw in NW_SPECS])}")
 
-    LATENCY_BUFFER_SIZE = 3 * CLOCK_SPEED_HZ / (25 * 12 * DATA_RATE_SLOWDOWN_FACTOR)
     RATE_KHZ = CLOCK_SPEED_HZ / (25 * 12 * DATA_RATE_SLOWDOWN_FACTOR * 1000)
 
     MIN_LINK = RU_CONFIG[RUIDX]["start_channel"]
@@ -101,8 +100,6 @@ def generate(
             app.QueueSpec(inst=f"sw_tp_link_{idx}", kind='FollySPSCQueue', capacity=100000)
                 for idx in range(MIN_LINK, MAX_LINK)
         ] + [
-            app.QueueSpec(inst=f"tp_fragments_q", kind='FollyMPMCQueue', capacity=100)
-        ] + [
             app.QueueSpec(inst=f"tpset_queue", kind='FollyMPMCQueue', capacity=10000)
         ] + [
             app.QueueSpec(inst=f"tp_requests_{idx}", kind='FollySPSCQueue', capacity=100)
@@ -114,46 +111,32 @@ def generate(
             app.QueueSpec(inst="errored_frames_q", kind="FollyMPMCQueue", capacity=10000)
         ]
 
-    if DQM_ENABLED:
-        queue_bare_specs += [
-            app.QueueSpec(inst="data_fragments_q_dqm", kind='FollyMPMCQueue', capacity=1000),
-        ] + [
-            app.QueueSpec(inst=f"data_requests_dqm_{idx}", kind='FollySPSCQueue', capacity=100)
-                for idx in range(MIN_LINK,MAX_LINK)
-        ]
-
     # Only needed to reproduce the same order as when using jsonnet
     queue_specs = app.QueueSpecs(sorted(queue_bare_specs, key=lambda x: x.inst))
 
     mod_specs = [
-        mspec(f"request_receiver", "RequestReceiver", [app.QueueInfo(name="output", inst=f"data_requests_{idx}", dir="output")]) for idx in range(MIN_LINK,MAX_LINK)
-    ] + [
         mspec(f"fragment_sender", "FragmentSender", [app.QueueInfo(name="input_queue", inst="fragment_q", dir="input")])
     ]
 
-    if DQM_ENABLED:
-        mod_specs += [
-            mspec("qton_fragments_dqm", "QueueToNetwork", [app.QueueInfo(name="input", inst="data_fragments_q_dqm", dir="input")])
-        ] + [
-            mspec(f"dqm_request_receiver", "RequestReceiver", [app.QueueInfo(name="output", inst=f"data_requests_dqm_{idx}", dir="output")]) for idx in range(MIN_LINK,MAX_LINK)
-        ]
-
     if SOFTWARE_TPG_ENABLED:
         mod_specs += [
-            mspec("tp_fragment_sender", "FragmentSender", [app.QueueInfo(name="input_queue", inst="tp_fragments_q", dir="input")])
-        ] + [
-            mspec(f"tp_request_receiver", "RequestReceiver", [app.QueueInfo(name="output", inst=f"tp_requests_{idx}", dir="output")]) for idx in range(MIN_LINK,MAX_LINK)
+            mspec(f"request_receiver", "RequestReceiver", [app.QueueInfo(name="output", inst=f"data_requests_{idx}", dir="output") for idx in range(MIN_LINK,MAX_LINK)] + 
+                [app.QueueInfo(name="output", inst=f"tp_requests_{idx}", dir="output") for idx in range(MIN_LINK,MAX_LINK)]) 
         ] + [
             mspec(f"tp_datahandler_{idx}", "DataLinkHandler", [
                 app.QueueInfo(name="raw_input", inst=f"sw_tp_link_{idx}", dir="input"),
                 app.QueueInfo(name="data_requests_0", inst=f"tp_requests_{idx}", dir="input"),
-                app.QueueInfo(name="fragment_queue", inst="tp_fragments_q", dir="output")
+                app.QueueInfo(name="fragment_queue", inst="fragment_q", dir="output")
             ]) for idx in range(MIN_LINK,MAX_LINK)
         ] + [
             mspec(f"tpset_publisher", "QueueToNetwork", [
                 app.QueueInfo(name="input", inst=f"tpset_queue", dir="input")
             ])
         ]
+    else:
+        mod_specs += [
+            mspec(f"request_receiver", "RequestReceiver", [app.QueueInfo(name="output", inst=f"data_requests_{idx}", dir="output") for idx in range(MIN_LINK,MAX_LINK)]) 
+        ] 
 
     if FRONTEND_TYPE == 'wib':
         mod_specs += [
@@ -177,10 +160,6 @@ def generate(
                     app.QueueInfo(name="data_requests_0", inst=f"data_requests_{idx}", dir="input"),
                     app.QueueInfo(name="fragment_queue", inst="fragment_q", dir="output")
                 ]
-            if DQM_ENABLED:
-                ls.extend([
-                    app.QueueInfo(name="data_requests_1", inst=f"data_requests_dqm_{idx}", dir="input")
-                ])
             if SOFTWARE_TPG_ENABLED:
                 ls.extend([
                     app.QueueInfo(name="tp_out", inst=f"sw_tp_link_{idx}", dir="output"),
@@ -270,7 +249,8 @@ def generate(
                             num_links=RU_CONFIG[RUIDX]["channel_count"])),
             ] + [
                  ("request_receiver", rrcv.ConfParams(
-                            map = [rrcv.geoidinst(region=RU_CONFIG[RUIDX]["region_id"] , element=idx , system=SYSTEM_TYPE , queueinstance=f"data_requests_{idx}") for idx in range(MIN_LINK,MAX_LINK)],
+                            map = [rrcv.geoidinst(region=RU_CONFIG[RUIDX]["region_id"] , element=idx , system=SYSTEM_TYPE , queueinstance=f"data_requests_{idx}") for idx in range(MIN_LINK,MAX_LINK)] +
+                                [rrcv.geoidinst(region=RU_CONFIG[RUIDX]["region_id"] , element=idx + total_link_count, system=SYSTEM_TYPE , queueinstance=f"tp_requests_{idx}") for idx in range(MIN_LINK,MAX_LINK) if SOFTWARE_TPG_ENABLED],
                             general_queue_timeout = QUEUE_POP_WAIT_MS,
                             connection_name = f"{PARTITION}.datareq_{RUIDX}"
                  )) 
@@ -285,6 +265,7 @@ def generate(
                             timesync_topic_name = "Timesync",
                         ),
                         latencybufferconf= rconf.LatencyBufferConf(
+                            latency_buffer_alignment_size = 4096,
                             latency_buffer_size = LATENCY_BUFFER_SIZE,
                             region_id = RU_CONFIG[RUIDX]["region_id"],
                             element_id = idx,
@@ -303,7 +284,7 @@ def generate(
                             pop_size_pct = 0.1,
                             region_id = RU_CONFIG[RUIDX]["region_id"],
                             element_id = idx,
-                            output_file = f"output_{RUIDX}_{idx}.out",
+                            output_file = path.join(RAW_RECORDING_OUTPUT_DIR, f"output_{RUIDX}_{idx}.out"),
                             stream_buffer_size = 8388608,
                             enable_raw_recording = RAW_RECORDING_ENABLED,
                         )
@@ -339,29 +320,9 @@ def generate(
                         )) for idx in range(MIN_LINK,MAX_LINK)
             ]
 
-    if DQM_ENABLED:
-        conf_list.append( ("qton_fragments_dqm", qton.Conf(msg_type="std::unique_ptr<dunedaq::daqdataformats::Fragment>",
-                                           msg_module_name="FragmentNQ",
-                                           sender_config=nos.Conf(name=f"{PARTITION}.fragx_dqm_{RUIDX}",
-                                                                  stype="msgpack"))) )
-        conf_list.extend( [
-                 ("dqm_request_receiver", rrcv.ConfParams(
-                            map = [rrcv.geoidinst(region=RU_CONFIG[RUIDX]["region_id"] , element=idx , system=SYSTEM_TYPE , queueinstance=f"data_requests_dqm_{idx}") for idx in range(MIN_LINK, MAX_LINK)],
-                            general_queue_timeout = QUEUE_POP_WAIT_MS,
-                            connection_name = f"{PARTITION}.datareq_dqm_{RUIDX}"
-                 )) 
-            ]  )
-
     if SOFTWARE_TPG_ENABLED:
 
         conf_list.extend([
-                            ("tp_fragment_sender", None)
-                        ] + [
-                            ("tp_request_receiver", rrcv.ConfParams(
-                                        map = [rrcv.geoidinst(region=RU_CONFIG[RUIDX]["region_id"] , element=idx + total_link_count, system=SYSTEM_TYPE , queueinstance=f"tp_requests_{idx}") for idx in range(MIN_LINK,MAX_LINK)],
-                                        general_queue_timeout = QUEUE_POP_WAIT_MS,
-                                        connection_name = f"{PARTITION}.tp_datareq_{RUIDX}")) 
-                        ] + [
                             (f"tpset_publisher", qton.Conf(msg_type="dunedaq::trigger::TPSet",
                                                                  msg_module_name="TPSetNQ",
                                                                  sender_config=nos.Conf(name=f"{PARTITION}.tpsets_{RUIDX}",
@@ -392,16 +353,13 @@ def generate(
 
     startpars = rccmd.StartParams(run=RUN_NUMBER)
     cmd_data['start'] = acmd([
-            ("qton_fragments_dqm", startpars),
             ("datahandler_.*", startpars),
             ("fake_source", startpars),
             ("pacman_source", startpars),
             ("flxcard.*", startpars),
             ("request_receiver", startpars),
-            ("tp_request_receiver", startpars),
             ("ssp.*", startpars),
             ("ntoq_trigdec", startpars),
-            ("tp_fragment_sender", startpars),
             (f"tp_datahandler_.*", startpars),
             (f"tpset_publisher", startpars),
             ("fakedataprod_.*", startpars),
@@ -415,8 +373,6 @@ def generate(
             ("fake_source", None),
             ("pacman_source", None),
             ("datahandler_.*", None),
-            ("qton_fragments_dqm", None),
-            ("tp_fragment_sender", None),
             (f"tp_datahandler_.*", None),
             (f"tpset_publisher", None),
             ("fakedataprod_.*", None),
@@ -427,11 +383,7 @@ def generate(
 
     cmd_data['resume'] = acmd([("", None)])
 
-    cmd_data['scrap'] = acmd([("request_receiver", None),
-            ("tp_request_receiver", None),
-            ("tp_fragment_sender", None),
-            (f"tpset_publisher", None),
-            ("timesync_to_network", None)])
+    cmd_data['scrap'] = acmd([("", None)])
 
     cmd_data['record'] = acmd([("", None)])
 
