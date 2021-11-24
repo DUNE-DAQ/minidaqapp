@@ -111,7 +111,8 @@ fragment producers (currently readout and trigger) only have to make
 changes to their own app, and do not have to make corresponding
 changes to dataflow or elsewhere. Unfortunately the steps needed to
 connect everything up consistently are not very elegant, although that
-may improve with the introduction of `NetworkManager`.
+may improve with the introduction of `NetworkManager`. Suggestions for
+improvements are welcome.
 
 This approach requires that the dataflow application is generated
 after all of the other applications (strictly, after all of the other
@@ -145,22 +146,27 @@ util.set_mlt_links(the_system, mlt_app_name="trigger")
 
 ## Generating JSON files
 
-To get from a `util.System` object to a full set of JSON files involves four steps:
+To get from a `util.System` object to a full set of JSON files involves five steps:
 
-1. Add networking modules (ie, `NetworkToQueue`/`QueueToNetwork`) to applications
-2. For each application, create the python data structures for each DAQ command that the application will respond to
-3. Create the python data structures for each DAQ command that the _system_ will respond to
-4. Convert the python data structures to JSON and dump to the appropriate files
+1. Connect the fragment producers as described in the previous section
+2. Add networking modules (ie, `NetworkToQueue`/`QueueToNetwork`) to applications
+3. For each application, create the python data structures for each DAQ command that the application will respond to
+4. Create the python data structures for each DAQ command that the _system_ will respond to
+5. Convert the python data structures to JSON and dump to the appropriate files
 
-As part of step 1, ports for all of the inter-application connections are assigned and saved in the `util.Dystem` object, and applications' lists of modules are updated if necessary to add N2Q/Q2N modules.
+As part of step 2, ports for all of the inter-application connections are assigned and saved in the `util.Dystem` object, and applications' lists of modules are updated if necessary to add N2Q/Q2N modules.
 
-As part of step 2, the necessary queue objects are created to apply the connections between modules, and the order to send start and stop commands to the modules is inferred based on the inter-module connections.
+As part of step 3, the necessary queue objects are created to apply the connections between modules, and the order to send start and stop commands to the modules is inferred based on the inter-module connections.
 
-As part of step 3, the order in which to send start and stop commands to applications is inferred from their connections.
+As part of step 4, the order in which to send start and stop commands to applications is inferred from their connections.
 
 For convenience, these four steps are wrapped by the `make_apps_json(the_system, json_dir, verbose=False)` function. If you need finer-grained control, or for debugging intermediate steps, you may wish to run each of the steps manually:
 
 ```python
+
+connect_all_fragment_producers(the_system)
+set_mlt_links(the_system, mlt_app_name="trigger")
+
 app_command_datas = dict()
 
 for app_name, app in the_system.apps.items():
@@ -183,9 +189,58 @@ Where possible, the functions in `util` try to provide sensible defaults, so tha
 * The `util.Connection` class constructor takes optional `queue_type`, `queue_capacity` and `toposort` arguments. Passing `toposort=True` removes this connection from the topological sort that is used to determine the order in which start and stop commands are sent. This is useful for breaking cycles in the connection graph.
 * The `util.System` class constructor takes optional `network_endpoints` and `app_start_order` arguments that can be used to override the automatically-assigned set of ports and application start order respectively.
 
-## Complete examples
+## `minidaqapp` with this framework
 
-Some complete examples can be found in subdirectories of this one:
+The `mdapp_multiru_gen.py` in this directory has been partially converted to work with the `util` framework. So far, the only configuration tested uses a dunedaq v2.8.2 base release, and the following generation command:
 
-* [faketp_to_sink](faketp_to_sink/) demonstrates a single-application system
-* [tpset_pub_sub](tpset_pub_sub/) demonstrates how to connect multiple applications together
+```bash
+python -m minidaqapp.nanorc.mdapp_multiru_gen --host-ru localhost -d ./frames.bin -o . -s 10 json --enable-software-tpg --trigger-activity-config 'dict(prescale=1000)' --number-of-data-producers 2
+```
+
+When the resulting configuration is run with nanorc, it produces an HDF5 output file with the expected fragments in it.
+
+The configuration requires one change to C++ DAQ code, namely to have
+`TriggerRecordBuilder` in `dfmodules` use `DAQSink` names rather than
+queue instance names to identify its data request queues. The relevant
+changes are on branch `philiprodrigues/use-queue-name-not-inst-v2.8.2`
+of `dfmodules`. I think this change is an improvement to the code
+(queue instance names are really an implementation detail which C++
+code shouldn't rely on), but if it's not considered acceptable, we can
+look into other approaches. In any case, I suspect that whole bit of
+code has changed with the introduction of `NetworkManager`, rendering
+this issue moot.
+
+You will also need to install the [`networkx`](https://networkx.org/documentation/stable/) package (which is used for the topological sort of modules). Set up the DAQ environment, then `pip install networkx`.
+
+Some things that are definitely missing from this setup (as of 2021-11-24), compared to the 2.8.2 configuration I started with:
+
+* No DQM, either inside readout or as its own process
+* Probably doesn't work with readout and real hardware
+* I haven't converted the `thi_gen` configuration
+
+There are probably others I haven't thought of too. A good next step would be to try running the integration tests from `dfmodules`, which will probably quickly turn up some problems.
+
+## TODOs, improvements and next steps
+
+Updated 2021-11-24
+
+Vaguely ordered highest-priority-first:
+
+* Need to update the minidaqapp conifiguration to whatever is current
+* Support `NetworkManager`
+* Find a better place to put this code. In its own package? Needs discussion with sw coordination
+* Need to check with sw coordination that the `networkx` dependency is OK
+* Switch all the classes defined as namedtuples to @dataclass
+* Add a `validate()` method to each of the data objects. Checks would include things like making sure that all endpoints referred to in intra-/inter-app connections actually exist
+* Split up code into multiple files?
+* Make graphviz diagrams at various stages/levels for debugging. Eg:
+    * Draw a `ModuleGraph` showing the internal modules, connections and endpoints
+    * draw a `System` object with the individual apps showing just their external endpoints, no internals
+* Move the `msg_type` and `msg_module_type` settings in N2Q/Q2N connections from the connection to the endpoints. Some benefits to this:
+    * Moves the specification of what's being sent/received into the per-app generate, rather than the top-level, so it's nearer to where the writer of the code knows what it should be
+    * Allows validation: both endpoints in an inter-app connection should have the same values for `msg_type` and `msg_module_type`
+    * Slightly tidies up the top-level config
+* Switch to using the `logging` package for logging, so that we have different levels. We can keep the output looking fancy via `rich.Console` with the technique described [here](https://rich.readthedocs.io/en/stable/logging.html) and also used in `nanorc`
+* When a topological sort finds cycles, display the cycles to the user
+* Maybe make connection to outgoing external endpoint be in Module ctor, instead of separate add_endpoint
+* Note all concepts that are referred to as "endpoint" and come up with different names for each
