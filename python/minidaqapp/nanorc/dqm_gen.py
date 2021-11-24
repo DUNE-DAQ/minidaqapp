@@ -67,7 +67,6 @@ def generate(NW_SPECS,
     MAX_LINK = MIN_LINK + RU_CONFIG[RUIDX]["channel_count"]
     # Define modules and queues
     queue_bare_specs =  [
-        app.QueueSpec(inst=f"time_sync_dqm_q", kind='FollyMPMCQueue', capacity=1000),
         app.QueueSpec(inst="data_fragments_q_dqm", kind='FollyMPMCQueue', capacity=1000),
         app.QueueSpec(inst="trigger_decision_q_dqm", kind='FollySPSCQueue', capacity=20),
         app.QueueSpec(inst="trigger_record_q_dqm", kind='FollySPSCQueue', capacity=20)
@@ -85,14 +84,8 @@ def generate(NW_SPECS,
     mod_specs += [mspec("dqmprocessor", "DQMProcessor", [
                     app.QueueInfo(name="trigger_record_dqm_processor", inst="trigger_record_q_dqm", dir="input"),
                     app.QueueInfo(name="trigger_decision_dqm_processor", inst="trigger_decision_q_dqm", dir="output"),
-                    # app.QueueInfo(name="timesync_dqm_processor", inst="time_sync_q", dir="input"),
-                    app.QueueInfo(name="timesync_dqm_processor", inst="time_sync_dqm_q", dir="input"),
                 ]),
     ]
-
-    mod_specs += [mspec("dqm_subscriber", "NetworkToQueue",
-            [app.QueueInfo(name="output", inst="time_sync_dqm_q", dir="output")]
-            )]
 
     mod_specs += [
         mspec(f"ntoq_fragments_dqm", "NetworkToQueue",
@@ -123,16 +116,8 @@ def generate(NW_SPECS,
                         kafka_address=DQM_KAFKA_ADDRESS,
                         link_idx=list(range(MIN_LINK, MAX_LINK)),
                         clock_frequency=CLOCK_SPEED_HZ,
+                        timesync_connection_name = f"{PARTITION}.timesync_{RUIDX}",
                         ))
-            ] + [
-                ("dqm_subscriber", ntoq.Conf(msg_type="dunedaq::dfmessages::TimeSync",
-                                msg_module_name="TimeSyncNQ",
-                                receiver_config=nor.Conf(name=f"{PARTITION}.timesync_{RUIDX}",
-                                                        subscriptions=["Timesync"],
-                                                        # stype="msgpack")
-                                                         )
-                                )
-                )
             ]
 
     cmd_data['conf'] = acmd(conf_list)
@@ -142,11 +127,9 @@ def generate(NW_SPECS,
             ("ntoq_fragments_dqm", startpars),
             ("dqmprocessor", startpars),
             ("trb_dqm", startpars),
-            ("dqm_subscriber", startpars),
             ])
 
     cmd_data['stop'] = acmd([
-            ("dqm_subscriber", None),
             ("trb_dqm", None), 
             ("dqmprocessor", None),
             ("ntoq_fragments_dqm", None),
