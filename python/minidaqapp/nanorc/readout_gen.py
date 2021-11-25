@@ -136,11 +136,11 @@ def generate(# NETWORK_ENDPOINTS,
     if not USE_FAKE_DATA_PRODUCERS:
         for idx in range(NUMBER_OF_DATA_PRODUCERS):
             modules[f"datahandler_{idx}"] = Module(plugin = "DataLinkHandler",
-                                                   connections = {"raw_recording": Conn(f"data_recorder_{idx}.raw_recording"),
-                                                                  "tp_out": Conn(f"tp_datahandler_{idx}.raw_input",
-                                                                                 queue_name=f"tp_link_{idx}",
-                                                                                 queue_kind="FollySPSCQueue",
-                                                                                 queue_capacity=100000)},
+                                                   connections = {"raw_recording": Conn(f"data_recorder_{idx}.raw_recording")} +
+                                                   {"tp_out": Conn(f"tp_datahandler_{idx}.raw_input",
+                                                                   queue_name=f"tp_link_{idx}",
+                                                                   queue_kind="FollySPSCQueue",
+                                                                   queue_capacity=100000)} if SOFTWARE_TPG_ENABLED else {},
                                                    conf = rconf.Conf(
                                                        readoutmodelconf= rconf.ReadoutModelConf(
                                                            source_queue_timeout_ms= QUEUE_POP_WAIT_MS,
@@ -212,16 +212,16 @@ def generate(# NETWORK_ENDPOINTS,
         mgraph.add_endpoint(f"tpsets_{idx}", f"datahandler_{idx}.tpset_out",    Direction.OUT)
         # TODO: Should we just have one timesync outgoing endpoint?
         mgraph.add_endpoint(f"timesync_{idx}", f"datahandler_{idx}.timesync",    Direction.OUT)
-        mgraph.add_endpoint(f"timesync_{idx+NUMBER_OF_DATA_PRODUCERS}", f"tp_datahandler_{idx}.timesync",    Direction.OUT)
 
         # Add fragment producers for raw data
         mgraph.add_fragment_producer(region = REGION_ID, element = idx, system = SYSTEM_TYPE,
                                      requests_in   = f"datahandler_{idx}.data_requests_0",
                                      fragments_out = f"datahandler_{idx}.data_response_0")
-
-        # Add fragment producers for TPC TPs. Make sure the element index doesn't overlap with the ones for raw data
-        mgraph.add_fragment_producer(region = REGION_ID, element = idx + NUMBER_OF_DATA_PRODUCERS, system = SYSTEM_TYPE,
-                                     requests_in   = f"tp_datahandler_{idx}.data_requests_0",
-                                     fragments_out = f"tp_datahandler_{idx}.data_response_0")
+        if SOFTWARE_TPG_ENABLED:
+            mgraph.add_endpoint(f"timesync_{idx+NUMBER_OF_DATA_PRODUCERS}", f"tp_datahandler_{idx}.timesync",    Direction.OUT)
+            # Add fragment producers for TPC TPs. Make sure the element index doesn't overlap with the ones for raw data
+            mgraph.add_fragment_producer(region = REGION_ID, element = idx + NUMBER_OF_DATA_PRODUCERS, system = SYSTEM_TYPE,
+                                         requests_in   = f"tp_datahandler_{idx}.data_requests_0",
+                                         fragments_out = f"tp_datahandler_{idx}.data_response_0")
         
     return mgraph

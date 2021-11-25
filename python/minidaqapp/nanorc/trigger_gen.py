@@ -80,40 +80,39 @@ def generate(
         modules[f"buf{idx}"] = Module(plugin="TPSetBufferCreator",
                                       conf=buf.Conf(tpset_buffer_size=10000, region=0, element=idx),
                                       connections={})
+    if NUMBER_OF_TPSET_PRODUCERS>0:
+        modules["zip"] = Module(plugin="TPZipper",
+                                connections={"output": Conn("tam.input")},
+                                conf=tzip.ConfParams(cardinality=NUMBER_OF_TPSET_PRODUCERS,
+                                                     max_latency_ms=1000,
+                                                     region_id=0,
+                                                     element_id=0))
 
-    modules["zip"] = Module(plugin="TPZipper",
-                            connections={"output": Conn("tam.input")},
-                            conf=tzip.ConfParams(cardinality=NUMBER_OF_TPSET_PRODUCERS,
-                                                 max_latency_ms=1000,
-                                                 region_id=0,
-                                                 element_id=0))
+        modules["tam"] = Module(plugin="TriggerActivityMaker",
+                                connections={"output": Conn("tcm.input")},
+                                conf=tam.Conf(activity_maker=ACTIVITY_PLUGIN,
+                                              geoid_region=0,  # Fake placeholder
+                                              geoid_element=0,  # Fake placeholder
+                                              window_time=10000,  # should match whatever makes TPSets, in principle
+                                              buffer_time=625000,  # 10ms in 62.5 MHz ticks
+                                              activity_maker_config=temptypes.ActivityConf(**ACTIVITY_CONFIG)))
 
-    modules["tam"] = Module(plugin="TriggerActivityMaker",
-                            connections={"output": Conn("tcm.input")},
-                            conf=tam.Conf(activity_maker=ACTIVITY_PLUGIN,
-                                          geoid_region=0,  # Fake placeholder
-                                          geoid_element=0,  # Fake placeholder
-                                          window_time=10000,  # should match whatever makes TPSets, in principle
-                                          buffer_time=625000,  # 10ms in 62.5 MHz ticks
-                                          activity_maker_config=temptypes.ActivityConf(**ACTIVITY_CONFIG)))
-
-    modules["tcm"] = Module(plugin="TriggerCandidateMaker",
-                            connections={
-                                "output": Conn("mlt.trigger_candidate_source")},
-                            conf=tcm.Conf(candidate_maker=CANDIDATE_PLUGIN,
-                                          candidate_maker_config=temptypes.CandidateConf(**CANDIDATE_CONFIG)))
+        modules["tcm"] = Module(plugin="TriggerCandidateMaker",
+                                connections={"output": Conn("mlt.trigger_candidate_source")},
+                                conf=tcm.Conf(candidate_maker=CANDIDATE_PLUGIN,
+                                              candidate_maker_config=temptypes.CandidateConf(**CANDIDATE_CONFIG)))
 
 
-    modules["ttcm"] = Module(plugin="TimingTriggerCandidateMaker",
-                             conf=ttcm.Conf(s1=ttcm.map_t(signal_type=TTCM_S1,
-                                                          time_before=TRIGGER_WINDOW_BEFORE_TICKS,
-                                                          time_after=TRIGGER_WINDOW_AFTER_TICKS),
-                                            s2=ttcm.map_t(signal_type=TTCM_S2,
-                                                          time_before=TRIGGER_WINDOW_BEFORE_TICKS,
-                                                          time_after=TRIGGER_WINDOW_AFTER_TICKS)
-                                            ),
-                             connections={"output": Conn("mlt.trigger_candidate_source")}
-                             )
+        modules["ttcm"] = Module(plugin="TimingTriggerCandidateMaker",
+                                 conf=ttcm.Conf(s1=ttcm.map_t(signal_type=TTCM_S1,
+                                                              time_before=TRIGGER_WINDOW_BEFORE_TICKS,
+                                                              time_after=TRIGGER_WINDOW_AFTER_TICKS),
+                                                s2=ttcm.map_t(signal_type=TTCM_S2,
+                                                              time_before=TRIGGER_WINDOW_BEFORE_TICKS,
+                                                              time_after=TRIGGER_WINDOW_AFTER_TICKS)
+                                                ),
+                                 connections={"output": Conn("mlt.trigger_candidate_source")}
+                                 )
 
     # The full list of MLT links is the raw data from upstream DAQ _and_ the raw TPs from upstream DAQ
     # all_mlt_links = [ mlt.GeoID(system=SYSTEM_TYPE, region=0, element=idx)
@@ -137,6 +136,7 @@ def generate(
     mgraph = ModuleGraph(modules)
     mgraph.add_endpoint("hsievents_in",  "ttcm.input", Direction.IN)
 
+    print(NUMBER_OF_TPSET_PRODUCERS)
     for idx in range(NUMBER_OF_TPSET_PRODUCERS):
         mgraph.add_endpoint(f"tpsets_into_buffer_link{idx}", f"buf{idx}.tpset_source",        Direction.IN)
         mgraph.add_endpoint(f"tpsets_into_chain_link{idx}",   "zip.input",                    Direction.IN)

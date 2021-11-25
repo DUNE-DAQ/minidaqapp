@@ -177,7 +177,7 @@ def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowd
 
     #-------------------------------------------------------------------
     # Trigger app
-    
+    print(f"enable_software_tpg? {enable_software_tpg}")
     mgraph_trigger = trigger_gen.generate(
         NUMBER_OF_RAWDATA_PRODUCERS = total_number_of_data_producers,
         NUMBER_OF_TPSET_PRODUCERS = total_number_of_data_producers if enable_software_tpg else 0,
@@ -300,12 +300,12 @@ def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowd
                                                  msg_module_name="TriggerDecisionTokenNQ",
                                                  receiver="trigger.tokens"),
     }
-
-    app_connections.update({ f"ruemu0.tpsets_{idx}": util.Publisher(msg_type="dunedaq::trigger::TPSet",
-                                                                    msg_module_name="TPSetNQ",
-                                                                    subscribers=[f"trigger.tpsets_into_buffer_link{idx}",
-                                                                                 f"trigger.tpsets_into_chain_link{idx}"])
-                             for idx in range(total_number_of_data_producers) })
+    if enable_software_tpg:
+        app_connections.update({ f"ruemu0.tpsets_{idx}": util.Publisher(msg_type="dunedaq::trigger::TPSet",
+                                                                        msg_module_name="TPSetNQ",
+                                                                        subscribers=[f"trigger.tpsets_into_buffer_link{idx}",
+                                                                                     f"trigger.tpsets_into_chain_link{idx}"])
+                                 for idx in range(total_number_of_data_producers) })
     
     app_connections.update({ f"ruemu0.timesync_{idx}": util.Publisher(msg_type="dunedaq::dfmessages::TimeSync",
                                                                       msg_module_name="TimeSyncNQ",
