@@ -26,10 +26,16 @@ import dunedaq.trigger.tpsetbuffercreator as buf
 import math
 from pprint import pprint
 
+from .module import Module, ModuleGraph
+from .app import App
+from .connection import Direction
+from .connection import Connection as Conn
+
 #FIXME maybe one day, triggeralgs will define schemas... for now allow a dictionary of 4byte int, 4byte floats, and strings
 moo.otypes.make_type(schema='number', dtype='i4', name='temp_integer', path='temptypes')
 moo.otypes.make_type(schema='number', dtype='f4', name='temp_float', path='temptypes')
 moo.otypes.make_type(schema='string', name='temp_string', path='temptypes')
+
 def make_moo_record(conf_dict,name,path='temptypes'):
     fields = []
     for pname,pvalue in conf_dict.items():
@@ -45,8 +51,9 @@ def make_moo_record(conf_dict,name,path='temptypes'):
         fields.append(dict(name=pname,item=typename))
     moo.otypes.make_type(schema='record', fields=fields, name=name, path=path)
 
+
 #===============================================================================
-def generate(
+def get_app (
         # NETWORK_ENDPOINTS: list,
 
         NUMBER_OF_RAWDATA_PRODUCERS: int = 2,
@@ -64,16 +71,12 @@ def generate(
         TTCM_S2: int = 2,
         TRIGGER_WINDOW_BEFORE_TICKS: int = 1000,
         TRIGGER_WINDOW_AFTER_TICKS: int = 1000,
-):
+        HOST: str = "localhost"):
 
     # Generate schema for the maker plugins on the fly in the temptypes module
-    make_moo_record(ACTIVITY_CONFIG,'ActivityConf','temptypes')
+    make_moo_record(ACTIVITY_CONFIG ,'ActivityConf' ,'temptypes')
     make_moo_record(CANDIDATE_CONFIG,'CandidateConf','temptypes')
     import temptypes
-
-    from .module import Module, ModuleGraph
-    from .connection import Direction
-    from .connection import Connection as Conn
 
     modules = {}
 
@@ -137,10 +140,9 @@ def generate(
     mgraph = ModuleGraph(modules)
     mgraph.add_endpoint("hsievents_in",  "ttcm.input", Direction.IN)
 
-    print(NUMBER_OF_TPSET_PRODUCERS)
     for idx in range(NUMBER_OF_TPSET_PRODUCERS):
-        mgraph.add_endpoint(f"tpsets_into_buffer_link{idx}", f"buf{idx}.tpset_source",        Direction.IN)
-        mgraph.add_endpoint(f"tpsets_into_chain_link{idx}",   "zip.input",                    Direction.IN)
+        mgraph.add_endpoint(f"tpsets_into_buffer_link{idx}", f"buf{idx}.tpset_source", Direction.IN)
+        mgraph.add_endpoint(f"tpsets_into_chain_link{idx}",   "zip.input",             Direction.IN)
 
         mgraph.add_fragment_producer(region=0, element=idx, system="DataSelection",
                                      requests_in=f"buf{idx}.data_request_source",
@@ -150,4 +152,5 @@ def generate(
     mgraph.add_endpoint("trigger_decisions", "mlt.trigger_decision_sink", Direction.OUT)
     mgraph.add_endpoint("tokens", "mlt.token_source", Direction.IN)
 
-    return mgraph
+    return App(modulegraph=mgraph,
+               host=host)

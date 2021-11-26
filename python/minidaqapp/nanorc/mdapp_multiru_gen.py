@@ -6,8 +6,13 @@ from rich.console import Console
 from os.path import exists, join
 from collections import defaultdict
 from copy import deepcopy
+
 from .command_maker import CommandMaker
 from .json_exporter import JSonExporter
+from .system import System
+from .app import App
+from .connection import Sender, Publisher
+
 CLOCK_SPEED_HZ = 50000000
 
 # Add -h as default help option
@@ -80,12 +85,15 @@ def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowd
         hsi_device_name, hsi_readout_period, hsi_endpoint_address, hsi_endpoint_partition, hsi_re_mask, hsi_fe_mask, hsi_inv_mask, hsi_source,
         use_hsi_hw, hsi_device_id, mean_hsi_signal_multiplicity, hsi_signal_emulation_mode, enabled_hsi_signals,
         ttcm_s1, ttcm_s2, trigger_activity_plugin, trigger_activity_config, trigger_candidate_plugin, trigger_candidate_config,
-        enable_raw_recording, raw_recording_output_dir, frontend_type, opmon_impl, enable_dqm, ers_impl, dqm_impl, pocket_url, enable_software_tpg, enable_tpset_writing, use_fake_data_producers, json_dir):
+        enable_raw_recording, raw_recording_output_dir, frontend_type, opmon_impl, enable_dqm, ers_impl, dqm_impl, pocket_url, enable_software_tpg, enable_tpset_writing,
+        use_fake_data_producers, json_dir):
+
     """
-      JSON_DIR: Json file output folder
+    JSON_DIR: Json file output folder
     """
 
-    json_exporter = JSonExporter(json_dir, console=console, verbose=False)
+    json_exporter = JSonExporter(json_dir, console=console)
+
     ####################################################################
     # Prologue
     ####################################################################
@@ -172,17 +180,11 @@ def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowd
     # Generating apps
     ####################################################################
 
-    # from
-    from .system import System
-    from .app import App
-    from .connection import Sender, Publisher
-
     the_system = System(console=console)
 
     #-------------------------------------------------------------------
     # Trigger app
-    print(f"enable_software_tpg? {enable_software_tpg}")
-    mgraph_trigger = trigger_gen.generate(
+    the_system.apps["trigger"] = trigger_gen.generate(
         NUMBER_OF_RAWDATA_PRODUCERS = total_number_of_data_producers,
         NUMBER_OF_TPSET_PRODUCERS = total_number_of_data_producers if enable_software_tpg else 0,
         ACTIVITY_PLUGIN = trigger_activity_plugin,
@@ -194,11 +196,10 @@ def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowd
         TTCM_S1=ttcm_s1,
         TTCM_S2=ttcm_s2,
         TRIGGER_WINDOW_BEFORE_TICKS = trigger_window_before_ticks,
-        TRIGGER_WINDOW_AFTER_TICKS = trigger_window_after_ticks)
+        TRIGGER_WINDOW_AFTER_TICKS = trigger_window_after_ticks,
+        host=host_trigger)
     
-    the_system.apps["trigger"] = App(modulegraph=mgraph_trigger, host=host_trigger)
-    
-    console.log("trigger module graph:", mgraph_trigger)
+    console.log("Trigger module graph:", the_system_apps['trigger'])
 
     #-------------------------------------------------------------------
     # Readout apps
