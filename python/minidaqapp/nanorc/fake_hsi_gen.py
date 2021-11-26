@@ -29,9 +29,9 @@ def generate(
     if TRIGGER_RATE_HZ > 0:
         trigger_interval_ticks=math.floor((1/TRIGGER_RATE_HZ) * CLOCK_SPEED_HZ/DATA_RATE_SLOWDOWN_FACTOR)
 
-    from .util import Module, ModuleGraph, Direction
-    from .util import Connection as Conn
-    from . import util
+    from .module import Module, ModuleGraph
+    from .connection import Direction
+    from .connection import Connection as Conn
     
     modules = {}
 

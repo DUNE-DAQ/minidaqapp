@@ -71,8 +71,9 @@ def generate(
     make_moo_record(CANDIDATE_CONFIG,'CandidateConf','temptypes')
     import temptypes
 
-    from .util import Module, ModuleGraph, Direction
-    from .util import Connection as Conn
+    from .module import Module, ModuleGraph
+    from .connection import Direction
+    from .connection import Connection as Conn
 
     modules = {}
 

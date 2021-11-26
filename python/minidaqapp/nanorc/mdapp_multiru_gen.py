@@ -6,7 +6,8 @@ from rich.console import Console
 from os.path import exists, join
 from collections import defaultdict
 from copy import deepcopy
-
+from .command_maker import CommandMaker
+from .json_exporter import JSonExporter
 CLOCK_SPEED_HZ = 50000000
 
 # Add -h as default help option
@@ -84,7 +85,7 @@ def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowd
       JSON_DIR: Json file output folder
     """
 
-
+    json_exporter = JSonExporter(json_dir, console=console, verbose=False)
     ####################################################################
     # Prologue
     ####################################################################
@@ -171,9 +172,12 @@ def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowd
     # Generating apps
     ####################################################################
 
-    from . import util
-    
-    the_system = util.System()
+    # from
+    from .system import System
+    from .app import App
+    from .connection import Sender, Publisher
+
+    the_system = System(console=console)
 
     #-------------------------------------------------------------------
     # Trigger app
@@ -191,8 +195,8 @@ def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowd
         TTCM_S2=ttcm_s2,
         TRIGGER_WINDOW_BEFORE_TICKS = trigger_window_before_ticks,
         TRIGGER_WINDOW_AFTER_TICKS = trigger_window_after_ticks)
-
-    the_system.apps["trigger"] = util.App(modulegraph=mgraph_trigger, host=host_trigger)
+    
+    the_system.apps["trigger"] = App(modulegraph=mgraph_trigger, host=host_trigger)
     
     console.log("trigger module graph:", mgraph_trigger)
 
@@ -237,7 +241,7 @@ def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowd
         mgraphs_readout.append(this_readout_mgraph)
 
     for i,ru_name in enumerate(ru_app_names):
-        the_system.apps[ru_name] = util.App(modulegraph=mgraphs_readout[i], host=host_ru[i])
+        the_system.apps[ru_name] = App(modulegraph=mgraphs_readout[i], host=host_ru[i])
 
     #-------------------------------------------------------------------
     # (Fake) HSI app
@@ -263,11 +267,11 @@ def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowd
             SIGNAL_EMULATION_MODE = hsi_signal_emulation_mode,
             ENABLED_SIGNALS =  enabled_hsi_signals,)
 
-    the_system.apps["hsi"] = util.App(modulegraph=mgraph_hsi, host=host_hsi)
+    the_system.apps["hsi"] = App(modulegraph=mgraph_hsi, host=host_hsi)
 
     # TODO: Actually deal with "thi" properly
     if control_timing_hw:
-        the_system.apps["thi"] = util.App()
+        the_system.apps["thi"] = App()
     
     #-------------------------------------------------------------------
     # Dataflow app
@@ -285,55 +289,56 @@ def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowd
         SOFTWARE_TPG_ENABLED = enable_software_tpg,
         TPSET_WRITING_ENABLED = enable_tpset_writing)
 
-    the_system.apps["dataflow"] = util.App(modulegraph=mgraph_dataflow, host=host_df)
+    the_system.apps["dataflow"] = App(modulegraph=mgraph_dataflow, host=host_df)
     
     console.log("dataflow module graph:", mgraph_dataflow)
 
     app_connections = {
-        "trigger.trigger_decisions": util.Sender(msg_type="dunedaq::dfmessages::TriggerDecision",
-                                                 msg_module_name="TriggerDecisionNQ",
-                                                 receiver="dataflow.trigger_decisions"),
-        "hsi.hsievent":              util.Sender(msg_type="dunedaq::dfmessages::HSIEvent",
-                                                 msg_module_name="HSIEventNQ",
-                                                 receiver="trigger.hsievents_in"),
-        "dataflow.tokens":           util.Sender(msg_type="dunedaq::dfmessages::TriggerDecisionToken",
-                                                 msg_module_name="TriggerDecisionTokenNQ",
-                                                 receiver="trigger.tokens"),
+        "trigger.trigger_decisions": Sender(msg_type="dunedaq::dfmessages::TriggerDecision",
+                                            msg_module_name="TriggerDecisionNQ",
+                                            receiver="dataflow.trigger_decisions"),
+        "hsi.hsievent":              Sender(msg_type="dunedaq::dfmessages::HSIEvent",
+                                            msg_module_name="HSIEventNQ",
+                                            receiver="trigger.hsievents_in"),
+        "dataflow.tokens":           Sender(msg_type="dunedaq::dfmessages::TriggerDecisionToken",
+                                            msg_module_name="TriggerDecisionTokenNQ",
+                                            receiver="trigger.tokens"),
     }
     if enable_software_tpg:
-        app_connections.update({ f"ruemu0.tpsets_{idx}": util.Publisher(msg_type="dunedaq::trigger::TPSet",
-                                                                        msg_module_name="TPSetNQ",
-                                                                        subscribers=[f"trigger.tpsets_into_buffer_link{idx}",
-                                                                                     f"trigger.tpsets_into_chain_link{idx}"])
+        app_connections.update({ f"ruemu0.tpsets_{idx}": Publisher(msg_type="dunedaq::trigger::TPSet",
+                                                                   msg_module_name="TPSetNQ",
+                                                                   subscribers=[f"trigger.tpsets_into_buffer_link{idx}",
+                                                                                f"trigger.tpsets_into_chain_link{idx}"])
                                  for idx in range(total_number_of_data_producers) })
     
-    app_connections.update({ f"ruemu0.timesync_{idx}": util.Publisher(msg_type="dunedaq::dfmessages::TimeSync",
-                                                                      msg_module_name="TimeSyncNQ",
-                                                                      subscribers=["hsi.time_sync"])
+    app_connections.update({ f"ruemu0.timesync_{idx}": Publisher(msg_type="dunedaq::dfmessages::TimeSync",
+                                                                 msg_module_name="TimeSyncNQ",
+                                                                 subscribers=["hsi.time_sync"])
                              for idx in range(total_number_of_data_producers) })
 
-    app_connections.update({ f"ruemu0.timesync_{total_number_of_data_producers+idx}": util.Publisher(msg_type="dunedaq::dfmessages::TimeSync",
-                                                                      msg_module_name="TimeSyncNQ",
-                                                                      subscribers=["hsi.time_sync"])
-                             for idx in range(total_number_of_data_producers) })
+    # app_connections.update({ f"ruemu0.timesync_{total_number_of_data_producers+idx}": Publisher(msg_type="dunedaq::dfmessages::TimeSync",
+    #                                                                                                  msg_module_name="TimeSyncNQ",
+    #                                                                                                  subscribers=["hsi.time_sync"])
+    #                          for idx in range(total_number_of_data_producers) })
 
     the_system.app_connections=app_connections
     the_system.app_start_order=["dataflow", "trigger"]+ru_app_names+["hsi"]
 
-    util.connect_all_fragment_producers(the_system, verbose=True)
+    the_system.connect_all_fragment_producers()
 
     console.log("After connecting fragment producers, trigger mgraph:", the_system.apps['trigger'].modulegraph)
     console.log("After connecting fragment producers, the_system.app_connections:", the_system.app_connections)
 
-    util.set_mlt_links(the_system, "trigger", verbose=True)
+    the_system.set_mlt_links("trigger")
     
-    util.add_network("trigger", the_system, verbose=True)
+    the_system.add_network("trigger")
     console.log("After adding network, trigger mgraph:", the_system.apps['trigger'].modulegraph)
-    util.add_network("hsi", the_system, verbose=True)
+    
+    the_system.add_network("hsi")
     for ru_app_name in ru_app_names:
-        util.add_network(ru_app_name, the_system, verbose=True)
+        the_system.add_network(ru_app_name)
 
-    util.add_network("dataflow", the_system, verbose=True)
+    the_system.add_network("dataflow")
     
 
     ####################################################################
@@ -353,26 +358,25 @@ def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowd
         console.log("thi cmd data:", cmd_data_thi)
     
     # Arrange per-app command data into the format used by util.write_json_files()
-    app_command_datas = {
-        name : util.make_app_command_data(app)
-        for name,app in the_system.apps.items()
-    }
+    cmd_maker = CommandMaker(console=console, verbose=True)
+    app_command_data = cmd_maker.make_app_command_data_from_system(the_system)
 
     if control_timing_hw:
-        app_command_datas["thi"] = cmd_data_thi
+        app_command_data["thi"] = cmd_data_thi
 
     ##################################################################################
 
     # Make boot.json config
 
-    system_command_datas = util.make_system_command_datas(the_system)
+    system_command_data = cmd_maker.make_system_command_datas(the_system)
     # Override the default boot.json with the one from minidaqapp
-    boot = util.generate_boot(the_system.apps, partition_name=partition_name, ers_settings=ers_settings, info_svc_uri=info_svc_uri,
-                              disable_trace=disable_trace, use_kafka=use_kafka)
+    boot = cmd_maker.generate_boot(the_system.apps, partition_name=partition_name,
+                                   ers_settings=ers_settings, info_svc_uri=info_svc_uri,
+                                   disable_trace=disable_trace, use_kafka=use_kafka)
 
-    system_command_datas['boot'] = boot
+    system_command_data['boot'] = boot
 
-    util.write_json_files(app_command_datas, system_command_datas, json_dir)
+    json_exporter.write_json_files(app_command_data, system_command_data)
 
     console.log(f"MDAapp config generated in {json_dir}")
 

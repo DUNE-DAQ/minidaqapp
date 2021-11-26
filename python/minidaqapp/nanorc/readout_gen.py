@@ -55,9 +55,9 @@ def generate(# NETWORK_ENDPOINTS,
     MIN_LINK = HOSTIDX*NUMBER_OF_DATA_PRODUCERS
     MAX_LINK = MIN_LINK + NUMBER_OF_DATA_PRODUCERS
 
-    from .util import Module, ModuleGraph, Direction
-    from .util import Connection as Conn
-    from . import util
+    from .module import Module, ModuleGraph, GeoID
+    from .connection import Direction
+    from .connection import Connection as Conn
 
     modules = {}
 
