@@ -23,9 +23,6 @@ import dunedaq.trigger.moduleleveltrigger as mlt
 import dunedaq.trigger.timingtriggercandidatemaker as ttcm
 import dunedaq.trigger.tpsetbuffercreator as buf
 
-import math
-from pprint import pprint
-
 from .module import Module, ModuleGraph
 from .app import App
 from .connection import Direction
@@ -85,6 +82,7 @@ def get_app (
                                       conf=buf.Conf(tpset_buffer_size=10000, region=0, element=idx),
                                       connections={})
     if NUMBER_OF_TPSET_PRODUCERS>0:
+        print(f"NUMBER_OF_TPSET_PRODUCERS {NUMBER_OF_TPSET_PRODUCERS}")
         modules["zip"] = Module(plugin="TPZipper",
                                 connections={"output": Conn("tam.input")},
                                 conf=tzip.ConfParams(cardinality=NUMBER_OF_TPSET_PRODUCERS,
@@ -138,6 +136,7 @@ def get_app (
                             connections={})
 
     mgraph = ModuleGraph(modules)
+
     mgraph.add_endpoint("hsievents_in",  "ttcm.input", Direction.IN)
 
     for idx in range(NUMBER_OF_TPSET_PRODUCERS):
