@@ -52,7 +52,7 @@ def generate(NETWORK_ENDPOINTS,
         TOTAL_NUMBER_OF_DATA_PRODUCERS=2,
         EMULATOR_MODE=False,
         DATA_RATE_SLOWDOWN_FACTOR=1,
-        RUN_NUMBER=333, 
+        RUN_NUMBER=333,
         DATA_FILE="./frames.bin",
         FLX_INPUT=False,
         SSP_INPUT=True,
@@ -110,7 +110,8 @@ def generate(NETWORK_ENDPOINTS,
 
     if FRONTEND_TYPE == 'wib':
         queue_bare_specs += [
-            app.QueueSpec(inst="errored_frames_q", kind="FollyMPMCQueue", capacity=10000)
+            app.QueueSpec(inst="errored_frames_q", kind="FollyMPMCQueue", capacity=10000),
+            app.QueueSpec(inst="errored_chunks_q", kind='FollyMPMCQueue', capacity=100)
         ]
 
     if DQM_ENABLED:
@@ -211,11 +212,15 @@ def generate(NETWORK_ENDPOINTS,
             mod_specs.append(mspec("flxcard_0", "FelixCardReader", [
                             app.QueueInfo(name=f"output_{idx}", inst=f"{FRONTEND_TYPE}_link_{idx}", dir="output")
                                 for idx in range(min(5, NUMBER_OF_DATA_PRODUCERS))
+                            ] + [
+                            app.QueueInfo(name="errored_chunks", inst="errored_chunks_q", dir="output")
                             ]))
             if NUMBER_OF_DATA_PRODUCERS > 5 :
                 mod_specs.append(mspec("flxcard_1", "FelixCardReader", [
                                 app.QueueInfo(name=f"output_{idx}", inst=f"{FRONTEND_TYPE}_link_{idx}", dir="output")
                                     for idx in range(5, NUMBER_OF_DATA_PRODUCERS)
+                                ] + [
+                                app.QueueInfo(name="errored_chunks", inst="errored_chunks_q", dir="output")
                                 ]))
         elif SSP_INPUT:
             mod_specs.append(mspec("ssp_0", "SSPCardReader", [
@@ -250,7 +255,7 @@ def generate(NETWORK_ENDPOINTS,
                                             sender_config=nos.Conf(ipm_plugin_type="ZmqSender",
                                                                    address=NETWORK_ENDPOINTS[f"timesync_{HOSTIDX}"],
                                                                    stype="msgpack"))),
-        
+
                 ("fake_source",sec.Conf(
                             link_confs=[sec.LinkConfiguration(
                             geoid=sec.GeoID(system=SYSTEM_TYPE, region=REGION_ID, element=idx),
