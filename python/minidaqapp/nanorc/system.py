@@ -1,4 +1,4 @@
-# Set moo schema search path
+1# Set moo schema search path
 from dunedaq.env import get_moo_model_path
 import moo.io
 moo.io.default_load_path = get_moo_model_path()
@@ -46,14 +46,20 @@ class System:
         self.console = console
         self.verbose = verbose
 
+    def finalise(self):
+        for app in self.apps:
+            app.__finalise(self) # Yuk
+        
     def __rich_repr__(self):
         yield "apps", self.apps
         yield "app_connections", self.app_connections
         yield "network_endpoints", self.network_endpoints
         yield "app_start_order", self.app_start_order
 
-    def get_fragment_producers(self):
-        """Get a list of all the fragment producers in the system"""
+    def get_fragment_producers(self, system):
+        """
+        Get a list of all the fragment producers in the system
+        """
         all_producers = []
         all_geoids = set()
         for app in self.apps.values():
@@ -65,78 +71,6 @@ class System:
                 all_geoids.add(producer.geoid)
                 all_producers.append(producer)
         return all_producers
-
-
-    def set_mlt_links(self, mlt_app_name="trigger"):
-        """
-        The MLT needs to know the full list of fragment producers in the
-        system so it can populate the TriggerDecisions it creates. This
-        function gets all the fragment producers in the system and adds their
-        GeoIDs to the MLT's config. It assumes that the ModuleLevelTrigger
-        lives in an application with name `mlt_app_name` and has the name
-        "mlt".
-        """
-        mlt_links = []
-        for producer in self.get_fragment_producers():
-            geoid = producer.geoid
-            mlt_links.append(mlt.GeoID(system=geoid.system, region=geoid.region, element=geoid.element) )
-
-        # Now we add the full set of links to the MLT plugin conf. It
-        # would be nice to just modify the `links` attribute of the
-        # mlt.ConfParams object, but moo-derived objects work in a funny
-        # way (returning a copy of the attribute, not returning a
-        # reference to it), which means we have to copy and replace the
-        # whole thing
-        if self.verbose:
-            self.console.log(f"Adding {len(mlt_links)} links to mlt.links: {mlt_links}")
-        old_mlt = deepcopy(self.apps["trigger"].modulegraph.modules["mlt"])
-        from .module import Module # ARG!
-        self.apps[mlt_app_name].modulegraph.modules["mlt"] = Module(plugin=old_mlt.plugin,
-                                                                    conf=mlt.ConfParams(links=mlt_links,
-                                                                                        initial_token_count=old_mlt.conf.initial_token_count),
-                                                                    connections=old_mlt.connections)
-
-    def connect_fragment_producers(self, app_name):
-        """
-        Connect the data request and fragment sending queues from all of
-        the fragment producers in the app with name `app_name` to the
-        appropriate endpoints of the dataflow app.
-        """
-        if self.verbose:
-            self.console.log(f"Connecting fragment producers in {app_name}")
-
-        app = self.apps[app_name]
-        producers = app.modulegraph.fragment_producers
-
-        for producer in producers.values():
-            request_endpoint = producer.data_request_endpoint_name()
-            if self.verbose:
-                self.console.log(f"Creating request endpoint {request_endpoint}")
-
-            app.modulegraph.add_endpoint(request_endpoint, producer.requests_in, Direction.IN)
-            self.app_connections[f"dataflow.{request_endpoint}"] = Sender(msg_type="dunedaq::dfmessages::DataRequest",
-                                                                          msg_module_name="DataRequestNQ",
-                                                                          receiver=f"{app_name}.{request_endpoint}")
-
-            frag_endpoint = f"fragments_{producer.geoid.raw_str()}"
-            if self.verbose:
-                self.console.log(f"Creating fragment endpoint {frag_endpoint}")
-            app.modulegraph.add_endpoint(frag_endpoint, producer.fragments_out, Direction.OUT)
-
-            self.app_connections[f"{app_name}.{frag_endpoint}"] = Sender(msg_type="std::unique_ptr<dunedaq::daqdataformats::Fragment>",
-                                                                         msg_module_name="FragmentNQ",
-                                                                         receiver=f"dataflow.fragments")
-
-
-    def connect_all_fragment_producers(self, dataflow_name="dataflow"):
-        """
-        Connect all fragment producers in the system to the appropriate
-        queues in the dataflow app.
-        """
-        for name, app in self.apps.items():
-            if name==dataflow_name:
-                continue
-            self.connect_fragment_producers(name)
 
     def add_network(self, app_name):
         """

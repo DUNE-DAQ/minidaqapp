@@ -103,7 +103,7 @@ def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowd
     console.log("Loading readout config generator")
     from . import readout_gen
     console.log("Loading trigger config generator")
-    from . import trigger_gen
+    from .trigger_app import Trigger
     console.log("Loading hsi config generator")
     from . import hsi_gen
     console.log("Loading fake hsi config generator")
@@ -184,7 +184,7 @@ def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowd
 
     #-------------------------------------------------------------------
     # Trigger app
-    the_system.apps["trigger"] = trigger_gen.get_app(
+    the_system.apps["trigger"] = Trigger(
         NUMBER_OF_RAWDATA_PRODUCERS = total_number_of_data_producers,
         NUMBER_OF_TPSET_PRODUCERS = total_number_of_data_producers if enable_software_tpg else 0,
         ACTIVITY_PLUGIN = trigger_activity_plugin,
@@ -327,12 +327,13 @@ def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowd
     the_system.app_connections=app_connections
     the_system.app_start_order=["dataflow", "trigger"]+ru_app_names+["hsi"]
 
-    the_system.connect_all_fragment_producers()
+    the_system.finalise()
+    # the_system.connect_all_fragment_producers()
 
     console.log("After connecting fragment producers, trigger mgraph:", the_system.apps['trigger'].modulegraph)
     console.log("After connecting fragment producers, the_system.app_connections:", the_system.app_connections)
 
-    the_system.set_mlt_links("trigger")
+    # the_system.set_mlt_links("trigger")
 
     the_system.add_network("trigger")
     console.log("After adding network, trigger mgraph:", the_system.apps['trigger'].modulegraph)

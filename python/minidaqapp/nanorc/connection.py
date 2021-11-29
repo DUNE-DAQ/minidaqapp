@@ -15,8 +15,10 @@ class Direction(Enum):
 Endpoint = namedtuple("Endpoint", [ 'external_name', 'internal_name', 'direction' ])
 
 def resolve_endpoint(app, external_name, inout, verbose=False):
-    """Resolve an `external` endpoint name to the corresponding internal "module.sinksource"
     """
+    Resolve an `external` endpoint name to the corresponding internal "module.sinksource"
+    """
+
     if external_name in app.modulegraph.endpoints:
         e=app.modulegraph.endpoints[external_name]
         if e.direction==inout:
@@ -30,7 +32,8 @@ def resolve_endpoint(app, external_name, inout, verbose=False):
 
 
 def assign_network_endpoints(the_system, verbose=False):
-    """Given a set of applications and connections between them, come up
+    """
+    Given a set of applications and connections between them, come up
     with a list of suitable zeromq endpoints. Return value is a mapping
     from name of upstream end of connection to endpoint name.
 
@@ -43,8 +46,8 @@ def assign_network_endpoints(the_system, verbose=False):
     apps, but that's not possible since multiple applications may run
     on the same host, and we don't know the _actual_ host here, just,
     eg "{host_dataflow}", which is later interpreted by nanorc.
-
     """
+    
     endpoints = {}
     #host_ports = defaultdict(int)
     port = 12345

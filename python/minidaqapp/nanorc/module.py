@@ -39,11 +39,13 @@ class Module:
         yield "conf", self.conf
         yield "connections", self.connections
 
-
+    def finalise(self, system):
+        pass
 
 
 class ModuleGraph:
-    """A set of modules and connections between them.
+    """
+    A set of modules and connections between them.
 
     modulegraph holds a dictionary of modules, with each module
     knowing its (outgoing) connections to other modules in the
@@ -55,8 +57,8 @@ class ModuleGraph:
     endpoint's `internal_name` specifies the particular module and
     sink/source name which the endpoint is connected to, which may be
     changed without affecting other applications.
-
     """
+
     def __init__(self, modules=None, endpoints=None, fragment_producers=None):
         self.modules=modules if modules else dict()
         self.endpoints=endpoints if endpoints else dict()
