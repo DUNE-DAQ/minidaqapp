@@ -23,7 +23,10 @@ import dunedaq.dqm.dqmprocessor as dqmprocessor
 import dunedaq.dfmodules.fakedataprod as fdp
 import dunedaq.readout.readoutconfig as rconf
 
-import math
+from .app import App
+from .module import Module, ModuleGraph, GeoID
+from .connection import Direction
+from .connection import Connection as Conn
 
 # Time to wait on pop()
 QUEUE_POP_WAIT_MS = 100
@@ -46,7 +49,7 @@ def generate(# NETWORK_ENDPOINTS,
         DQM_ENABLED=False,
         DQM_KAFKA_ADDRESS='',
         SOFTWARE_TPG_ENABLED=False,
-        USE_FAKE_DATA_PRODUCERS=False):
+        USE_FAKE_DATA_PRODUCERS=False,):
     """Generate the json configuration for the readout and DF process"""
 
     LATENCY_BUFFER_SIZE = 3 * CLOCK_SPEED_HZ / (25 * 12 * DATA_RATE_SLOWDOWN_FACTOR)
@@ -55,9 +58,6 @@ def generate(# NETWORK_ENDPOINTS,
     MIN_LINK = HOSTIDX*NUMBER_OF_DATA_PRODUCERS
     MAX_LINK = MIN_LINK + NUMBER_OF_DATA_PRODUCERS
 
-    from .module import Module, ModuleGraph, GeoID
-    from .connection import Direction
-    from .connection import Connection as Conn
 
     modules = {}
 
