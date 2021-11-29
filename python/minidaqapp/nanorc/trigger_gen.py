@@ -129,9 +129,9 @@ def generate(
 
     if SOFTWARE_TPG_ENABLED:
         mod_specs.extend([
-            mspec(f"request_receiver", "RequestReceiver", [app.QueueInfo(name="output", inst=f"data_request_q{ru}_{idy}", dir="output")]) for ru in range(len(RU_CONFIG)) for idy in range(RU_CONFIG[ru]["channel_count"]) 
+            mspec(f"request_receiver", "RequestReceiver", [app.QueueInfo(name="output", inst=f"data_request_q{ru}_{idy}", dir="output") for ru in range(len(RU_CONFIG)) for idy in range(RU_CONFIG[ru]["channel_count"])])
         ] + [
-            mspec(f"tpset_receiver", "TPSetReceiver", [app.QueueInfo(name="output", inst=f"tpset_q_for_buf{ru}_{idy}", dir="output")]) for ru in range(len(RU_CONFIG)) for idy in range(RU_CONFIG[ru]["channel_count"])
+            mspec(f"tpset_receiver", "TPSetReceiver", [app.QueueInfo(name="output", inst=f"tpset_q_for_buf{ru}_{idy}", dir="output") for ru in range(len(RU_CONFIG)) for idy in range(RU_CONFIG[ru]["channel_count"])])
         ] + [
             mspec(f"qton_fragments", "QueueToNetwork", [app.QueueInfo(name="input", inst=f"fragment_q", dir="input")]),
                 mspec(f'tcm', 'TriggerCandidateMaker', [ # TASet -> TC
