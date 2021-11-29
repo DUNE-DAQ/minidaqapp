@@ -80,7 +80,7 @@ import click
 @click.option('--dqm-rawdisplay-params', nargs=3, default=[60, 10, 50], help="Parameters that control the data sent for the raw display plot")
 @click.option('--dqm-meanrms-params', nargs=3, default=[10, 1, 100], help="Parameters that control the data sent for the mean/rms plot")
 @click.option('--dqm-fourier-params', nargs=3, default=[600, 60, 100], help="Parameters that control the data sent for the fourier transform plot")
-@click.option('--dqm-fouriersum-params', nargs=3, default=[10, 1, 8192], help="Parameters that control the data sent for the summed fourier transform plot")
+@click.option('--dqm-fouriersum-params', nargs=3, default=[600, 60, 1000], help="Parameters that control the data sent for the summed fourier transform plot")
 @click.option('--tpc-region-name-prefix', default='APA', help="Prefix to be used for the 'Region' Group name inside the HDF5 file")
 @click.option('--op-env', default='swtest', help="Operational environment - used for raw data filename prefix and HDF5 Attribute inside the files")
 @click.argument('json_dir', type=click.Path())
