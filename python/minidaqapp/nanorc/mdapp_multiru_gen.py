@@ -220,24 +220,25 @@ def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowd
 
     mgraphs_readout = []
     for hostidx in range(len(host_ru)):
-        this_readout_mgraph = readout_gen.generate(NUMBER_OF_DATA_PRODUCERS = number_of_data_producers,
-                                                    TOTAL_NUMBER_OF_DATA_PRODUCERS=total_number_of_data_producers,
-                                                    EMULATOR_MODE = emulator_mode,
-                                                    DATA_RATE_SLOWDOWN_FACTOR = data_rate_slowdown_factor,
-                                                    DATA_FILE = data_file,
-                                                    FLX_INPUT = use_felix,
-                                                    CLOCK_SPEED_HZ = CLOCK_SPEED_HZ,
-                                                    HOSTIDX = hostidx,
-                                                    CARDID = cardid[hostidx],
-                                                    RAW_RECORDING_ENABLED = enable_raw_recording,
-                                                    RAW_RECORDING_OUTPUT_DIR = raw_recording_output_dir,
-                                                    FRONTEND_TYPE = frontend_type,
-                                                    SYSTEM_TYPE = system_type,
-                                                    REGION_ID = region_id,
-                                                    DQM_ENABLED=enable_dqm,
-                                                    DQM_KAFKA_ADDRESS=dqm_kafka_address,
-                                                    SOFTWARE_TPG_ENABLED = enable_software_tpg,
-                                                    USE_FAKE_DATA_PRODUCERS = use_fake_data_producers)
+        this_readout_mgraph = readout_gen.generate(
+            NUMBER_OF_DATA_PRODUCERS = number_of_data_producers,
+            TOTAL_NUMBER_OF_DATA_PRODUCERS=total_number_of_data_producers,
+            EMULATOR_MODE = emulator_mode,
+            DATA_RATE_SLOWDOWN_FACTOR = data_rate_slowdown_factor,
+            DATA_FILE = data_file,
+            FLX_INPUT = use_felix,
+            CLOCK_SPEED_HZ = CLOCK_SPEED_HZ,
+            HOSTIDX = hostidx,
+            CARDID = cardid[hostidx],
+            RAW_RECORDING_ENABLED = enable_raw_recording,
+            RAW_RECORDING_OUTPUT_DIR = raw_recording_output_dir,
+            FRONTEND_TYPE = frontend_type,
+            SYSTEM_TYPE = system_type,
+            REGION_ID = region_id,
+            DQM_ENABLED=enable_dqm,
+            DQM_KAFKA_ADDRESS=dqm_kafka_address,
+            SOFTWARE_TPG_ENABLED = enable_software_tpg,
+            USE_FAKE_DATA_PRODUCERS = use_fake_data_producers)
         console.log("readout mgraph:", this_readout_mgraph)
         mgraphs_readout.append(this_readout_mgraph)
 
@@ -273,6 +274,7 @@ def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowd
     # TODO: Actually deal with "thi" properly
     if control_timing_hw:
         the_system.apps["thi"] = App()
+        raise RuntimeError("thi wasn't implemented!")
 
     #-------------------------------------------------------------------
     # Dataflow app
