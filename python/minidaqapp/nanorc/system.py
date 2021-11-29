@@ -1,10 +1,25 @@
+# Set moo schema search path
+from dunedaq.env import get_moo_model_path
+import moo.io
+moo.io.default_load_path = get_moo_model_path()
+
+# Load configuration types
+import moo.otypes
+
+moo.otypes.load_types('trigger/moduleleveltrigger.jsonnet')
+moo.otypes.load_types('nwqueueadapters/queuetonetwork.jsonnet')
+moo.otypes.load_types('nwqueueadapters/networkobjectsender.jsonnet')
+moo.otypes.load_types('nwqueueadapters/networkobjectreceiver.jsonnet')
+moo.otypes.load_types('nwqueueadapters/networktoqueue.jsonnet')
+
+import dunedaq.trigger.moduleleveltrigger as mlt
+
 from .connection import *
 from .app import App
 import dunedaq.trigger.moduleleveltrigger as mlt
 from copy import deepcopy
 import dunedaq.nwqueueadapters.queuetonetwork as qton
 import dunedaq.nwqueueadapters.networkobjectsender as nos
-import dunedaq.nwqueueadapters.queuetonetwork as qton
 import dunedaq.nwqueueadapters.networkobjectreceiver as nor
 import dunedaq.nwqueueadapters.networktoqueue as ntoq
 
