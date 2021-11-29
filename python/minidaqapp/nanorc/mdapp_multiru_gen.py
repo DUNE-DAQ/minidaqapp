@@ -184,7 +184,7 @@ def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowd
 
     #-------------------------------------------------------------------
     # Trigger app
-    the_system.apps["trigger"] = trigger_gen.generate(
+    the_system.apps["trigger"] = trigger_gen.get_app(
         NUMBER_OF_RAWDATA_PRODUCERS = total_number_of_data_producers,
         NUMBER_OF_TPSET_PRODUCERS = total_number_of_data_producers if enable_software_tpg else 0,
         ACTIVITY_PLUGIN = trigger_activity_plugin,
@@ -197,9 +197,9 @@ def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowd
         TTCM_S2=ttcm_s2,
         TRIGGER_WINDOW_BEFORE_TICKS = trigger_window_before_ticks,
         TRIGGER_WINDOW_AFTER_TICKS = trigger_window_after_ticks,
-        host=host_trigger)
+        HOST=host_trigger)
 
-    console.log("Trigger module graph:", the_system_apps['trigger'])
+    console.log("Trigger module graph:", the_system.apps['trigger'])
 
     #-------------------------------------------------------------------
     # Readout apps
@@ -317,10 +317,10 @@ def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowd
                                                                  subscribers=["hsi.time_sync"])
                              for idx in range(total_number_of_data_producers) })
 
-    # app_connections.update({ f"ruemu0.timesync_{total_number_of_data_producers+idx}": Publisher(msg_type="dunedaq::dfmessages::TimeSync",
-    #                                                                                                  msg_module_name="TimeSyncNQ",
-    #                                                                                                  subscribers=["hsi.time_sync"])
-    #                          for idx in range(total_number_of_data_producers) })
+    app_connections.update({ f"ruemu0.timesync_{total_number_of_data_producers+idx}": Publisher(msg_type="dunedaq::dfmessages::TimeSync",
+                                                                                                     msg_module_name="TimeSyncNQ",
+                                                                                                     subscribers=["hsi.time_sync"])
+                             for idx in range(total_number_of_data_producers) })
 
     the_system.app_connections=app_connections
     the_system.app_start_order=["dataflow", "trigger"]+ru_app_names+["hsi"]
