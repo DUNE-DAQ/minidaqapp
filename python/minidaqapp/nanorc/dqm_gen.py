@@ -1,4 +1,3 @@
-
 # Set moo schema search path
 from dunedaq.env import get_moo_model_path
 import moo.io
@@ -9,12 +8,8 @@ import moo.otypes
 moo.otypes.load_types('rcif/cmd.jsonnet')
 moo.otypes.load_types('appfwk/cmd.jsonnet')
 moo.otypes.load_types('appfwk/app.jsonnet')
-
 moo.otypes.load_types('dfmodules/triggerrecordbuilder.jsonnet')
-moo.otypes.load_types('nwqueueadapters/queuetonetwork.jsonnet')
-moo.otypes.load_types('nwqueueadapters/networktoqueue.jsonnet')
-moo.otypes.load_types('nwqueueadapters/networkobjectreceiver.jsonnet')
-moo.otypes.load_types('nwqueueadapters/networkobjectsender.jsonnet')
+moo.otypes.load_types('dfmodules/fragmentreceiver.jsonnet')
 moo.otypes.load_types('dqm/dqmprocessor.jsonnet')
 
 # Import new types
@@ -22,19 +17,12 @@ import dunedaq.cmdlib.cmd as basecmd # AddressedCmd,
 import dunedaq.rcif.cmd as rccmd # AddressedCmd,
 import dunedaq.appfwk.cmd as cmd # AddressedCmd,
 import dunedaq.appfwk.app as app # AddressedCmd,
-import dunedaq.nwqueueadapters.networktoqueue as ntoq
-import dunedaq.nwqueueadapters.queuetonetwork as qton
-import dunedaq.nwqueueadapters.networkobjectreceiver as nor
-import dunedaq.nwqueueadapters.networkobjectsender as nos
 import dunedaq.dfmodules.triggerrecordbuilder as trb
+import dunedaq.dfmodules.fragmentreceiver as frcv
 import dunedaq.dqm.dqmprocessor as dqmprocessor
 
 from appfwk.utils import acmd, mcmd, mrccmd, mspec
-from os import path
 
-import json
-import math
-from pprint import pprint
 # Time to wait on pop()
 QUEUE_POP_WAIT_MS = 100
 # local clock speed Hz
@@ -67,7 +55,7 @@ def generate(NW_SPECS,
     MAX_LINK = MIN_LINK + RU_CONFIG[RUIDX]["channel_count"]
     # Define modules and queues
     queue_bare_specs =  [
-        app.QueueSpec(inst="data_fragments_q_dqm", kind='FollyMPMCQueue', capacity=1000),
+        app.QueueSpec(inst="data_fragments_q", kind='FollyMPMCQueue', capacity=1000),
         app.QueueSpec(inst="trigger_decision_q_dqm", kind='FollySPSCQueue', capacity=20),
         app.QueueSpec(inst="trigger_record_q_dqm", kind='FollySPSCQueue', capacity=20)
     ]
@@ -78,7 +66,7 @@ def generate(NW_SPECS,
     mod_specs = [mspec("trb_dqm", "TriggerRecordBuilder", [
                     app.QueueInfo(name="trigger_decision_input_queue", inst="trigger_decision_q_dqm", dir="input"),
                     app.QueueInfo(name="trigger_record_output_queue", inst="trigger_record_q_dqm", dir="output"),
-                    app.QueueInfo(name="data_fragment_input_queue", inst="data_fragments_q_dqm", dir="input")
+                    app.QueueInfo(name="data_fragment_input_queue", inst="data_fragments_q", dir="input")
                 ]),
     ]
     mod_specs += [mspec("dqmprocessor", "DQMProcessor", [
@@ -88,16 +76,15 @@ def generate(NW_SPECS,
     ]
 
     mod_specs += [
-        mspec(f"ntoq_fragments_dqm", "NetworkToQueue",
-              [app.QueueInfo(name="output", inst="data_fragments_q_dqm", dir="output")
+        mspec(f"fragment_receiver_dqm", "FragmentReceiver",
+              [app.QueueInfo(name="output", inst="data_fragments_q", dir="output")
                ])]
 
     cmd_data['init'] = app.Init(queues=queue_specs, modules=mod_specs, nwconnections=NW_SPECS)
 
-    conf_list = [
-                ("ntoq_fragments_dqm", ntoq.Conf(msg_type="std::unique_ptr<dunedaq::daqdataformats::Fragment>",
-                                           msg_module_name="FragmentNQ",
-                                           receiver_config=nor.Conf(name=f"{PARTITION}.fragx_dqm_{RUIDX}")))
+    conf_list = [("fragment_receiver_dqm", frcv.ConfParams(
+                    general_queue_timeout=QUEUE_POP_WAIT_MS,
+                    connection_name=f"{PARTITION}.fragx_dqm_{RUIDX}"))
             ] + [
                 ("trb_dqm", trb.ConfParams(
                         general_queue_timeout=QUEUE_POP_WAIT_MS,
@@ -124,7 +111,7 @@ def generate(NW_SPECS,
 
     startpars = rccmd.StartParams(run=RUN_NUMBER)
     cmd_data['start'] = acmd([
-            ("ntoq_fragments_dqm", startpars),
+            ("fragment_receiver_dqm", startpars),
             ("dqmprocessor", startpars),
             ("trb_dqm", startpars),
             ])
@@ -132,7 +119,7 @@ def generate(NW_SPECS,
     cmd_data['stop'] = acmd([
             ("trb_dqm", None), 
             ("dqmprocessor", None),
-            ("ntoq_fragments_dqm", None),
+            ("fragment_receiver_dqm", None),
             ])
 
     cmd_data['pause'] = acmd([("", None)])
