@@ -113,8 +113,9 @@ def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowd
 
     console.log("Loading dataflow config generator")
     from . import dataflow_gen
-    console.log("Loading dqm config generator")
-    from . import dqm_gen
+    if enable_dqm:
+        console.log("Loading dqm config generator")
+        from . import dqm_gen
     console.log("Loading readout config generator")
     from . import readout_gen
     console.log("Loading trigger config generator")
