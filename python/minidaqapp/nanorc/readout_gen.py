@@ -63,18 +63,18 @@ def generate(# NETWORK_ENDPOINTS,
 
     if not USE_FAKE_DATA_PRODUCERS and not FLX_INPUT:
         modules["fake_source"] = Module(plugin = "FakeCardReader",
-                                        connections = { f"output_{idx-MIN_LINK}" : Conn(f"datahandler_{idx}.raw_input",
-                                                                                        queue_name=f"{FRONTEND_TYPE}_{idx}",
-                                                                                        queue_kind="FollySPSCQueue",
-                                                                                        queue_capacity=100000)
-                                                        for idx in range(MIN_LINK,MAX_LINK) },
+                                        connections = {f"output_{idx-MIN_LINK}" : Conn(f"datahandler_{idx}.raw_input",
+                                                                                       queue_name=f"{FRONTEND_TYPE}_{idx}",
+                                                                                       queue_kind="FollySPSCQueue",
+                                                                                       queue_capacity=100000)
+                                                        for idx in range(MIN_LINK,MAX_LINK)},
                                         conf = sec.Conf(link_confs = [ sec.LinkConfiguration(geoid=sec.GeoID(system = SYSTEM_TYPE, region = 0, element = idx),
-                                                                                                   slowdown=DATA_RATE_SLOWDOWN_FACTOR,
-                                                                                                   queue_name=f"output_{idx-MIN_LINK}",
-                                                                                                   data_filename = DATA_FILE)
-                                                                          for idx in range(MIN_LINK,MAX_LINK) ],
-                                                           # input_limit=10485100, # default
-                                                           queue_timeout_ms = QUEUE_POP_WAIT_MS))
+                                                                                             slowdown=DATA_RATE_SLOWDOWN_FACTOR,
+                                                                                             queue_name=f"output_{idx-MIN_LINK}",
+                                                                                             data_filename = DATA_FILE)
+                                                                       for idx in range(MIN_LINK,MAX_LINK) ],
+                                                        # input_limit=10485100, # default
+                                                        queue_timeout_ms = QUEUE_POP_WAIT_MS))
 
     if not USE_FAKE_DATA_PRODUCERS and FLX_INPUT:
         modules["flxcard_0"] = Module(plugin = "FelixCardReader",
@@ -135,12 +135,14 @@ def generate(# NETWORK_ENDPOINTS,
 
     if not USE_FAKE_DATA_PRODUCERS:
         for idx in range(NUMBER_OF_DATA_PRODUCERS):
+            connections = {"raw_recording": Conn(f"data_recorder_{idx}.raw_recording")}
+            if SOFTWARE_TPG_ENABLED:
+                connections.update({"tp_out": Conn(f"tp_datahandler_{idx}.raw_input",
+                                                   queue_name=f"tp_link_{idx}",
+                                                   queue_kind="FollySPSCQueue",
+                                                   queue_capacity=100000)})
             modules[f"datahandler_{idx}"] = Module(plugin = "DataLinkHandler",
-                                                   connections = {"raw_recording": Conn(f"data_recorder_{idx}.raw_recording")} +
-                                                   {"tp_out": Conn(f"tp_datahandler_{idx}.raw_input",
-                                                                   queue_name=f"tp_link_{idx}",
-                                                                   queue_kind="FollySPSCQueue",
-                                                                   queue_capacity=100000)} if SOFTWARE_TPG_ENABLED else {},
+                                                   connections = connections,
                                                    conf = rconf.Conf(
                                                        readoutmodelconf= rconf.ReadoutModelConf(
                                                            source_queue_timeout_ms= QUEUE_POP_WAIT_MS,
@@ -207,21 +209,22 @@ def generate(# NETWORK_ENDPOINTS,
                                                                     fragment_type = "FakeData"))
 
     mgraph = ModuleGraph(modules)
-
+    print(f"NUMBER_OF_DATA_PRODUCERS {NUMBER_OF_DATA_PRODUCERS}")
     for idx in range(NUMBER_OF_DATA_PRODUCERS):
         mgraph.add_endpoint(f"tpsets_{idx}", f"datahandler_{idx}.tpset_out",    Direction.OUT)
         # TODO: Should we just have one timesync outgoing endpoint?
         mgraph.add_endpoint(f"timesync_{idx}", f"datahandler_{idx}.timesync",    Direction.OUT)
-
+        # if SOFTWARE_TPG_ENABLED:
+        mgraph.add_endpoint(f"timesync_{idx+NUMBER_OF_DATA_PRODUCERS}", f"tp_datahandler_{idx}.timesync",    Direction.OUT)
+        
         # Add fragment producers for raw data
         mgraph.add_fragment_producer(region = REGION_ID, element = idx, system = SYSTEM_TYPE,
                                      requests_in   = f"datahandler_{idx}.data_requests_0",
                                      fragments_out = f"datahandler_{idx}.data_response_0")
-        if SOFTWARE_TPG_ENABLED:
-            mgraph.add_endpoint(f"timesync_{idx+NUMBER_OF_DATA_PRODUCERS}", f"tp_datahandler_{idx}.timesync",    Direction.OUT)
-            # Add fragment producers for TPC TPs. Make sure the element index doesn't overlap with the ones for raw data
-            mgraph.add_fragment_producer(region = REGION_ID, element = idx + NUMBER_OF_DATA_PRODUCERS, system = SYSTEM_TYPE,
-                                         requests_in   = f"tp_datahandler_{idx}.data_requests_0",
-                                         fragments_out = f"tp_datahandler_{idx}.data_response_0")
+        # if SOFTWARE_TPG_ENABLED:
+        # Add fragment producers for TPC TPs. Make sure the element index doesn't overlap with the ones for raw data
+        mgraph.add_fragment_producer(region = REGION_ID, element = idx + NUMBER_OF_DATA_PRODUCERS, system = SYSTEM_TYPE,
+                                     requests_in   = f"tp_datahandler_{idx}.data_requests_0",
+                                     fragments_out = f"tp_datahandler_{idx}.data_response_0")
         
     return mgraph
