@@ -198,12 +198,12 @@ def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowd
         TRIGGER_WINDOW_BEFORE_TICKS = trigger_window_before_ticks,
         TRIGGER_WINDOW_AFTER_TICKS = trigger_window_after_ticks,
         host=host_trigger)
-    
+
     console.log("Trigger module graph:", the_system_apps['trigger'])
 
     #-------------------------------------------------------------------
     # Readout apps
-    
+
     cardid = {}
     host_id_dict = {}
 
@@ -246,7 +246,7 @@ def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowd
 
     #-------------------------------------------------------------------
     # (Fake) HSI app
-    
+
     if use_hsi_hw:
         mgraph_hsi = hsi_gen.generate(
             CONTROL_HSI_HARDWARE=control_timing_hw,
@@ -273,14 +273,14 @@ def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowd
     # TODO: Actually deal with "thi" properly
     if control_timing_hw:
         the_system.apps["thi"] = App()
-    
+
     #-------------------------------------------------------------------
     # Dataflow app
     #
     # This has to be last, because it needs to know all of the
     # fragment producers that exist in the system, which are defined
     # by the other apps' generate functions
-    
+
     mgraph_dataflow = dataflow_gen.generate(
         FRAGMENT_PRODUCERS = the_system.get_fragment_producers(),
         NUMBER_OF_DATA_PRODUCERS = total_number_of_data_producers,
@@ -291,7 +291,7 @@ def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowd
         TPSET_WRITING_ENABLED = enable_tpset_writing)
 
     the_system.apps["dataflow"] = App(modulegraph=mgraph_dataflow, host=host_df)
-    
+
     console.log("dataflow module graph:", mgraph_dataflow)
 
     app_connections = {
@@ -311,7 +311,7 @@ def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowd
                                                                    subscribers=[f"trigger.tpsets_into_buffer_link{idx}",
                                                                                 f"trigger.tpsets_into_chain_link{idx}"])
                                  for idx in range(total_number_of_data_producers) })
-    
+
     app_connections.update({ f"ruemu0.timesync_{idx}": Publisher(msg_type="dunedaq::dfmessages::TimeSync",
                                                                  msg_module_name="TimeSyncNQ",
                                                                  subscribers=["hsi.time_sync"])
@@ -331,16 +331,16 @@ def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowd
     console.log("After connecting fragment producers, the_system.app_connections:", the_system.app_connections)
 
     the_system.set_mlt_links("trigger")
-    
+
     the_system.add_network("trigger")
     console.log("After adding network, trigger mgraph:", the_system.apps['trigger'].modulegraph)
-    
+
     the_system.add_network("hsi")
     for ru_app_name in ru_app_names:
         the_system.add_network(ru_app_name)
 
     the_system.add_network("dataflow")
-    
+
 
     ####################################################################
     # Application command data generation
@@ -357,7 +357,7 @@ def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowd
             HSI_DEVICE_NAME=hsi_device_name,
         )
         console.log("thi cmd data:", cmd_data_thi)
-    
+
     # Arrange per-app command data into the format used by util.write_json_files()
     cmd_maker = CommandMaker(console=console, verbose=True)
     app_command_data = cmd_maker.make_app_command_data_from_system(the_system)
