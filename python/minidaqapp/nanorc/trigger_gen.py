@@ -151,5 +151,4 @@ def get_app (
     mgraph.add_endpoint("trigger_decisions", "mlt.trigger_decision_sink", Direction.OUT)
     mgraph.add_endpoint("tokens", "mlt.token_source", Direction.IN)
 
-    return App(modulegraph=mgraph,
-               host=host)
+    return App(modulegraph=mgraph, host=HOST)
