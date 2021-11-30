@@ -201,7 +201,7 @@ def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowd
         nwmgr.Connection(name=partition_name + ".frags_0", topics=[],  address="tcp://{host_df}:12347")]
 
     port = 12348
-    if control_timing_hw:
+    if control_timing_hw and use_hsi_hw:
         nw_specs.append(nwmgr.Connection(name=partition_name + ".hsicmds",  topics=[], address="tcp://{host_timing_hw}:" + f"{port}"))
         port = port + 1
 
@@ -250,7 +250,7 @@ def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowd
     if control_timing_hw:
         timing_cmd_network_endpoints = set()
         if use_hsi_hw:
-            timing_cmd_network_endpoints.add(partition_name + 'hsicmds')
+            timing_cmd_network_endpoints.add(partition_name + '.hsicmds')
         cmd_data_thi = thi_gen.generate(RUN_NUMBER = run_number,
             NW_SPECS=nw_specs,
             TIMING_CMD_NETWORK_ENDPOINTS=timing_cmd_network_endpoints,

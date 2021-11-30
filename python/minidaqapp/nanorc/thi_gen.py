@@ -87,14 +87,16 @@ def generate(RUN_NUMBER: int,
 
     mod_specs = [app.ModSpec(inst="thi", plugin="TimingHardwareManagerPDI", data=thi_init_data),]
     for cmd_nw_endpoint in TIMING_CMD_NETWORK_ENDPOINTS:
-        mod_specs.extend([mspec(f'ntoq_{cmd_nw_endpoint}', "NetworkToQueue", [app.QueueInfo(name="output", inst="ntoq_timing_cmds", dir="output")]),])
+        nq_mod_name_suffix=cmd_nw_endpoint.split('.')[-1]
+        mod_specs.extend([mspec(f'ntoq_{nq_mod_name_suffix}', "NetworkToQueue", [app.QueueInfo(name="output", inst="ntoq_timing_cmds", dir="output")]),])
             
     cmd_data['init'] = app.Init(queues=queue_specs, modules=mod_specs, nwconnections=NW_SPECS)
     
 
     conf_cmds = []
     for cmd_nw_endpoint in TIMING_CMD_NETWORK_ENDPOINTS:
-        conf_cmds.extend([(f'ntoq_{cmd_nw_endpoint}', ntoq.Conf(msg_type="dunedaq::timinglibs::timingcmd::TimingHwCmd",
+        nq_mod_name_suffix=cmd_nw_endpoint.split('.')[-1]
+        conf_cmds.extend([(f'ntoq_{nq_mod_name_suffix}', ntoq.Conf(msg_type="dunedaq::timinglibs::timingcmd::TimingHwCmd",
                                                msg_module_name="TimingHwCmdNQ",
                                                receiver_config=nor.Conf(name=cmd_nw_endpoint))),])
     cmd_data['conf'] = acmd(conf_cmds)

@@ -68,15 +68,13 @@ def generate(NW_SPECS: list,
         raise RuntimeError(f"ERROR: not all the required endpoints ({', '.join(required_eps)}) found in list of endpoints {' '.join([nw.name for nw in NW_SPECS])}")
 
     # Define modules and queues
-    queue_bare_specs = [app.QueueSpec(inst="hsievent_q_to_net", kind='FollySPSCQueue', capacity=100),]
+    queue_bare_specs = []
 
     # Only needed to reproduce the same order as when using jsonnet
     queue_specs = app.QueueSpecs(sorted(queue_bare_specs, key=lambda x: x.inst))
 
 
-    mod_specs = [mspec("fhsig", "FakeHSIEventGenerator", [app.QueueInfo(name="hsievent_sink", inst="hsievent_q_to_net", dir="output"),]),
-        mspec("qton_hsievent", "QueueToNetwork", [app.QueueInfo(name="input", inst="hsievent_q_to_net", dir="input")])
-        ]
+    mod_specs = [ mspec("fhsig", "FakeHSIEventGenerator", []), ]
 
     cmd_data['init'] = app.Init(queues=queue_specs, modules=mod_specs, nwconnections=NW_SPECS)
 
@@ -89,13 +87,9 @@ def generate(NW_SPECS: list,
                         mean_signal_multiplicity=MEAN_SIGNAL_MULTIPLICITY,
                         signal_emulation_mode=SIGNAL_EMULATION_MODE,
                         enabled_signals=ENABLED_SIGNALS,
-                        timesync_topic="Timesync"
+                        timesync_topic="Timesync",
+                        hsievent_connection_name = PARTITION+".hsievent",
                         )),
-
-                ("qton_hsievent", qton.Conf(msg_type="dunedaq::dfmessages::HSIEvent",
-                                           msg_module_name="HSIEventNQ",
-                                           sender_config=nos.Conf(name=PARTITION + ".hsievent",
-                                                                  stype="msgpack")))
                 ])
  
 
@@ -104,11 +98,11 @@ def generate(NW_SPECS: list,
 
     cmd_data['start'] = acmd([
             ("fhsig", startpars),
-            ("qton_hsievent", startpars)])
+            ])
 
     cmd_data['stop'] = acmd([
             ("fhsig", None),
-            ("qton_hsievent", None)])
+            ])
 
     cmd_data['pause'] = acmd([("", None)])
 
