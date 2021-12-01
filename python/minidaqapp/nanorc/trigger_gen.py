@@ -23,6 +23,7 @@ moo.otypes.load_types('nwqueueadapters/queuetonetwork.jsonnet')
 moo.otypes.load_types('nwqueueadapters/networktoqueue.jsonnet')
 moo.otypes.load_types('nwqueueadapters/networkobjectreceiver.jsonnet')
 moo.otypes.load_types('nwqueueadapters/networkobjectsender.jsonnet')
+moo.otypes.load_types('dfmodules/datafloworchestrator.jsonnet')
 moo.otypes.load_types('dfmodules/requestreceiver.jsonnet')
 moo.otypes.load_types('networkmanager/nwmgr.jsonnet')
 
@@ -46,6 +47,7 @@ import dunedaq.nwqueueadapters.queuetonetwork as qton
 import dunedaq.nwqueueadapters.networkobjectreceiver as nor
 import dunedaq.nwqueueadapters.networkobjectsender as nos
 import dunedaq.dfmodules.requestreceiver as rrcv
+import dunedaq.dfmodules.datafloworchestrator as dfo
 import dunedaq.networkmanager.nwmgr as nwmgr
 
 from appfwk.utils import acmd, mcmd, mrccmd, mspec
@@ -310,6 +312,7 @@ def generate(
     start_order = [
         "buf.*",
         "mlt",
+        "dfo",
         "ttcm",
         "ntoq_hsievent",
         "ntoq_token"
@@ -342,7 +345,7 @@ def generate(
     ])
 
     cmd_data['scrap'] = acmd([
-        ("", None)
+        ("dfo", None)
     ])
 
     cmd_data['record'] = acmd([
