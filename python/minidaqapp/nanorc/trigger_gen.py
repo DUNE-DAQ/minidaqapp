@@ -103,6 +103,7 @@ def generate(
     # Define modules and queues
     queue_bare_specs = [
         app.QueueSpec(inst='trigger_candidate_q', kind='FollyMPMCQueue', capacity=1000),
+        app.QueueSpec(inst='trigger_decisions_q', kind='StdDeQueue', capacity=1),
         app.QueueSpec(inst="hsievent_from_netq", kind='FollyMPMCQueue', capacity=1000),
     ]
 
@@ -182,6 +183,13 @@ def generate(
 
         mspec("mlt", "ModuleLevelTrigger", [
             app.QueueInfo(name="trigger_candidate_source", inst="trigger_candidate_q", dir="input"),
+            app.QueueInfo(name="trigger_decision_sink", inst="trigger_decision_q", dir="output"), 
+        ]),
+
+        ### DFO
+
+        mspec("dfo", "DataFlowOrchestrator", [
+            app.QueueInfo(name="trigger_decision_queue", inst="trigger_decision_q", dir="input"), 
         ]),
 
     ])
@@ -275,8 +283,6 @@ def generate(
         # Module level trigger
         ("mlt", mlt.ConfParams(
             # This line requests the raw data from upstream DAQ _and_ the raw TPs from upstream DAQ
-            td_connection_name=PARTITION+".trigdec",
-            token_connection_name=PARTITION+".triginh",
             links=[
                 mlt.GeoID(system=SYSTEM_TYPE, region=RU_CONFIG[ru]["region_id"], element=RU_CONFIG[ru]["start_channel"] + idx)
                     for ru in range(len(RU_CONFIG)) for idx in range(RU_CONFIG[ru]["channel_count"])
@@ -287,7 +293,12 @@ def generate(
                 mlt.GeoID(system=SYSTEM_TYPE, region=RU_CONFIG[ru]["region_id"], element=RU_CONFIG[ru]["start_channel"] + idx + total_link_count)
                     for ru in range(len(RU_CONFIG)) for idx in range(RU_CONFIG[ru]["channel_count"])
             ] if SOFTWARE_TPG_ENABLED else []),
-            initial_token_count=TOKEN_COUNT
+        )),
+
+        ("dfo", dfo.Confparams(
+            initial_token_count=TOKEN_COUNT,
+            td_connection=PARTITION+".trigdec",
+            token_connection=PARTITION+".triginh"
         )),
     ])
 
