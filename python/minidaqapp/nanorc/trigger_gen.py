@@ -105,7 +105,7 @@ def generate(
     # Define modules and queues
     queue_bare_specs = [
         app.QueueSpec(inst='trigger_candidate_q', kind='FollyMPMCQueue', capacity=1000),
-        app.QueueSpec(inst='trigger_decisions_q', kind='StdDeQueue', capacity=1),
+        app.QueueSpec(inst='trigger_decision_q', kind='StdDeQueue', capacity=1),
         app.QueueSpec(inst="hsievent_from_netq", kind='FollyMPMCQueue', capacity=1000),
     ]
 
@@ -297,7 +297,7 @@ def generate(
             ] if SOFTWARE_TPG_ENABLED else []),
         )),
 
-        ("dfo", dfo.Confparams(
+        ("dfo", dfo.ConfParams(
             initial_token_count=TOKEN_COUNT,
             td_connection=PARTITION+".trigdec",
             token_connection=PARTITION+".triginh"
