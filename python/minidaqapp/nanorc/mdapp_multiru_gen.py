@@ -6,7 +6,7 @@ import glob
 import rich.traceback
 from rich.console import Console
 from os.path import exists, join
-
+from appfwk.conf_utils import System
 
 CLOCK_SPEED_HZ = 50000000
 
@@ -111,23 +111,25 @@ def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowd
     if exists(json_dir):
         raise RuntimeError(f"Directory {json_dir} already exists")
 
-    console.log("Loading dataflow config generator")
-    from . import dataflow_gen
-    if enable_dqm:
-        console.log("Loading dqm config generator")
-        from . import dqm_gen
+    # console.log("Loading dataflow config generator")
+    # from . import dataflow_gen
+    # if enable_dqm:
+    #     console.log("Loading dqm config generator")
+    #     from . import dqm_gen
     console.log("Loading readout config generator")
-    from . import readout_gen
-    console.log("Loading trigger config generator")
-    from . import trigger_gen
-    console.log("Loading hsi config generator")
-    from . import hsi_gen
+    from .readout_gen import ReadoutApp
+    # console.log("Loading trigger config generator")
+    # from . import trigger_gen
+    # console.log("Loading hsi config generator")
+    # from . import hsi_gen
     console.log("Loading fake hsi config generator")
-    from . import fake_hsi_gen
-    console.log("Loading timing hardware config generator")
-    from . import thi_gen
-    console.log(f"Generating configs for hosts trigger={host_trigger} dataflow={host_df} readout={host_ru} hsi={host_hsi} dqm={host_ru}")
+    from .fake_hsi_gen import FakeHSIApp
+    # console.log("Loading timing hardware config generator")
+    # from . import thi_gen
+    # console.log(f"Generating configs for hosts trigger={host_trigger} dataflow={host_df} readout={host_ru} hsi={host_hsi} dqm={host_ru}")
 
+    the_system = System()
+    
     total_number_of_data_producers = 0
 
     if use_ssp:
@@ -173,24 +175,27 @@ def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowd
     else:
         info_svc_uri = "file://info_${APP_NAME}_${APP_PORT}.json"
 
+
+    ers_settings=dict()
+
     if ers_impl == 'cern':
         use_kafka = True
-        ers_info = "erstrace,throttle,lstdout,erskafka(dqmbroadcast:9092)"
-        ers_warning = "erstrace,throttle,lstdout,erskafka(dqmbroadcast:9092)"
-        ers_error = "erstrace,throttle,lstdout,erskafka(dqmbroadcast:9092)"
-        ers_fatal = "erstrace,lstdout,erskafka(dqmbroadcast:9092)"
+        ers_settings["INFO"] =    "erstrace,throttle,lstdout,erskafka(dqmbroadcast:9092)"
+        ers_settings["WARNING"] = "erstrace,throttle,lstdout,erskafka(dqmbroadcast:9092)"
+        ers_settings["ERROR"] =   "erstrace,throttle,lstdout,erskafka(dqmbroadcast:9092)"
+        ers_settings["FATAL"] =   "erstrace,lstdout,erskafka(dqmbroadcast:9092)"
     elif ers_impl == 'pocket':
         use_kafka = True
-        ers_info = "erstrace,throttle,lstdout,erskafka(" + pocket_url + ":30092)"
-        ers_warning = "erstrace,throttle,lstdout,erskafka(" + pocket_url + ":30092)"
-        ers_error = "erstrace,throttle,lstdout,erskafka(" + pocket_url + ":30092)"
-        ers_fatal = "erstrace,lstdout,erskafka(" + pocket_url + ":30092)"
+        ers_settings["INFO"] =    "erstrace,throttle,lstdout,erskafka(" + pocket_url + ":30092)"
+        ers_settings["WARNING"] = "erstrace,throttle,lstdout,erskafka(" + pocket_url + ":30092)"
+        ers_settings["ERROR"] =   "erstrace,throttle,lstdout,erskafka(" + pocket_url + ":30092)"
+        ers_settings["FATAL"] =   "erstrace,lstdout,erskafka(" + pocket_url + ":30092)"
     else:
         use_kafka = False
-        ers_info = "erstrace,throttle,lstdout"
-        ers_warning = "erstrace,throttle,lstdout"
-        ers_error = "erstrace,throttle,lstdout"
-        ers_fatal = "erstrace,lstdout"
+        ers_settings["INFO"] =    "erstrace,throttle,lstdout"
+        ers_settings["WARNING"] = "erstrace,throttle,lstdout"
+        ers_settings["ERROR"] =   "erstrace,throttle,lstdout"
+        ers_settings["FATAL"] =   "erstrace,lstdout"
 
     dqm_kafka_address = "dqmbroadcast:9092" if dqm_impl == 'cern' else pocket_url + ":30092" if dqm_impl == 'pocket' else ''
 
@@ -251,32 +256,35 @@ def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowd
         timing_cmd_network_endpoints = set()
         if use_hsi_hw:
             timing_cmd_network_endpoints.add(partition_name + 'hsicmds')
-        cmd_data_thi = thi_gen.generate(RUN_NUMBER = run_number,
-            NW_SPECS=nw_specs,
-            TIMING_CMD_NETWORK_ENDPOINTS=timing_cmd_network_endpoints,
-            CONNECTIONS_FILE=timing_hw_connections_file,
-            HSI_DEVICE_NAME=hsi_device_name,
-        )
+        # cmd_data_thi = thi_gen.generate(RUN_NUMBER = run_number,
+        #     NW_SPECS=nw_specs,
+        #     TIMING_CMD_NETWORK_ENDPOINTS=timing_cmd_network_endpoints,
+        #     CONNECTIONS_FILE=timing_hw_connections_file,
+        #     HSI_DEVICE_NAME=hsi_device_name,
+        # )
         console.log("thi cmd data:", cmd_data_thi)
 
     if use_hsi_hw:
-        cmd_data_hsi = hsi_gen.generate(nw_specs,
-            RUN_NUMBER = run_number,
-            CLOCK_SPEED_HZ = CLOCK_SPEED_HZ,
-            TRIGGER_RATE_HZ = trigger_rate_hz,
-            CONTROL_HSI_HARDWARE=control_timing_hw,
-            CONNECTIONS_FILE=timing_hw_connections_file,
-            READOUT_PERIOD_US = hsi_readout_period,
-            HSI_DEVICE_NAME = hsi_device_name,
-            HSI_ENDPOINT_ADDRESS = hsi_endpoint_address,
-            HSI_ENDPOINT_PARTITION = hsi_endpoint_partition,
-            HSI_RE_MASK=hsi_re_mask,
-            HSI_FE_MASK=hsi_fe_mask,
-            HSI_INV_MASK=hsi_inv_mask,
-            HSI_SOURCE=hsi_source,
-            PARTITION=partition_name)
+        pass
+        # cmd_data_hsi = hsi_gen.generate(nw_specs,
+        #     RUN_NUMBER = run_number,
+        #     CLOCK_SPEED_HZ = CLOCK_SPEED_HZ,
+        #     TRIGGER_RATE_HZ = trigger_rate_hz,
+        #     CONTROL_HSI_HARDWARE=control_timing_hw,
+        #     CONNECTIONS_FILE=timing_hw_connections_file,
+        #     READOUT_PERIOD_US = hsi_readout_period,
+        #     HSI_DEVICE_NAME = hsi_device_name,
+        #     HSI_ENDPOINT_ADDRESS = hsi_endpoint_address,
+        #     HSI_ENDPOINT_PARTITION = hsi_endpoint_partition,
+        #     HSI_RE_MASK=hsi_re_mask,
+        #     HSI_FE_MASK=hsi_fe_mask,
+        #     HSI_INV_MASK=hsi_inv_mask,
+        #     HSI_SOURCE=hsi_source,
+        #     PARTITION=partition_name)
     else:
-        cmd_data_hsi = fake_hsi_gen.generate(nw_specs,
+        print("run_number", run_number)
+        the_system.apps["hsi"] = FakeHSIApp(
+            # nw_specs,
             RUN_NUMBER = run_number,
             CLOCK_SPEED_HZ = CLOCK_SPEED_HZ,
             DATA_RATE_SLOWDOWN_FACTOR = data_rate_slowdown_factor,
@@ -285,277 +293,378 @@ def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowd
             MEAN_SIGNAL_MULTIPLICITY = mean_hsi_signal_multiplicity,
             SIGNAL_EMULATION_MODE = hsi_signal_emulation_mode,
             ENABLED_SIGNALS =  enabled_hsi_signals,
-            PARTITION=partition_name)
-
-    console.log("hsi cmd data:", cmd_data_hsi)
-
-    cmd_data_trigger = trigger_gen.generate(nw_specs,
-        SOFTWARE_TPG_ENABLED = enable_software_tpg,
-        RU_CONFIG = ru_configs,
-        ACTIVITY_PLUGIN = trigger_activity_plugin,
-        ACTIVITY_CONFIG = eval(trigger_activity_config),
-        CANDIDATE_PLUGIN = trigger_candidate_plugin,
-        CANDIDATE_CONFIG = eval(trigger_candidate_config),
-        TOKEN_COUNT = trigemu_token_count,
-        SYSTEM_TYPE = system_type,
-        TTCM_S1=ttcm_s1,
-        TTCM_S2=ttcm_s2,
-        TRIGGER_WINDOW_BEFORE_TICKS = trigger_window_before_ticks,
-        TRIGGER_WINDOW_AFTER_TICKS = trigger_window_after_ticks,
-        PARTITION=partition_name)
-
-
-    console.log("trigger cmd data:", cmd_data_trigger)
-
-    cmd_data_dataflow = dataflow_gen.generate(nw_specs,
-        RU_CONFIG = ru_configs,
-        RUN_NUMBER = run_number,
-        OUTPUT_PATH = output_path,
-        TOKEN_COUNT = df_token_count,
-        SYSTEM_TYPE = system_type,
-        SOFTWARE_TPG_ENABLED = enable_software_tpg,
-        TPSET_WRITING_ENABLED = enable_tpset_writing,
-        PARTITION=partition_name,
-        OPERATIONAL_ENVIRONMENT = op_env,
-        TPC_REGION_NAME_PREFIX = tpc_region_name_prefix,
-        MAX_FILE_SIZE = max_file_size)
-    console.log("dataflow cmd data:", cmd_data_dataflow)
-
-    cmd_data_readout = [ readout_gen.generate(nw_specs,
-            RU_CONFIG = ru_configs,
-            EMULATOR_MODE = emulator_mode,
-            DATA_RATE_SLOWDOWN_FACTOR = data_rate_slowdown_factor,
-            RUN_NUMBER = run_number,
-            DATA_FILE = data_file,
-            FLX_INPUT = use_felix,
-            SSP_INPUT = use_ssp,
-            CLOCK_SPEED_HZ = CLOCK_SPEED_HZ,
-            RUIDX = hostidx,
-            RAW_RECORDING_ENABLED = enable_raw_recording,
-            RAW_RECORDING_OUTPUT_DIR = raw_recording_output_dir,
-            FRONTEND_TYPE = frontend_type,
-            SYSTEM_TYPE = system_type,
-            SOFTWARE_TPG_ENABLED = enable_software_tpg,
-            USE_FAKE_DATA_PRODUCERS = use_fake_data_producers,
             PARTITION=partition_name,
-            LATENCY_BUFFER_SIZE=latency_buffer_size) for hostidx in range(len(host_ru))]
-    console.log("readout cmd data:", cmd_data_readout)
+            HOST=host_hsi)
 
-    if enable_dqm:
-        cmd_data_dqm = [ dqm_gen.generate(nw_specs,
-                RU_CONFIG = ru_configs,
-                EMULATOR_MODE = emulator_mode,
-                RUN_NUMBER = run_number,
-                DATA_FILE = data_file,
-                CLOCK_SPEED_HZ = CLOCK_SPEED_HZ,
-                RUIDX = hostidx,
-                SYSTEM_TYPE = system_type,
-                DQM_ENABLED=enable_dqm,
-                DQM_KAFKA_ADDRESS=dqm_kafka_address,
-                DQM_CMAP=dqm_cmap,
-                DQM_RAWDISPLAY_PARAMS=dqm_rawdisplay_params,
-                DQM_MEANRMS_PARAMS=dqm_meanrms_params,
-                DQM_FOURIER_PARAMS=dqm_fourier_params,
-                PARTITION=partition_name
-                ) for hostidx in range(len(host_ru))]
-        console.log("dqm cmd data:", cmd_data_dqm)
+        # the_system.apps["hsi"] = util.App(modulegraph=mgraph_hsi, host=host_hsi)
+    console.log("hsi cmd data:", the_system.apps["hsi"])
+
+    # cmd_data_trigger = trigger_gen.generate(nw_specs,
+    #     SOFTWARE_TPG_ENABLED = enable_software_tpg,
+    #     RU_CONFIG = ru_configs,
+    #     ACTIVITY_PLUGIN = trigger_activity_plugin,
+    #     ACTIVITY_CONFIG = eval(trigger_activity_config),
+    #     CANDIDATE_PLUGIN = trigger_candidate_plugin,
+    #     CANDIDATE_CONFIG = eval(trigger_candidate_config),
+    #     TOKEN_COUNT = trigemu_token_count,
+    #     SYSTEM_TYPE = system_type,
+    #     TTCM_S1=ttcm_s1,
+    #     TTCM_S2=ttcm_s2,
+    #     TRIGGER_WINDOW_BEFORE_TICKS = trigger_window_before_ticks,
+    #     TRIGGER_WINDOW_AFTER_TICKS = trigger_window_after_ticks,
+    #     PARTITION=partition_name)
 
 
-    data_dir = join(json_dir, 'data')
-    os.makedirs(data_dir)
+    # console.log("trigger cmd data:", cmd_data_trigger)
 
-    app_thi="thi"
-    app_hsi = "hsi"
-    app_trigger = "trigger"
-    app_df = "dataflow"
-    app_dqm = [f"dqm{idx}" for idx in range(len(host_ru))]
-    app_ru = [f"ruflx{idx}" if use_felix else f"ruemu{idx}" for idx in range(len(host_ru))]
-    if use_ssp:
-        app_ru = [f"russp{idx}" if use_ssp else f"ruemu{idx}" for idx in range(len(host_ru))]
-
-    jf_hsi = join(data_dir, app_hsi)
-    jf_trigemu = join(data_dir, app_trigger)
-    jf_df = join(data_dir, app_df)
-    jf_dqm = [join(data_dir, app_dqm[idx]) for idx in range(len(host_ru))]
-    jf_ru = [join(data_dir, app_ru[idx]) for idx in range(len(host_ru))]
-    if control_timing_hw:
-        jf_thi = join(data_dir, app_thi)
-
-    cmd_set = ["init", "conf", "start", "stop", "pause", "resume", "scrap", "record"]
+    #     cmd_data_dataflow = dataflow_gen.generate(nw_specs,
+    #         RU_CONFIG = ru_configs,
+    #         RUN_NUMBER = run_number,
+    #         OUTPUT_PATH = output_path,
+    #         TOKEN_COUNT = df_token_count,
+    #         SYSTEM_TYPE = system_type,
+    #         SOFTWARE_TPG_ENABLED = enable_software_tpg,
+    #         TPSET_WRITING_ENABLED = enable_tpset_writing,
+    #         PARTITION=partition_name,
+    #         OPERATIONAL_ENVIRONMENT = op_env,
+    #         TPC_REGION_NAME_PREFIX = tpc_region_name_prefix,
+    #         MAX_FILE_SIZE = max_file_size)
+    #     console.log("dataflow cmd data:", cmd_data_dataflow)
     
-    apps = [app_hsi, app_trigger, app_df] + app_ru
-    if enable_dqm:
-        apps += app_dqm
-    cmds_data = [cmd_data_hsi, cmd_data_trigger, cmd_data_dataflow] + cmd_data_readout
-    if enable_dqm:
-        cmds_data += cmd_data_dqm
-    if control_timing_hw:
-        apps.append(app_thi)
-        cmds_data.append(cmd_data_thi)
+        #-------------------------------------------------------------------
+    # Readout apps
+    
+    cardid = {}
+    host_id_dict = {}
 
-    for app,data in zip(apps, cmds_data):
-        console.log(f"Generating {app} command data json files")
-        for c in cmd_set:
-            with open(f'{join(data_dir, app)}_{c}.json', 'w') as f:
-                json.dump(data[c].pod(), f, indent=4, sort_keys=True)
+    ru_app_names=[f"ruflx{idx}" if use_felix else f"ruemu{idx}" for idx in range(len(host_ru))]
 
+    for hostidx in range(len(host_ru)):
+        if host_ru[hostidx] in host_id_dict:
+            host_id_dict[host_ru[hostidx]] = host_id_dict[host_ru[hostidx]] + 1
+            cardid[hostidx] = host_id_dict[host_ru[hostidx]]
+        else:
+            cardid[hostidx] = 0
+            host_id_dict[host_ru[hostidx]] = 0
+        hostidx = hostidx + 1
 
-    console.log(f"Generating top-level command json files")
-
-    start_order = [app_df] + [app_trigger] + app_ru + [app_hsi] + app_dqm
-    if not control_timing_hw and use_hsi_hw:
-        resume_order = [app_trigger]
-    else:
-        resume_order = [app_hsi, app_trigger]
-
-    for c in cmd_set:
-        with open(join(json_dir,f'{c}.json'), 'w') as f:
-            cfg = {
-                "apps": { app: f'data/{app}_{c}' for app in apps }
-            }
-            if c in ['conf']:
-                conf_order = start_order
-                if control_timing_hw:
-                    conf_order = [app_thi] + conf_order
-                cfg[f'order'] = conf_order
-            elif c == 'start':
-                cfg['order'] = start_order
-                if control_timing_hw:
-                    del cfg['apps'][app_thi]
-            elif c == 'stop':
-                cfg['order'] = start_order[::-1]
-                if control_timing_hw:
-                    del cfg['apps'][app_thi]
-            elif c in ('resume', 'pause'):
-                del cfg['apps'][app_df]
-                if control_timing_hw:
-                    del cfg['apps'][app_thi]
-                elif use_hsi_hw:
-                    del cfg['apps'][app_hsi]
-                for ruapp in app_ru:
-                    del cfg['apps'][ruapp]
-                if enable_dqm:
-                    for dqmapp in app_dqm:
-                        del cfg['apps'][dqmapp]
-                if c == 'resume':
-                    cfg['order'] = resume_order
-                elif c == 'pause':
-                    cfg['order'] = resume_order[::-1]
-
-            json.dump(cfg, f, indent=4, sort_keys=True)
-
-
-    console.log(f"Generating boot json file")
-    with open(join(json_dir,'boot.json'), 'w') as f:
-        daq_app_specs = {
-            "daq_application" : {
-                "comment": "Application profile using  PATH variables (lower start time)",
-                "env":{
-                    "CET_PLUGIN_PATH": "getenv",
-                    "DUNEDAQ_SHARE_PATH": "getenv",
-                    "TIMING_SHARE": "getenv",
-                    "LD_LIBRARY_PATH": "getenv",
-                    "PATH": "getenv",
-                    "DETCHANNELMAPS_SHARE": "getenv"
-                },
-                "cmd": ["CMD_FAC=rest://localhost:${APP_PORT}",
-                    "INFO_SVC=" + info_svc_uri,
-                    "cd ${APP_WD}",
-                    "daq_application --name ${APP_NAME} -c ${CMD_FAC} -i ${INFO_SVC}"]
-            }
-        }
-
-        if not disable_trace:
-            daq_app_specs["daq_application"]["env"]["TRACE_FILE"] = "getenv:/tmp/trace_buffer_${HOSTNAME}_${USER}"
-
-        cfg = {
-            "env" : {
-                "DUNEDAQ_ERS_VERBOSITY_LEVEL": "getenv:1",
-                "DUNEDAQ_PARTITION": partition_name,
-                "DUNEDAQ_ERS_INFO": ers_info,
-                "DUNEDAQ_ERS_WARNING": ers_warning,
-                "DUNEDAQ_ERS_ERROR": ers_error,
-                "DUNEDAQ_ERS_FATAL": ers_fatal,
-                "DUNEDAQ_ERS_DEBUG_LEVEL": "getenv:-1",
-            },
-            "hosts": {
-                "host_df": host_df,
-                "host_trigger": host_trigger,
-                "host_hsi": host_hsi,
-            },
-            "apps" : {
-                app_hsi: {
-                    "exec": "daq_application",
-                    "host": "host_hsi",
-                    "port": 3332
-                },
-                app_trigger : {
-                    "exec": "daq_application",
-                    "host": "host_trigger",
-                    "port": 3333
-                },
-                app_df: {
-                    "exec": "daq_application",
-                    "host": "host_df",
-                    "port": 3334
-                },
-            },
-            "response_listener": {
-                "port": 56789
-            },
-            "exec": daq_app_specs
-        }
-
-        if use_kafka:
-            cfg["env"]["DUNEDAQ_ERS_STREAM_LIBS"] = "erskafka"
-
-        appport = 3335
-        for hostidx in range(len(host_ru)):
-            cfg["hosts"][f"host_ru{hostidx}"] = host_ru[hostidx]
-            cfg["apps"][app_ru[hostidx]] = {
-                    "exec": "daq_application",
-                    "host": f"host_ru{hostidx}",
-                    "port": appport }
-            appport = appport + 1
-        if enable_dqm:
-            for hostidx in range(len(host_ru)):
-                cfg["hosts"][f"host_dqm{hostidx}"] = host_ru[hostidx]
-                cfg["apps"][app_dqm[hostidx]] = {
-                        "exec": "daq_application",
-                        "host": f"host_dqm{hostidx}",
-                        "port": appport }
-                appport = appport + 1
+    mgraphs_readout = []
+    for i in range(len(host_ru)):
+        ru_name = ru_app_names[i]
+        the_system.apps[ru_name] = ReadoutApp(NUMBER_OF_DATA_PRODUCERS = number_of_data_producers,
+                                              TOTAL_NUMBER_OF_DATA_PRODUCERS=total_number_of_data_producers,
+                                              EMULATOR_MODE = emulator_mode,
+                                              DATA_RATE_SLOWDOWN_FACTOR = data_rate_slowdown_factor,
+                                              DATA_FILE = data_file,
+                                              FLX_INPUT = use_felix,
+                                              CLOCK_SPEED_HZ = CLOCK_SPEED_HZ,
+                                              HOSTIDX = i,
+                                              CARDID = cardid[i],
+                                              RAW_RECORDING_ENABLED = enable_raw_recording,
+                                              RAW_RECORDING_OUTPUT_DIR = raw_recording_output_dir,
+                                              FRONTEND_TYPE = frontend_type,
+                                              SYSTEM_TYPE = system_type,
+                                              REGION_ID = region_id,
+                                              DQM_ENABLED=enable_dqm,
+                                              DQM_KAFKA_ADDRESS=dqm_kafka_address,
+                                              SOFTWARE_TPG_ENABLED = enable_software_tpg,
+                                              USE_FAKE_DATA_PRODUCERS = use_fake_data_producers,
+                                              HOST=host_ru[i])
+        console.log(f"{ru_name} app: {the_system[ru_name]}")
+        # a.append(this_readout_mgraph)
+        # # for i,ru_name in enumerate(ru_app_names):
+        #  = util.App(modulegraph=mgraphs_readout[i], host=host_ru[i])
+    # = [ readout_gen.generate(nw_specs,
+    #                                              RU_CONFIG = ru_configs,
+    #                                              EMULATOR_MODE = emulator_mode,
+    #                                              DATA_RATE_SLOWDOWN_FACTOR = data_rate_slowdown_factor,
+    #                                              RUN_NUMBER = run_number,
+    #                                              DATA_FILE = data_file,
+    #                                              FLX_INPUT = use_felix,
+    #                                              SSP_INPUT = use_ssp,
+    #                                              CLOCK_SPEED_HZ = CLOCK_SPEED_HZ,
+    #                                              RUIDX = hostidx,
+    #                                              RAW_RECORDING_ENABLED = enable_raw_recording,
+    #                                              RAW_RECORDING_OUTPUT_DIR = raw_recording_output_dir,
+    #                                              FRONTEND_TYPE = frontend_type,
+    #                                              SYSTEM_TYPE = system_type,
+    #                                              SOFTWARE_TPG_ENABLED = enable_software_tpg,
+    #                                              USE_FAKE_DATA_PRODUCERS = use_fake_data_producers,
+    #                                              PARTITION=partition_name,
+    #                                              LATENCY_BUFFER_SIZE=latency_buffer_size) for hostidx in range(len(host_ru))]
+    #    console.log("readout cmd data:", cmd_data_readout)
+    
+    #     if enable_dqm:
+    #         cmd_data_dqm = [ dqm_gen.generate(nw_specs,
+    #                 RU_CONFIG = ru_configs,
+    #                 EMULATOR_MODE = emulator_mode,
+    #                 RUN_NUMBER = run_number,
+    #                 DATA_FILE = data_file,
+    #                 CLOCK_SPEED_HZ = CLOCK_SPEED_HZ,
+    #                 RUIDX = hostidx,
+    #                 SYSTEM_TYPE = system_type,
+    #                 DQM_ENABLED=enable_dqm,
+    #                 DQM_KAFKA_ADDRESS=dqm_kafka_address,
+    #                 DQM_CMAP=dqm_cmap,
+    #                 DQM_RAWDISPLAY_PARAMS=dqm_rawdisplay_params,
+    #                 DQM_MEANRMS_PARAMS=dqm_meanrms_params,
+    #                 DQM_FOURIER_PARAMS=dqm_fourier_params,
+    #                 PARTITION=partition_name
+    #                 ) for hostidx in range(len(host_ru))]
+    #         console.log("dqm cmd data:", cmd_data_dqm)
+    
+    
+    #     data_dir = join(json_dir, 'data')
+    #     os.makedirs(data_dir)
+    
+    #     app_thi="thi"
+    #     app_hsi = "hsi"
+    #     app_trigger = "trigger"
+    #     app_df = "dataflow"
+    #     app_dqm = [f"dqm{idx}" for idx in range(len(host_ru))]
+    #     app_ru = [f"ruflx{idx}" if use_felix else f"ruemu{idx}" for idx in range(len(host_ru))]
+    #     if use_ssp:
+    #         app_ru = [f"russp{idx}" if use_ssp else f"ruemu{idx}" for idx in range(len(host_ru))]
+    
+    #     jf_hsi = join(data_dir, app_hsi)
+    #     jf_trigemu = join(data_dir, app_trigger)
+    #     jf_df = join(data_dir, app_df)
+    #     jf_dqm = [join(data_dir, app_dqm[idx]) for idx in range(len(host_ru))]
+    #     jf_ru = [join(data_dir, app_ru[idx]) for idx in range(len(host_ru))]
+    #     if control_timing_hw:
+    #         jf_thi = join(data_dir, app_thi)
+    
+    #     cmd_set = ["init", "conf", "start", "stop", "pause", "resume", "scrap", "record"]
         
-        if control_timing_hw:
-            cfg["hosts"][f"host_timing_hw"] = host_timing_hw
-            cfg["apps"][app_thi] = {
-                    "exec": "daq_application",
-                    "host": "host_timing_hw",
-                    "port": appport + len(host_ru) }
+    #     apps = [app_hsi, app_trigger, app_df] + app_ru
+    #     if enable_dqm:
+    #         apps += app_dqm
+    #     cmds_data = [cmd_data_hsi, cmd_data_trigger, cmd_data_dataflow] + cmd_data_readout
+    #     if enable_dqm:
+    #         cmds_data += cmd_data_dqm
+    #     if control_timing_hw:
+    #         apps.append(app_thi)
+    #         cmds_data.append(cmd_data_thi)
+    
+    #     for app,data in zip(apps, cmds_data):
+    #         console.log(f"Generating {app} command data json files")
+    #         for c in cmd_set:
+    #             with open(f'{join(data_dir, app)}_{c}.json', 'w') as f:
+    #                 json.dump(data[c].pod(), f, indent=4, sort_keys=True)
+    
+    
+    #     console.log(f"Generating top-level command json files")
+    
+    #     start_order = [app_df] + [app_trigger] + app_ru + [app_hsi] + app_dqm
+    #     if not control_timing_hw and use_hsi_hw:
+    #         resume_order = [app_trigger]
+    #     else:
+    #         resume_order = [app_hsi, app_trigger]
+    
+    #     for c in cmd_set:
+    #         with open(join(json_dir,f'{c}.json'), 'w') as f:
+    #             cfg = {
+    #                 "apps": { app: f'data/{app}_{c}' for app in apps }
+    #             }
+    #             if c in ['conf']:
+    #                 conf_order = start_order
+    #                 if control_timing_hw:
+    #                     conf_order = [app_thi] + conf_order
+    #                 cfg[f'order'] = conf_order
+    #             elif c == 'start':
+    #                 cfg['order'] = start_order
+    #                 if control_timing_hw:
+    #                     del cfg['apps'][app_thi]
+    #             elif c == 'stop':
+    #                 cfg['order'] = start_order[::-1]
+    #                 if control_timing_hw:
+    #                     del cfg['apps'][app_thi]
+    #             elif c in ('resume', 'pause'):
+    #                 del cfg['apps'][app_df]
+    #                 if control_timing_hw:
+    #                     del cfg['apps'][app_thi]
+    #                 elif use_hsi_hw:
+    #                     del cfg['apps'][app_hsi]
+    #                 for ruapp in app_ru:
+    #                     del cfg['apps'][ruapp]
+    #                 if enable_dqm:
+    #                     for dqmapp in app_dqm:
+    #                         del cfg['apps'][dqmapp]
+    #                 if c == 'resume':
+    #                     cfg['order'] = resume_order
+    #                 elif c == 'pause':
+    #                     cfg['order'] = resume_order[::-1]
+    
+    #             json.dump(cfg, f, indent=4, sort_keys=True)
+    
+    
+    #     console.log(f"Generating boot json file")
+    #     with open(join(json_dir,'boot.json'), 'w') as f:
+    #         daq_app_specs = {
+    #             "daq_application" : {
+    #                 "comment": "Application profile using  PATH variables (lower start time)",
+    #                 "env":{
+    #                     "CET_PLUGIN_PATH": "getenv",
+    #                     "DUNEDAQ_SHARE_PATH": "getenv",
+    #                     "TIMING_SHARE": "getenv",
+    #                     "LD_LIBRARY_PATH": "getenv",
+    #                     "PATH": "getenv",
+    #                     "DETCHANNELMAPS_SHARE": "getenv"
+    #                 },
+    #                 "cmd": ["CMD_FAC=rest://localhost:${APP_PORT}",
+    #                     "INFO_SVC=" + info_svc_uri,
+    #                     "cd ${APP_WD}",
+    #                     "daq_application --name ${APP_NAME} -c ${CMD_FAC} -i ${INFO_SVC}"]
+    #             }
+    #         }
+    
+    #         if not disable_trace:
+    #             daq_app_specs["daq_application"]["env"]["TRACE_FILE"] = "getenv:/tmp/trace_buffer_${HOSTNAME}_${USER}"
+    
+    #         cfg = {
+    #             "env" : {
+    #                 "DUNEDAQ_ERS_VERBOSITY_LEVEL": "getenv:1",
+    #                 "DUNEDAQ_PARTITION": partition_name,
+    #                 "DUNEDAQ_ERS_INFO": ers_info,
+    #                 "DUNEDAQ_ERS_WARNING": ers_warning,
+    #                 "DUNEDAQ_ERS_ERROR": ers_error,
+    #                 "DUNEDAQ_ERS_FATAL": ers_fatal,
+    #                 "DUNEDAQ_ERS_DEBUG_LEVEL": "getenv:-1",
+    #             },
+    #             "hosts": {
+    #                 "host_df": host_df,
+    #                 "host_trigger": host_trigger,
+    #                 "host_hsi": host_hsi,
+    #             },
+    #             "apps" : {
+    #                 app_hsi: {
+    #                     "exec": "daq_application",
+    #                     "host": "host_hsi",
+    #                     "port": 3332
+    #                 },
+    #                 app_trigger : {
+    #                     "exec": "daq_application",
+    #                     "host": "host_trigger",
+    #                     "port": 3333
+    #                 },
+    #                 app_df: {
+    #                     "exec": "daq_application",
+    #                     "host": "host_df",
+    #                     "port": 3334
+    #                 },
+    #             },
+    #             "response_listener": {
+    #                 "port": 56789
+    #             },
+    #             "exec": daq_app_specs
+    #         }
+    
+    #         if use_kafka:
+    #             cfg["env"]["DUNEDAQ_ERS_STREAM_LIBS"] = "erskafka"
+    
+    #         appport = 3335
+    #         for hostidx in range(len(host_ru)):
+    #             cfg["hosts"][f"host_ru{hostidx}"] = host_ru[hostidx]
+    #             cfg["apps"][app_ru[hostidx]] = {
+    #                     "exec": "daq_application",
+    #                     "host": f"host_ru{hostidx}",
+    #                     "port": appport }
+    #             appport = appport + 1
+    #         if enable_dqm:
+    #             for hostidx in range(len(host_ru)):
+    #                 cfg["hosts"][f"host_dqm{hostidx}"] = host_ru[hostidx]
+    #                 cfg["apps"][app_dqm[hostidx]] = {
+    #                         "exec": "daq_application",
+    #                         "host": f"host_dqm{hostidx}",
+    #                         "port": appport }
+    #                 appport = appport + 1
+            
+    #         if control_timing_hw:
+    #             cfg["hosts"][f"host_timing_hw"] = host_timing_hw
+    #             cfg["apps"][app_thi] = {
+    #                     "exec": "daq_application",
+    #                     "host": "host_timing_hw",
+    #                     "port": appport + len(host_ru) }
+    
+    #         json.dump(cfg, f, indent=4, sort_keys=True)
+    
+    #     console.log("Generating metadata file")
+    #     with open(join(json_dir, 'mdapp_multiru_gen.info'), 'w') as f:
+    #         mdapp_dir = os.path.dirname(os.path.abspath(__file__))
+    #         buildinfo_files = glob.glob('**/minidaqapp_build_info.txt', recursive=True)
+    #         buildinfo = {}
+    #         for buildinfo_file in buildinfo_files:
+    #             if(os.path.dirname(os.path.abspath(buildinfo_file)) in mdapp_dir):
+    #                 with open(buildinfo_file, 'r') as ff:
+    #                     line = ff.readline()
+    #                     while line: 
+    #                         line_parse = line.split(':')
+    #                         buildinfo[line_parse[0].strip()]=':'.join(line_parse[1:]).strip()
+    #                         line = ff.readline()
+                        
+    #                 break
+    #         mdapp_info = {
+    #             "command_line": ' '.join(sys.argv),
+    #             "mdapp_dir": mdapp_dir,
+    #             "build_info": buildinfo
+    #         }
+    #         json.dump(mdapp_info, f, indent=4, sort_keys=True)
+    
+    #     console.log(f"MDAapp config generated in {json_dir}")
+    from appfwk.conf_utils import connect_all_fragment_producers, add_network, make_app_command_data
+    connect_all_fragment_producers(the_system, verbose=True)
 
-        json.dump(cfg, f, indent=4, sort_keys=True)
+    # console.log("After connecting fragment producers, trigger mgraph:", the_system.apps['trigger'].modulegraph)
+    # console.log("After connecting fragment producers, the_system.app_connections:", the_system.app_connections)
 
-    console.log("Generating metadata file")
-    with open(join(json_dir, 'mdapp_multiru_gen.info'), 'w') as f:
-        mdapp_dir = os.path.dirname(os.path.abspath(__file__))
-        buildinfo_files = glob.glob('**/minidaqapp_build_info.txt', recursive=True)
-        buildinfo = {}
-        for buildinfo_file in buildinfo_files:
-            if(os.path.dirname(os.path.abspath(buildinfo_file)) in mdapp_dir):
-                with open(buildinfo_file, 'r') as ff:
-                    line = ff.readline()
-                    while line: 
-                        line_parse = line.split(':')
-                        buildinfo[line_parse[0].strip()]=':'.join(line_parse[1:]).strip()
-                        line = ff.readline()
-                    
-                break
-        mdapp_info = {
-            "command_line": ' '.join(sys.argv),
-            "mdapp_dir": mdapp_dir,
-            "build_info": buildinfo
-        }
-        json.dump(mdapp_info, f, indent=4, sort_keys=True)
+    # util.set_mlt_links(the_system, "trigger", verbose=True)
+    
+    # util.add_network("trigger", the_system, verbose=True)
+    # console.log("After adding network, trigger mgraph:", the_system.apps['trigger'].modulegraph)
+    add_network("hsi", the_system, verbose=True)
+    # for ru_app_name in ru_app_names:
+    #     util.add_network(ru_app_name, the_system, verbose=True)
+
+    # util.add_network("dataflow", the_system, verbose=True)
+    
+
+    ####################################################################
+    # Application command data generation
+    ####################################################################
+
+    # if control_timing_hw:
+    #     timing_cmd_network_endpoints=set()
+    #     if use_hsi_hw:
+    #         timing_cmd_network_endpoints.add('hsicmds')
+    #     cmd_data_thi = thi_gen.generate(
+    #         RUN_NUMBER = run_number,
+    #         NETWORK_ENDPOINTS=network_endpoints,
+    #         TIMING_CMD_NETWORK_ENDPOINTS=timing_cmd_network_endpoints,
+    #         HSI_DEVICE_NAME=hsi_device_name,
+    #     )
+    #     console.log("thi cmd data:", cmd_data_thi)
+    
+    # Arrange per-app command data into the format used by util.write_json_files()
+    app_command_datas = {
+        name : make_app_command_data(app, nw_specs)
+        for name,app in the_system.apps.items()
+    }
+
+    if control_timing_hw:
+        app_command_datas["thi"] = cmd_data_thi
+
+    ##################################################################################
+
+    # Make boot.json config
+    from appfwk.conf_utils import make_system_command_datas,generate_boot, write_json_files
+    system_command_datas = make_system_command_datas(the_system)
+    # Override the default boot.json with the one from minidaqapp
+    boot = generate_boot(the_system.apps, partition_name=partition_name, ers_settings=ers_settings, info_svc_uri=info_svc_uri,
+                              disable_trace=disable_trace, use_kafka=use_kafka)
+
+    system_command_datas['boot'] = boot
+
+    write_json_files(app_command_datas, system_command_datas, json_dir)
 
     console.log(f"MDAapp config generated in {json_dir}")
 

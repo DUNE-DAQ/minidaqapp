@@ -49,6 +49,7 @@ import dunedaq.dfmodules.requestreceiver as rrcv
 import dunedaq.networkmanager.nwmgr as nwmgr
 
 from appfwk.utils import acmd, mcmd, mrccmd, mspec
+from appfwk.conf_utils import ModuleGraph, Module
 
 import json
 import math

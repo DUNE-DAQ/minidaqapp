@@ -54,148 +54,46 @@ from pprint import pprint
 
 
 #===============================================================================
-def generate(
-        NW_SPECS: list,
-        RUN_NUMBER = 333,
-        CLOCK_SPEED_HZ: int = 50000000,
-        TRIGGER_RATE_HZ: int = 1,
-        CONTROL_HSI_HARDWARE = False,
-        READOUT_PERIOD_US: int = 1e3,
-        HSI_ENDPOINT_ADDRESS = 1,
-        HSI_ENDPOINT_PARTITION = 0,
-        HSI_RE_MASK = 0x20000,
-        HSI_FE_MASK = 0,
-        HSI_INV_MASK = 0,
-        HSI_SOURCE = 1,
-        CONNECTIONS_FILE="${TIMING_SHARE}/config/etc/connections.xml",
-        HSI_DEVICE_NAME="BOREAS_TLU",
-        UHAL_LOG_LEVEL="notice",
-        PARTITION="UNKNOWN"
-    ):
-    """
-    { item_description }
-    """
-    cmd_data = {}
-
-    required_eps = {PARTITION+'.hsievent'}
-    if CONTROL_HSI_HARDWARE:
-        required_eps.add('hsicmds')
-
-    if not required_eps.issubset([nw.name for nw in NW_SPECS]):
-        raise RuntimeError(f"ERROR: not all the required endpoints ({', '.join(required_eps)}) found in list of endpoints {' '.join([nw.name for nw in NW_SPECS])}")
-
-    # Define modules and queues
-    queue_bare_specs = [
-            app.QueueSpec(inst="hsievent_q_to_net", kind='FollySPSCQueue', capacity=100),
-    ]
+class HSIApp(App):
+    def __init__(self,
+                 NW_SPECS: list,
+                 RUN_NUMBER = 333,
+                 CLOCK_SPEED_HZ: int = 50000000,
+                 TRIGGER_RATE_HZ: int = 1,
+                 CONTROL_HSI_HARDWARE = False,
+                 READOUT_PERIOD_US: int = 1e3,
+                 HSI_ENDPOINT_ADDRESS = 1,
+                 HSI_ENDPOINT_PARTITION = 0,
+                 HSI_RE_MASK = 0x20000,
+                 HSI_FE_MASK = 0,
+                 HSI_INV_MASK = 0,
+                 HSI_SOURCE = 1,
+                 CONNECTIONS_FILE="${TIMING_SHARE}/config/etc/connections.xml",
+                 HSI_DEVICE_NAME="BOREAS_TLU",
+                 UHAL_LOG_LEVEL="notice",
+                 PARTITION="UNKNOWN",
+                 HOST="localhost"## CHANGE ME TO WHAT IT SHOULD BE
+                 ):
+        """
+        { item_description }
+        """
     
-    if CONTROL_HSI_HARDWARE:
-        queue_bare_specs.extend([app.QueueSpec(inst="hw_cmds_q_to_net", kind='FollySPSCQueue', capacity=100)])
-
-    # Only needed to reproduce the same order as when using jsonnet
-    queue_specs = app.QueueSpecs(sorted(queue_bare_specs, key=lambda x: x.inst))
-
-    hsi_controller_init_data = hsic.InitParams(
-                                                  qinfos=app.QueueInfos([app.QueueInfo(name="hardware_commands_out", inst="hw_cmds_q_to_net", dir="output")]),
-                                                  device=HSI_DEVICE_NAME,
-                                                 )
-    mod_specs = [
-        mspec("qton_hsievent", "QueueToNetwork", [
-                        app.QueueInfo(name="input", inst="hsievent_q_to_net", dir="input")
-                    ]),
-
-        mspec("hsir", "HSIReadout", [
-                                    app.QueueInfo(name="hsievent_sink", inst="hsievent_q_to_net", dir="output"),
-                                ]),
-        ]
+        required_eps = {PARTITION+'.hsievent'}
+        if CONTROL_HSI_HARDWARE:
+            required_eps.add('hsicmds')
     
-    if CONTROL_HSI_HARDWARE:
-        hsi_controller_init_data = hsic.InitParams(
-                                                  qinfos=app.QueueInfos([app.QueueInfo(name="hardware_commands_out", inst="hw_cmds_q_to_net", dir="output")]),
-                                                  device=HSI_DEVICE_NAME,
-                                                 )
-        mod_specs.extend ( [
-            mspec("qton_hw_cmds", "QueueToNetwork", [
-                        app.QueueInfo(name="input", inst="hw_cmds_q_to_net", dir="input")
-                    ]),
-            app.ModSpec(inst="hsic", plugin="HSIController", data=hsi_controller_init_data)
-        ])
-
-    cmd_data['init'] = app.Init(queues=queue_specs, modules=mod_specs, nwconnections=NW_SPECS)
+        if not required_eps.issubset([nw.name for nw in NW_SPECS]):
+            raise RuntimeError(f"ERROR: not all the required endpoints ({', '.join(required_eps)}) found in list of endpoints {' '.join([nw.name for nw in NW_SPECS])}")
     
-    conf_cmds = [
-        ("qton_hsievent", qton.Conf(msg_type="dunedaq::dfmessages::HSIEvent",
-                                           msg_module_name="HSIEventNQ",
-                                           sender_config=nos.Conf(name=PARTITION+".hsievent",
-                                                                  stype="msgpack")
-                                           )
-                ),
-                        ("hsir", hsi.ConfParams(
-                        connections_file=CONNECTIONS_FILE,
-                        readout_period=READOUT_PERIOD_US,
-                        hsi_device_name=HSI_DEVICE_NAME,
-                        uhal_log_level=UHAL_LOG_LEVEL
-                        )),
-    ]
-    
-    trigger_interval_ticks=0
-    if TRIGGER_RATE_HZ > 0:
-        trigger_interval_ticks=math.floor((1/TRIGGER_RATE_HZ) * CLOCK_SPEED_HZ)
-    elif CONTROL_HSI_HARDWARE:
-        console.log('WARNING! Emulated trigger rate of 0 will not disable signal emulation in real HSI hardware! To disable emulated HSI triggers, use  option: "--hsi-source 0" or mask all signal bits', style="bold red")
+        
+        hsi_controller_init_data = hsic.InitParams(qinfos=app.QueueInfos([app.QueueInfo(name="hardware_commands_out", inst="hw_cmds_q_to_net", dir="output")]),
+                                                   device=HSI_DEVICE_NAME,
+                                                   )
+        from appfwk.conf_utils import Module, ModuleGraph, Direction
+        modules = {}
+        modules["hsir"] = Module("HSIReadout")
+        
+        if CONTROL_HSI_HARDWARE:
+            modules["hsic"] = Module("HSIController")
 
-    if CONTROL_HSI_HARDWARE:
-        conf_cmds.extend([
-            ("qton_hw_cmds", qton.Conf(msg_type="dunedaq::timinglibs::timingcmd::TimingHwCmd",
-                                           msg_module_name="TimingHwCmdNQ",
-                                           sender_config=nos.Conf(name=PARTITION+".hsicmds",
-                                                                  stype="msgpack")
-                                           )),
-            ("hsic", hsic.ConfParams(
-                                clock_frequency=CLOCK_SPEED_HZ,
-                                trigger_interval_ticks=trigger_interval_ticks,
-                                address=HSI_ENDPOINT_ADDRESS,
-                                partition=HSI_ENDPOINT_PARTITION,
-                                rising_edge_mask=HSI_RE_MASK,
-                                falling_edge_mask=HSI_FE_MASK,
-                                invert_edge_mask=HSI_INV_MASK,
-                                data_source=HSI_SOURCE,
-                                )),
-        ])
-    cmd_data['conf'] = acmd(conf_cmds)
-
-    startpars = rccmd.StartParams(run=RUN_NUMBER, trigger_interval_ticks = trigger_interval_ticks)
-    resumepars = rccmd.ResumeParams(trigger_interval_ticks = trigger_interval_ticks)
-
-    cmd_data['start'] = acmd([
-            ("hsi.*", startpars),
-            ("qton_.*", startpars)
-        ])
-
-    cmd_data['stop'] = acmd([
-            ("hsi.*", None),
-            ("qton.*", None)
-        ])
-
-    cmd_data['pause'] = acmd([
-            ("", None)
-        ])
-
-    if CONTROL_HSI_HARDWARE:
-        cmd_data['resume'] = acmd([
-                ("hsic", resumepars)
-            ])
-    else:
-        cmd_data['resume'] = acmd([
-            ("", None)
-        ])
-
-    cmd_data['scrap'] = acmd([
-            ("", None)
-        ])
-
-    cmd_data['record'] = acmd([
-            ("", None)
-    ])
-
-    return cmd_data
+        super().__init__(modulegraph=mgraph, host=HOST)
