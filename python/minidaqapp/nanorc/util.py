@@ -330,7 +330,8 @@ def make_app_command_data(app, verbose=False):
 
     # Fill in the "standard" command entries in the command_data structure
 
-    command_data['init'] = appfwk.Init(queues=queue_specs, modules=mod_specs)
+    sorted_queue_specs = appfwk.QueueSpecs(sorted(queue_specs, key=lambda x: x.inst))
+    command_data['init'] = appfwk.Init(queues=sorted_queue_specs, modules=mod_specs)
 
     # TODO: Conf ordering
     command_data['conf'] = acmd([
