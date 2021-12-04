@@ -70,8 +70,8 @@ def generate(
 
     # Define modules and queues
     queue_bare_specs = [
-            app.QueueSpec(inst="time_sync_from_netq", kind='FollyMPMCQueue', capacity=100),
-            app.QueueSpec(inst="hsievent_q_to_net", kind='FollySPSCQueue', capacity=100),
+            app.QueueSpec(inst="hsi_time_sync_from_netq", kind='FollyMPMCQueue', capacity=100),
+            app.QueueSpec(inst="fhsighsievent_q_to_net", kind='FollySPSCQueue', capacity=100),
         ]
 
     # Only needed to reproduce the same order as when using jsonnet
@@ -81,16 +81,16 @@ def generate(
     mod_specs = [
 
         mspec("fhsig", "FakeHSIEventGenerator", [
-                        app.QueueInfo(name="time_sync_source", inst="time_sync_from_netq", dir="input"),
-                        app.QueueInfo(name="hsievent_sink", inst="hsievent_q_to_net", dir="output"),
+                        app.QueueInfo(name="hsievent_sink", inst="fhsighsievent_q_to_net", dir="output"),
+                        app.QueueInfo(name="time_sync_source", inst="hsi_time_sync_from_netq", dir="input"),
                     ]),
         mspec("qton_hsievent", "QueueToNetwork", [
-                        app.QueueInfo(name="input", inst="hsievent_q_to_net", dir="input")
+                        app.QueueInfo(name="input", inst="fhsighsievent_q_to_net", dir="input")
                     ]),
         ] + [
 
            mspec(f"ntoq_timesync_{idx}", "NetworkToQueue", [
-                        app.QueueInfo(name="output", inst="time_sync_from_netq", dir="output")
+                        app.QueueInfo(name="output", inst="hsi_time_sync_from_netq", dir="output")
                     ]) for idx, inst in enumerate(NETWORK_ENDPOINTS) if "timesync" in inst
         ]
 

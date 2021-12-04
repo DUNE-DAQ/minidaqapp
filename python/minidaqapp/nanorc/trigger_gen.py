@@ -97,21 +97,21 @@ def generate(
     # Define modules and queues
     queue_bare_specs = [
         ] + ([
-            app.QueueSpec(inst="tpsets_from_netq", kind='FollyMPMCQueue', capacity=1000),
+            app.QueueSpec(inst="trigger_tpsets_from_netq", kind='FollyMPMCQueue', capacity=1000),
             app.QueueSpec(inst='zipped_tpset_q', kind='FollySPSCQueue', capacity=1000),
-            app.QueueSpec(inst='taset_q', kind='FollySPSCQueue', capacity=1000),
+            app.QueueSpec(inst='tamoutput_to_tcminput', kind='FollySPSCQueue', capacity=1000),
         ] if NUMBER_OF_TPSET_PRODUCERS else []) + [
-        app.QueueSpec(inst='trigger_candidate_q', kind='FollyMPMCQueue', capacity=1000),
-        app.QueueSpec(inst="hsievent_from_netq", kind='FollyMPMCQueue', capacity=1000),
-        app.QueueSpec(inst="token_from_netq", kind='FollySPSCQueue', capacity=1000),
-        app.QueueSpec(inst="trigger_decision_to_netq", kind='FollySPSCQueue', capacity=1000),
+        app.QueueSpec(inst='tcmoutput_to_mlttrigger_candidate_source', kind='FollyMPMCQueue', capacity=1000),
+        app.QueueSpec(inst="trigger_hsievent_from_netq", kind='FollyMPMCQueue', capacity=1000),
+        app.QueueSpec(inst="trigger_tokens_from_netq", kind='FollySPSCQueue', capacity=1000),
+        app.QueueSpec(inst="mlttrigger_decision_to_netq", kind='FollySPSCQueue', capacity=1000),
     ]
 
     for idx in range(NUMBER_OF_TPSET_PRODUCERS):
         queue_bare_specs.extend([
-            app.QueueSpec(inst=f"fragment_q{idx}", kind='FollySPSCQueue', capacity=1000),
-            app.QueueSpec(inst=f"tpset_q_for_buf{idx}", kind='FollySPSCQueue', capacity=1000),
-            app.QueueSpec(inst=f"data_request_q{idx}", kind='FollySPSCQueue', capacity=1000),
+            app.QueueSpec(inst=f"buf{idx}fragment_q{idx}", kind='FollySPSCQueue', capacity=1000),
+            app.QueueSpec(inst=f"trigger_tpset_q_for_buf{idx}", kind='FollySPSCQueue', capacity=1000),
+            app.QueueSpec(inst=f"trigger_data_request_q{idx}", kind='FollySPSCQueue', capacity=1000),
         ])
 
     # Only needed to reproduce the same order as when using jsonnet
@@ -121,73 +121,79 @@ def generate(
 
     for idx in range(NUMBER_OF_TPSET_PRODUCERS):
         mod_specs.extend([
-            mspec(f"ntoq_data_request{idx}", "NetworkToQueue", [
-                app.QueueInfo(name="output", inst=f"data_request_q{idx}", dir="output")
-            ]),
-            mspec(f"ntoq_tpset_for_buf{idx}", "NetworkToQueue", [
-                app.QueueInfo(name="output", inst=f"tpset_q_for_buf{idx}", dir="output")
-            ]),
-            mspec(f"tpset_subscriber_{idx}", "NetworkToQueue", [
-                app.QueueInfo(name="output", inst=f"tpsets_from_netq", dir="output")
-            ]),
-            mspec(f"qton_fragment{idx}", "QueueToNetwork", [
-                app.QueueInfo(name="input", inst=f"fragment_q{idx}", dir="input")
-            ]),
             mspec(f"buf{idx}", "TPSetBufferCreator", [
-                app.QueueInfo(name="tpset_source", inst=f"tpset_q_for_buf{idx}", dir="input"),
-                app.QueueInfo(name="data_request_source", inst=f"data_request_q{idx}", dir="input"),
-                app.QueueInfo(name="fragment_sink", inst=f"fragment_q{idx}", dir="output"),
-            ])
-
+                app.QueueInfo(name="fragment_sink", inst=f"buf{idx}fragment_q{idx}", dir="output"),
+                app.QueueInfo(name="tpset_source", inst=f"trigger_tpset_q_for_buf{idx}", dir="input"),
+                app.QueueInfo(name="data_request_source", inst=f"trigger_data_request_q{idx}", dir="input"),
+            ]),
         ])
 
     mod_specs += ([
             mspec("zip", "TPZipper", [
-                app.QueueInfo(name="input", inst="tpsets_from_netq", dir="input"),
                 app.QueueInfo(name="output", inst="zipped_tpset_q", dir="output"), #FIXME need to fanout this zipped_tpset_q if using multiple algorithms
+                app.QueueInfo(name="input", inst="trigger_tpsets_from_netq", dir="input"),
             ]),
 
             ### Algorithm(s)
 
             mspec('tam', 'TriggerActivityMaker', [ # TPSet -> TASet
                 app.QueueInfo(name='input', inst='zipped_tpset_q', dir='input'),
-                app.QueueInfo(name='output', inst='taset_q', dir='output'),
+                app.QueueInfo(name='output', inst='tamoutput_to_tcminput', dir='output'),
             ]),
 
             mspec('tcm', 'TriggerCandidateMaker', [ # TASet -> TC
-                app.QueueInfo(name='input', inst='taset_q', dir='input'),
-                app.QueueInfo(name='output', inst='trigger_candidate_q', dir='output'),
+                app.QueueInfo(name='input', inst='tamoutput_to_tcminput', dir='input'),
+                app.QueueInfo(name='output', inst='tcmoutput_to_mlttrigger_candidate_source', dir='output'),
             ])
 
         ] if NUMBER_OF_TPSET_PRODUCERS else []) + [
 
         ### Timing TCs
-        mspec("ntoq_hsievent", "NetworkToQueue", [
-            app.QueueInfo(name="output", inst="hsievent_from_netq", dir="output")
-        ]),
-
         mspec("ttcm", "TimingTriggerCandidateMaker", [
-            app.QueueInfo(name="input", inst="hsievent_from_netq", dir="input"),
-            app.QueueInfo(name="output", inst="trigger_candidate_q", dir="output"),
+            app.QueueInfo(name="output", inst="tcmoutput_to_mlttrigger_candidate_source", dir="output"),
+            app.QueueInfo(name="input", inst="trigger_hsievent_from_netq", dir="input"),
         ]),
 
         ### Module level trigger
 
-        mspec("ntoq_token", "NetworkToQueue", [
-            app.QueueInfo(name="output", inst="token_from_netq", dir="output")
+        mspec("mlt", "ModuleLevelTrigger", [
+            app.QueueInfo(name="trigger_candidate_source", inst="tcmoutput_to_mlttrigger_candidate_source", dir="input"),
+            app.QueueInfo(name="trigger_decision_sink", inst="mlttrigger_decision_to_netq", dir="output"),
+            app.QueueInfo(name="token_source", inst="trigger_tokens_from_netq", dir="input"),
         ]),
 
         mspec("qton_trigdec", "QueueToNetwork", [
-            app.QueueInfo(name="input", inst="trigger_decision_to_netq", dir="input")
+            app.QueueInfo(name="input", inst="mlttrigger_decision_to_netq", dir="input")
         ]),
 
-        mspec("mlt", "ModuleLevelTrigger", [
-            app.QueueInfo(name="token_source", inst="token_from_netq", dir="input"),
-            app.QueueInfo(name="trigger_decision_sink", inst="trigger_decision_to_netq", dir="output"),
-            app.QueueInfo(name="trigger_candidate_source", inst="trigger_candidate_q", dir="input"),
+        mspec("ntoq_hsievent", "NetworkToQueue", [
+            app.QueueInfo(name="output", inst="trigger_hsievent_from_netq", dir="output")
+        ]),
+
+        mspec("ntoq_token", "NetworkToQueue", [
+            app.QueueInfo(name="output", inst="trigger_tokens_from_netq", dir="output")
         ]),
 
     ]
+
+    for idx in range(NUMBER_OF_TPSET_PRODUCERS):
+        mod_specs.extend([
+            mspec(f"ntoq_tpset_for_buf{idx}", "NetworkToQueue", [
+                app.QueueInfo(name="output", inst=f"trigger_tpset_q_for_buf{idx}", dir="output")
+            ]),
+            mspec(f"tpset_subscriber_{idx}", "NetworkToQueue", [
+                app.QueueInfo(name="output", inst=f"trigger_tpsets_from_netq", dir="output")
+            ]),
+        ])
+    for idx in range(NUMBER_OF_TPSET_PRODUCERS):
+        mod_specs.extend([
+            mspec(f"ntoq_data_request{idx}", "NetworkToQueue", [
+                app.QueueInfo(name="output", inst=f"trigger_data_request_q{idx}", dir="output")
+            ]),
+            mspec(f"qton_fragment{idx}", "QueueToNetwork", [
+                app.QueueInfo(name="input", inst=f"buf{idx}fragment_q{idx}", dir="input")
+            ]),
+        ])
 
     cmd_data['init'] = app.Init(queues=queue_specs, modules=mod_specs)
 
