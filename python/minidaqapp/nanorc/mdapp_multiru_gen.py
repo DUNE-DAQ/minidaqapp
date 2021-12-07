@@ -150,11 +150,7 @@ def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowd
         raise Exception("TPSet writing can only be used when software TPG is enabled")
 
     if token_count > 0:
-        df_token_count = 0
         trigemu_token_count = token_count
-    else:
-        df_token_count = -1 * token_count
-        trigemu_token_count = 0
 
     if (len(region_id) != len(host_ru)) and (len(region_id) != 1):
         raise Exception("--region-id should be specified either once only or once for each --host-ru!")
@@ -311,7 +307,6 @@ def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowd
         RU_CONFIG = ru_configs,
         RUN_NUMBER = run_number,
         OUTPUT_PATH = output_path,
-        TOKEN_COUNT = df_token_count,
         SYSTEM_TYPE = system_type,
         SOFTWARE_TPG_ENABLED = enable_software_tpg,
         TPSET_WRITING_ENABLED = enable_tpset_writing,

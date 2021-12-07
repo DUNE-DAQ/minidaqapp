@@ -298,9 +298,8 @@ def generate(
         )),
 
         ("dfo", dfo.ConfParams(
-            initial_token_count=TOKEN_COUNT,
-            td_connection=PARTITION+".trigdec",
-            token_connection=PARTITION+".triginh"
+            token_connection=PARTITION+".triginh",
+            dataflow_applications=[dfo.app_config(decision_connection=f"{PARTITION}.trigdec", capacity=TOKEN_COUNT)]
         )),
     ])
 

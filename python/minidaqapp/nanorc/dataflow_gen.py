@@ -127,7 +127,7 @@ def generate(NW_SPECS,
 
                                         ] if SOFTWARE_TPG_ENABLED else [])
                                                               ) )),
-                ("datawriter", dw.ConfParams(initial_token_count=TOKEN_COUNT,
+                ("datawriter", dw.ConfParams(decision_connection=PARTITION+".trigdec",
                                              token_connection=PARTITION+".triginh",
                                 data_store_parameters=hdf5ds.ConfParams(name="data_store",
                                 version = 3,
