@@ -47,11 +47,7 @@ import dunedaq.nwqueueadapters.networkobjectsender as nos
 import dunedaq.networkmanager.nwmgr as nwmgr
 
 from appfwk.utils import acmd, mcmd, mrccmd, mspec
-
-import json
-import math
-from pprint import pprint
-
+from appfwk.conf_utils import App, ModuleGraph, Module, Direction
 
 #===============================================================================
 class HSIApp(App):
@@ -89,11 +85,25 @@ class HSIApp(App):
         hsi_controller_init_data = hsic.InitParams(qinfos=app.QueueInfos([app.QueueInfo(name="hardware_commands_out", inst="hw_cmds_q_to_net", dir="output")]),
                                                    device=HSI_DEVICE_NAME,
                                                    )
-        from appfwk.conf_utils import Module, ModuleGraph, Direction
         modules = {}
-        modules["hsir"] = Module("HSIReadout")
+
+        ## TODO all the connections...
+        modules["hsir"] = Module(plugin = "HSIReadout",
+                                 conf = hsi.ConfParams(connections_file=CONNECTIONS_FILE,
+                                                       readout_period=READOUT_PERIOD_US,
+                                                       hsi_device_name=HSI_DEVICE_NAME,
+                                                       uhal_log_level=UHAL_LOG_LEVEL,
+                                                       hsievent_connection_name = f"{PARTITION}.hsievent"))
         
         if CONTROL_HSI_HARDWARE:
-            modules["hsic"] = Module("HSIController")
-
+            modules["hsic"] = Module(plugin = "HSIController",
+                                     conf = hsic.ConfParams(clock_frequency=CLOCK_SPEED_HZ,
+                                                            trigger_interval_ticks=trigger_interval_ticks,
+                                                            address=HSI_ENDPOINT_ADDRESS,
+                                                            partition=HSI_ENDPOINT_PARTITION,
+                                                            rising_edge_mask=HSI_RE_MASK,
+                                                            falling_edge_mask=HSI_FE_MASK,
+                                                            invert_edge_mask=HSI_INV_MASK,
+                                                            data_source=HSI_SOURCE))
+        mgraph = ModuleGraph(modules)
         super().__init__(modulegraph=mgraph, host=HOST)

@@ -41,184 +41,160 @@ import dunedaq.nwqueueadapters.networkobjectsender as nos
 import dunedaq.networkmanager.nwmgr as nwmgr
 
 from appfwk.utils import acmd, mcmd, mrccmd, mspec
+from appfwk.conf_utils import App, ModuleGraph, Module, Direction, Connection
 
-import json
-import math
-from pprint import pprint
 # Time to wait on pop()
 QUEUE_POP_WAIT_MS = 100
 # local clock speed Hz
 # CLOCK_SPEED_HZ = 50000000;
 
-def generate(NW_SPECS,
-        RU_CONFIG=[],
-        RUN_NUMBER=333,
-        OUTPUT_PATH=".",
-        TOKEN_COUNT=0,
-        SYSTEM_TYPE="TPC",
-        SOFTWARE_TPG_ENABLED=False,
-        TPSET_WRITING_ENABLED=False,
-        PARTITION="UNKNOWN",
-        OPERATIONAL_ENVIRONMENT="swtest",
-        TPC_REGION_NAME_PREFIX="APA",
-        MAX_FILE_SIZE=4*1024*1024*1024):
-    """Generate the json configuration for the readout and DF process"""
-
-    cmd_data = {}
-
-    required_eps = {PARTITION+'.trigdec', PARTITION+'.triginh'}
-    if not required_eps.issubset([nw.name for nw in NW_SPECS]):
-        raise RuntimeError(f"ERROR: not all the required endpoints ({', '.join(required_eps)}) found in list of endpoints {' '.join([nw.name for nw in NW_SPECS])}")
-
-
-
-    # Define modules and queues
-    queue_bare_specs = [app.QueueSpec(inst="trigger_decision_q", kind='FollySPSCQueue', capacity=100),
-            app.QueueSpec(inst="trigger_record_q", kind='FollySPSCQueue', capacity=100),
-            app.QueueSpec(inst="data_fragments_q", kind='FollyMPMCQueue', capacity=1000),
-            ] + ([
-            app.QueueSpec(inst="tpsets_from_netq", kind='FollyMPMCQueue', capacity=1000),
-            ] if TPSET_WRITING_ENABLED else [])
-
-    # Only needed to reproduce the same order as when using jsonnet
-    queue_specs = app.QueueSpecs(sorted(queue_bare_specs, key=lambda x: x.inst))
-
-
-    mod_specs = [
-        mspec("trigdec_receiver", "TriggerDecisionReceiver", [app.QueueInfo(name="output", inst="trigger_decision_q", dir="output")]),
-
-        mspec("fragment_receiver", "FragmentReceiver", [app.QueueInfo(name="output", inst="data_fragments_q", dir="output")]),
-
-        mspec("trb", "TriggerRecordBuilder", [  app.QueueInfo(name="trigger_decision_input_queue", inst="trigger_decision_q", dir="input"),
-                                                app.QueueInfo(name="trigger_record_output_queue", inst="trigger_record_q", dir="output"),
-                                                app.QueueInfo(name="data_fragment_input_queue", inst="data_fragments_q", dir="input")
-                                             ]),
+class DataFlowApp(App):
+    def __init__(self,
+                 NW_SPECS,
+                 FRAGMENT_PRODUCERS,
+                 RU_CONFIG=[],
+                 RUN_NUMBER=333,
+                 OUTPUT_PATH=".",
+                 TOKEN_COUNT=0,
+                 SYSTEM_TYPE="TPC",
+                 SOFTWARE_TPG_ENABLED=False,
+                 TPSET_WRITING_ENABLED=False,
+                 PARTITION="UNKNOWN",
+                 OPERATIONAL_ENVIRONMENT="swtest",
+                 TPC_REGION_NAME_PREFIX="APA",
+                 HOST="localhost",
+                 MAX_FILE_SIZE=4*1024*1024*1024):
         
-        mspec("datawriter", "DataWriter", [ app.QueueInfo(name="trigger_record_input_queue", inst="trigger_record_q", dir="input")]),
+        """Generate the json configuration for the readout and DF process"""
 
-    ] + ([        
-        mspec(f"tpset_subscriber_{idx}", "NetworkToQueue", [app.QueueInfo(name="output", inst=f"tpsets_from_netq", dir="output")])  for idx in range(len(RU_CONFIG))
-    ] if TPSET_WRITING_ENABLED else []) + ([
-        mspec("tpswriter", "TPSetWriter", [app.QueueInfo(name="tpset_source", inst="tpsets_from_netq", dir="input")])
-    ] if TPSET_WRITING_ENABLED else []) + ([
-        mspec("tp_fragment_receiver", "FragmentReceiver", [app.QueueInfo(name="output", inst="data_fragments_q", dir="output")]),
-        mspec("ds_tpset_fragment_receiver", "FragmentReceiver", [app.QueueInfo(name="output", inst="data_fragments_q", dir="output")]),
-    ] if SOFTWARE_TPG_ENABLED else []) 
+        required_eps = {PARTITION+'.trigdec', PARTITION+'.triginh'}
+        if not required_eps.issubset([nw.name for nw in NW_SPECS]):
+            raise RuntimeError(f"ERROR: not all the required endpoints ({', '.join(required_eps)}) found in list of endpoints {' '.join([nw.name for nw in NW_SPECS])}")
 
+        # trb_geoid_list = []
+        # for idx, producer in enumerate(FRAGMENT_PRODUCERS):
+        #     trb_geoid_list.append(trb.geoidinst(region = producer.geoid.region,
+        #                                         element = producer.geoid.element,
+        #                                         system = producer.geoid.system,
+        #                                         connection_name = 
+        #                                         )
 
-    cmd_data['init'] = app.Init(queues=queue_specs, modules=mod_specs, nwconnections=NW_SPECS)
+        modules = []
+        total_link_count = 0
+        for ru in range(len(RU_CONFIG)):
+            total_link_count += RU_CONFIG[ru]["channel_count"]
 
-    total_link_count = 0
-    for ru in range(len(RU_CONFIG)):
-        total_link_count += RU_CONFIG[ru]["channel_count"]
+        trb_geoid_map = trb.mapgeoidqueue(trb_geoid_list)
+        
+        modules += [Module(name = 'trigdec_receiver',
+                           plugin = 'TriggerDecisionReceiver',
+                           connections = {'output': Connection('trb.trigger_decision_q')},
+                           conf = tdrcv.ConfParams(general_queue_timeout=QUEUE_POP_WAIT_MS,
+                                                   connection_name=PARTITION+".trigdec")),
+        
+                    Module(name = 'fragment_receiver',
+                           plugin = 'FragmentReceiver',
+                           connections = {'output': Connection('trb.data_fragments_q', Direction.OUT)},
+                           conf = frcv.ConfParams(general_queue_timeout=QUEUE_POP_WAIT_MS,
+                                                  connection_name=PARTITION+".frags_0")),
+                    
+                    Module(name = 'trb',
+                           plugin = 'TriggerRecordBuilder',
+                           connections = {'trigger_decision_input_queue': Connection('trigdec_receiver.trigger_decision_q'),
+                                          'trigger_record_output_queue': Connection('datawriter.trigger_record_q')},
+                           conf = trb.ConfParams(general_queue_timeout=QUEUE_POP_WAIT_MS,
+                                                 reply_connection_name = PARTITION+".frags_0",
+                                                 map=trb.mapgeoidconnections([
+                                                     trb.geoidinst(region=RU_CONFIG[ru]["region_id"],
+                                                                   element=idx+RU_CONFIG[ru]["start_channel"],
+                                                                   system=SYSTEM_TYPE,
+                                                                   connection_name=f"{PARTITION}.datareq_{ru}")
+                                                     for ru in range(len(RU_CONFIG)) for idx in range(RU_CONFIG[ru]["channel_count"])
+                                                 ] + ([
+                                                     trb.geoidinst(region=RU_CONFIG[ru]["region_id"],
+                                                                   element=idx+RU_CONFIG[ru]["start_channel"]+total_link_count,
+                                                                   system=SYSTEM_TYPE,
+                                                                   connection_name=f"{PARTITION}.datareq_{ru}")
+                                                     for ru in range(len(RU_CONFIG)) for idx in range(RU_CONFIG[ru]["channel_count"])
+                                                 ] if SOFTWARE_TPG_ENABLED else []) + ([
+                                                     trb.geoidinst(region=RU_CONFIG[ru]["region_id"],
+                                                                   element=idx+RU_CONFIG[ru]["start_channel"],
+                                                                   system="DataSelection",
+                                                                   connection_name=f"{PARTITION}.ds_tp_datareq_0")
+                                                     for ru in range(len(RU_CONFIG)) for idx in range(RU_CONFIG[ru]["channel_count"])
+                                                 ] if SOFTWARE_TPG_ENABLED else [])))),
+                    Module(name = 'datawriter',
+                           plugin = 'DataWriter',
+                           connections = {'trigger_record_input_queue': Connection('datawriter.trigger_record_q')},
+                           conf = dw.ConfParams(
+                               initial_token_count=TOKEN_COUNT,
+                               token_connection=PARTITION+".triginh",
+                               data_store_parameters=hdf5ds.ConfParams(
+                                   name="data_store",
+                                   version = 3,
+                                   operational_environment = OPERATIONAL_ENVIRONMENT,
+                                   directory_path = OUTPUT_PATH,
+                                   max_file_size_bytes = MAX_FILE_SIZE,
+                                   disable_unique_filename_suffix = False,
+                                   filename_parameters = hdf5ds.FileNameParams(
+                                       overall_prefix = OPERATIONAL_ENVIRONMENT,
+                                       digits_for_run_number = 6,
+                                       file_index_prefix = "",
+                                       digits_for_file_index = 4),
+                                   file_layout_parameters = hdf5ds.FileLayoutParams(
+                                       trigger_record_name_prefix= "TriggerRecord",
+                                       digits_for_trigger_number = 5,
+                                       path_param_list = hdf5ds.PathParamList(
+                                           [hdf5ds.PathParams(detector_group_type="TPC",
+                                                              detector_group_name="TPC",
+                                                              region_name_prefix=TPC_REGION_NAME_PREFIX,
+                                                              element_name_prefix="Link"),
+                                            hdf5ds.PathParams(detector_group_type="PDS",
+                                                              detector_group_name="PDS"),
+                                            hdf5ds.PathParams(detector_group_type="NDLArTPC",
+                                                              detector_group_name="NDLArTPC"),
+                                            hdf5ds.PathParams(detector_group_type="Trigger",
+                                                              detector_group_name="Trigger"),
+                                            hdf5ds.PathParams(detector_group_type="TPC_TP",
+                                                              detector_group_name="TPC",
+                                                              region_name_prefix="TP_APA",
+                                                              element_name_prefix="Link")])))))]
+            
+        if TPSET_WRITING_ENABLED:
+            for idx in range(len(RU_CONFIG)):
+                modules += [Module(name = f'tpset_subscriber_{idx}',
+                                   plugin = "NetworkToQueue",
+                                   connections = {'output':Connection(f"tpswriter.tpsets_from_netq")},
+                                   conf = nor.Conf(name=f'{PARTITION}.tpsets_{idx}',
+                                                   subscriptions=["TPSets"]))]
 
-    cmd_data['conf'] = acmd([
-                ("trigdec_receiver", tdrcv.ConfParams(general_queue_timeout=QUEUE_POP_WAIT_MS,
-                                                      connection_name=PARTITION+".trigdec")),
+            modules += [Module(name = 'tpswriter',
+                               plugin = "TPSetWriter",
+                               connections = {'tpset_source': Connection("tpsets_from_netq")},
+                               conf = tpsw.ConfParams(max_file_size_bytes=1000000000))]
 
-                ("trb", trb.ConfParams( general_queue_timeout=QUEUE_POP_WAIT_MS,
-                                        reply_connection_name = PARTITION+".frags_0",
-                                        map=trb.mapgeoidconnections([
-                                                trb.geoidinst(region=RU_CONFIG[ru]["region_id"], element=idx + RU_CONFIG[ru]["start_channel"], system=SYSTEM_TYPE, connection_name=f"{PARTITION}.datareq_{ru}") for ru in range(len(RU_CONFIG)) for idx in range(RU_CONFIG[ru]["channel_count"])
-                                        ] + ([
-                                            trb.geoidinst(region=RU_CONFIG[ru]["region_id"], element=idx + RU_CONFIG[ru]["start_channel"] + total_link_count, system=SYSTEM_TYPE, connection_name=f"{PARTITION}.datareq_{ru}") for ru in range(len(RU_CONFIG)) for idx in range(RU_CONFIG[ru]["channel_count"])
-                                        ] if SOFTWARE_TPG_ENABLED else []) + ([
-                                            trb.geoidinst(region=RU_CONFIG[ru]["region_id"], element=idx + RU_CONFIG[ru]["start_channel"], system="DataSelection", connection_name=f"{PARTITION}.ds_tp_datareq_0") for ru in range(len(RU_CONFIG)) for idx in range(RU_CONFIG[ru]["channel_count"])
+        if SOFTWARE_TPG_ENABLED:
+            modules += [Module(name = 'tp_fragment_receiver',
+                               plugin = "FragmentReceiver",
+                               connections = {'output': Connection("trb.data_fragments_q", Direction.OUT)},
+                               conf = frcv.ConfParams(general_queue_timeout=QUEUE_POP_WAIT_MS,
+                                                      connection_name=PARTITION+".tp_frags_0")),
+                        
+                        Module(name = 'ds_tpset_fragment_receiver',
+                               plugin = "FragmentReceiver",
+                               connections = {"output": Connection("trb.data_fragments_q", Direction.OUT)},
+                               conf = frcv.ConfParams(general_queue_timeout=QUEUE_POP_WAIT_MS,
+                                                      connection_name=PARTITION+".frags_tpset_ds_0"))]
+                        
+        mgraph=ModuleGraph(modules)
+        mgraph.add_endpoint("fragments",         "trb.data_fragment_input_queue",    Direction.IN)
+        mgraph.add_endpoint("trigger_decisions", "trb.trigger_decision_input_queue", Direction.IN)
+        mgraph.add_endpoint("tokens",            "datawriter.token_output_queue",    Direction.OUT)
 
-                                        ] if SOFTWARE_TPG_ENABLED else [])
-                                                              ) )),
-                ("datawriter", dw.ConfParams(initial_token_count=TOKEN_COUNT,
-                                             token_connection=PARTITION+".triginh",
-                                data_store_parameters=hdf5ds.ConfParams(name="data_store",
-                                version = 3,
-                                operational_environment = OPERATIONAL_ENVIRONMENT,
-                                directory_path = OUTPUT_PATH,
-                                max_file_size_bytes = MAX_FILE_SIZE,
-                                disable_unique_filename_suffix = False,
-                                filename_parameters = hdf5ds.FileNameParams(overall_prefix = OPERATIONAL_ENVIRONMENT,
-                                    digits_for_run_number = 6,
-                                    file_index_prefix = "",
-                                    digits_for_file_index = 4,),
-                                file_layout_parameters = hdf5ds.FileLayoutParams(trigger_record_name_prefix= "TriggerRecord",
-                                    digits_for_trigger_number = 5,
-                                    path_param_list = hdf5ds.PathParamList([hdf5ds.PathParams(detector_group_type="TPC",
-                                                                                              detector_group_name="TPC",
-                                                                                              region_name_prefix=TPC_REGION_NAME_PREFIX,
-                                                                                              element_name_prefix="Link"),
-                                                                            hdf5ds.PathParams(detector_group_type="PDS",
-                                                                                              detector_group_name="PDS"),
-                                                                            hdf5ds.PathParams(detector_group_type="NDLArTPC",
-                                                                                              detector_group_name="NDLArTPC"),
-                                                                            hdf5ds.PathParams(detector_group_type="Trigger",
-                                                                                              detector_group_name="Trigger"),
-                                                                            hdf5ds.PathParams(detector_group_type="TPC_TP",
-                                                                                              detector_group_name="TPC",
-                                                                                              region_name_prefix="TP_APA",
-                                                                                              element_name_prefix="Link")])
-                                )))),
-            ] + [
-                ("fragment_receiver", frcv.ConfParams(
-                    general_queue_timeout=QUEUE_POP_WAIT_MS,
-                    connection_name=PARTITION+".frags_0"
-                )), 
-                ("tp_fragment_receiver", frcv.ConfParams(
-                    general_queue_timeout=QUEUE_POP_WAIT_MS,
-                    connection_name=PARTITION+".tp_frags_0"
-                )), 
-                ("ds_tpset_fragment_receiver", frcv.ConfParams(
-                    general_queue_timeout=QUEUE_POP_WAIT_MS,
-                    connection_name=PARTITION+".frags_tpset_ds_0"
-                )), 
-            ] + [
-                (f"tpset_subscriber_{idx}", ntoq.Conf(
-                    msg_type="dunedaq::trigger::TPSet",
-                    msg_module_name="TPSetNQ",
-                    receiver_config=nor.Conf(name=f'{PARTITION}.tpsets_{idx}',
-                                             subscriptions=["TPSets"])
-                ))
-                for idx in range(len(RU_CONFIG))
-            ] + ([
-                ("tpswriter", tpsw.ConfParams(
-                    max_file_size_bytes=1000000000,
-                ))] if TPSET_WRITING_ENABLED else [])
-            )
+        for i, producer in enumerate(FRAGMENT_PRODUCERS):
+            queue_name=f"data_request_{i}_output_queue"
+            mgraph.add_endpoint(util.data_request_endpoint_name(producer), f"trb.{queue_name}", Direction.OUT)
+        
+        super().__init__(modulegraph=mgraph, host=HOST)
+        self.export("trigger_app.dot")
 
-    startpars = rccmd.StartParams(run=RUN_NUMBER)
-    cmd_data['start'] = acmd([] +
-            ([("tpswriter", startpars),
-              ("tpset_subscriber_.*", startpars)
-            ] if TPSET_WRITING_ENABLED else [])
-            + [
-            ("datawriter", startpars),
-            ("fragment_receiver", startpars),
-            ("tp_fragment_receiver",startpars),
-            ("ds_tpset_fragment_receiver",startpars),
-            ("trb", startpars),
-            ("trigdec_receiver", startpars)])
-
-    cmd_data['stop'] = acmd([("trigdec_receiver", None),
-            ("trb", None),
-            ("fragment_receiver", None),
-              ("tp_fragment_receiver",None),
-              ("ds_tpset_fragment_receiver",None),
-            ("datawriter", None),
-            ] + ([
-              ("tpset_subscriber_.*", None),
-              ("tpswriter", None)
-              ] if TPSET_WRITING_ENABLED else [])
-            )
-
-    cmd_data['pause'] = acmd([("", None)])
-
-    cmd_data['resume'] = acmd([("", None)])
-
-    cmd_data['scrap'] = acmd([
-            ("fragment_receiver", None),
-            ("trigdec_receiver", None),
-            ("tp_fragment_receiver",None),
-            ("ds_tpset_fragment_receiver",None),
-            ("qton_token", None)])
-
-    cmd_data['record'] = acmd([("", None)])
-
-    return cmd_data

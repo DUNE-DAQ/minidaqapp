@@ -104,29 +104,27 @@ def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowd
         dqm_rawdisplay_params, dqm_meanrms_params, dqm_fourier_params,
         op_env, tpc_region_name_prefix, max_file_size, json_dir):
 
-    """
-      JSON_DIR: Json file output folder
-    """
 
     if exists(json_dir):
         raise RuntimeError(f"Directory {json_dir} already exists")
 
-    # console.log("Loading dataflow config generator")
-    # from . import dataflow_gen
+    console.log("Loading dataflow config generator")
+    from .dataflow_gen import DataFlowApp
     # if enable_dqm:
     #     console.log("Loading dqm config generator")
     #     from . import dqm_gen
     console.log("Loading readout config generator")
     from .readout_gen import ReadoutApp
-    # console.log("Loading trigger config generator")
-    # from . import trigger_gen
-    # console.log("Loading hsi config generator")
-    # from . import hsi_gen
+    console.log("Loading trigger config generator")
+    from .trigger_gen import TriggerApp
+    console.log("Loading hsi config generator")
+    from . import hsi_gen
     console.log("Loading fake hsi config generator")
     from .fake_hsi_gen import FakeHSIApp
-    # console.log("Loading timing hardware config generator")
-    # from . import thi_gen
-    # console.log(f"Generating configs for hosts trigger={host_trigger} dataflow={host_df} readout={host_ru} hsi={host_hsi} dqm={host_ru}")
+    console.log("Loading timing hardware config generator")
+    from .thi_gen import THIApp
+
+    console.log(f"Generating configs for hosts trigger={host_trigger} dataflow={host_df} readout={host_ru} hsi={host_hsi} dqm={host_ru}")
 
     the_system = System()
     
@@ -251,21 +249,27 @@ def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowd
         ru_configs.append( {"host": host_ru[hostidx], "card_id": cardid, "region_id": region_id[regionidx], "start_channel": ru_channel_counts[region_id[regionidx]], "channel_count": number_of_data_producers} )
         ru_channel_counts[region_id[regionidx]] += number_of_data_producers
         if len(region_id) != 1: regionidx = regionidx + 1
-    
+
+    for nw in nw_specs:
+        print(f'{nwmgr.Name} {nwmgr.Topic} {nwmgr.Address}')
+        
     if control_timing_hw:
-        timing_cmd_network_endpoints = set()
-        if use_hsi_hw:
-            timing_cmd_network_endpoints.add(partition_name + 'hsicmds')
+        pass
+        # PL: TODO
+        # timing_cmd_network_endpoints = set()
+        # if use_hsi_hw:
+        #     timing_cmd_network_endpoints.add(partition_name + 'hsicmds')
         # cmd_data_thi = thi_gen.generate(RUN_NUMBER = run_number,
         #     NW_SPECS=nw_specs,
         #     TIMING_CMD_NETWORK_ENDPOINTS=timing_cmd_network_endpoints,
         #     CONNECTIONS_FILE=timing_hw_connections_file,
         #     HSI_DEVICE_NAME=hsi_device_name,
         # )
-        console.log("thi cmd data:", cmd_data_thi)
+        # console.log("thi cmd data:", cmd_data_thi)
 
     if use_hsi_hw:
         pass
+        # PL: TODO
         # cmd_data_hsi = hsi_gen.generate(nw_specs,
         #     RUN_NUMBER = run_number,
         #     CLOCK_SPEED_HZ = CLOCK_SPEED_HZ,
@@ -282,9 +286,8 @@ def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowd
         #     HSI_SOURCE=hsi_source,
         #     PARTITION=partition_name)
     else:
-        print("run_number", run_number)
         the_system.apps["hsi"] = FakeHSIApp(
-            # nw_specs,
+            NW_SPECS=nw_specs,
             RUN_NUMBER = run_number,
             CLOCK_SPEED_HZ = CLOCK_SPEED_HZ,
             DATA_RATE_SLOWDOWN_FACTOR = data_rate_slowdown_factor,
@@ -299,39 +302,45 @@ def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowd
         # the_system.apps["hsi"] = util.App(modulegraph=mgraph_hsi, host=host_hsi)
     console.log("hsi cmd data:", the_system.apps["hsi"])
 
-    # cmd_data_trigger = trigger_gen.generate(nw_specs,
-    #     SOFTWARE_TPG_ENABLED = enable_software_tpg,
-    #     RU_CONFIG = ru_configs,
-    #     ACTIVITY_PLUGIN = trigger_activity_plugin,
-    #     ACTIVITY_CONFIG = eval(trigger_activity_config),
-    #     CANDIDATE_PLUGIN = trigger_candidate_plugin,
-    #     CANDIDATE_CONFIG = eval(trigger_candidate_config),
-    #     TOKEN_COUNT = trigemu_token_count,
-    #     SYSTEM_TYPE = system_type,
-    #     TTCM_S1=ttcm_s1,
-    #     TTCM_S2=ttcm_s2,
-    #     TRIGGER_WINDOW_BEFORE_TICKS = trigger_window_before_ticks,
-    #     TRIGGER_WINDOW_AFTER_TICKS = trigger_window_after_ticks,
-    #     PARTITION=partition_name)
-
+    the_system.apps['trigger'] = TriggerApp(
+        NW_SPECS = nw_specs,
+        SOFTWARE_TPG_ENABLED = enable_software_tpg,
+        RU_CONFIG = ru_configs,
+        ACTIVITY_PLUGIN = trigger_activity_plugin,
+        ACTIVITY_CONFIG = eval(trigger_activity_config),
+        CANDIDATE_PLUGIN = trigger_candidate_plugin,
+        CANDIDATE_CONFIG = eval(trigger_candidate_config),
+        TOKEN_COUNT = trigemu_token_count,
+        SYSTEM_TYPE = system_type,
+        TTCM_S1=ttcm_s1,
+        TTCM_S2=ttcm_s2,
+        TRIGGER_WINDOW_BEFORE_TICKS = trigger_window_before_ticks,
+        TRIGGER_WINDOW_AFTER_TICKS = trigger_window_after_ticks,
+        PARTITION=partition_name,
+        HOST=host_trigger)
 
     # console.log("trigger cmd data:", cmd_data_trigger)
 
-    #     cmd_data_dataflow = dataflow_gen.generate(nw_specs,
-    #         RU_CONFIG = ru_configs,
-    #         RUN_NUMBER = run_number,
-    #         OUTPUT_PATH = output_path,
-    #         TOKEN_COUNT = df_token_count,
-    #         SYSTEM_TYPE = system_type,
-    #         SOFTWARE_TPG_ENABLED = enable_software_tpg,
-    #         TPSET_WRITING_ENABLED = enable_tpset_writing,
-    #         PARTITION=partition_name,
-    #         OPERATIONAL_ENVIRONMENT = op_env,
-    #         TPC_REGION_NAME_PREFIX = tpc_region_name_prefix,
-    #         MAX_FILE_SIZE = max_file_size)
+    the_system.apps['dataflow'] = DataFlowApp(
+        NW_SPECS = nw_specs,
+        FRAGMENT_PRODUCERS = the_system.get_fragment_producers(),
+        RU_CONFIG = ru_configs,
+        RUN_NUMBER = run_number,
+        OUTPUT_PATH = output_path,
+        TOKEN_COUNT = df_token_count,
+        SYSTEM_TYPE = system_type,
+        SOFTWARE_TPG_ENABLED = enable_software_tpg,
+        TPSET_WRITING_ENABLED = enable_tpset_writing,
+        PARTITION=partition_name,
+        OPERATIONAL_ENVIRONMENT = op_env,
+        TPC_REGION_NAME_PREFIX = tpc_region_name_prefix,
+        MAX_FILE_SIZE = max_file_size,
+        HOST=host_df
+    )
+    exit(0)
     #     console.log("dataflow cmd data:", cmd_data_dataflow)
     
-        #-------------------------------------------------------------------
+    #-------------------------------------------------------------------
     # Readout apps
     
     cardid = {}
@@ -351,29 +360,32 @@ def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowd
     mgraphs_readout = []
     for i in range(len(host_ru)):
         ru_name = ru_app_names[i]
-        the_system.apps[ru_name] = ReadoutApp(NUMBER_OF_DATA_PRODUCERS = number_of_data_producers,
-                                              TOTAL_NUMBER_OF_DATA_PRODUCERS=total_number_of_data_producers,
+        the_system.apps[ru_name] = ReadoutApp(# NUMBER_OF_DATA_PRODUCERS = number_of_data_producers,
+                                              PARTITION=partition_name,
+                                              NW_SPECS=nw_specs,
+                                              RU_CONFIG=ru_configs,
+                                              # TOTAL_NUMBER_OF_DATA_PRODUCERS=total_number_of_data_producers,
                                               EMULATOR_MODE = emulator_mode,
                                               DATA_RATE_SLOWDOWN_FACTOR = data_rate_slowdown_factor,
                                               DATA_FILE = data_file,
                                               FLX_INPUT = use_felix,
                                               CLOCK_SPEED_HZ = CLOCK_SPEED_HZ,
-                                              HOSTIDX = i,
-                                              CARDID = cardid[i],
+                                              RUIDX = i,
+                                              # CARDID = cardid[i],
                                               RAW_RECORDING_ENABLED = enable_raw_recording,
                                               RAW_RECORDING_OUTPUT_DIR = raw_recording_output_dir,
                                               FRONTEND_TYPE = frontend_type,
                                               SYSTEM_TYPE = system_type,
-                                              REGION_ID = region_id,
-                                              DQM_ENABLED=enable_dqm,
-                                              DQM_KAFKA_ADDRESS=dqm_kafka_address,
+                                              # REGION_ID = region_id,
+                                              # DQM_ENABLED=enable_dqm,
+                                              # DQM_KAFKA_ADDRESS=dqm_kafka_address,
                                               SOFTWARE_TPG_ENABLED = enable_software_tpg,
                                               USE_FAKE_DATA_PRODUCERS = use_fake_data_producers,
                                               HOST=host_ru[i])
-        console.log(f"{ru_name} app: {the_system[ru_name]}")
-        # a.append(this_readout_mgraph)
-        # # for i,ru_name in enumerate(ru_app_names):
-        #  = util.App(modulegraph=mgraphs_readout[i], host=host_ru[i])
+        console.log(f"{ru_name} app: {the_system.apps[ru_name]}")
+    # a.append(this_readout_mgraph)
+    # for i,ru_name in enumerate(ru_app_names):
+    #  = util.App(modulegraph=mgraphs_readout[i], host=host_ru[i])
     # = [ readout_gen.generate(nw_specs,
     #                                              RU_CONFIG = ru_configs,
     #                                              EMULATOR_MODE = emulator_mode,

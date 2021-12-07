@@ -43,24 +43,23 @@ import dunedaq.nwqueueadapters.networkobjectsender as nos
 from appfwk.utils import acmd, mcmd, mrccmd, mspec
 from appfwk.conf_utils import ModuleGraph, App
 
-import json
 import math
 
 
 #===============================================================================
 class FakeHSIApp(App):
-    def __init__(#NW_SPECS: list,
-            self,
-            RUN_NUMBER=333,
-            CLOCK_SPEED_HZ: int=50000000,
-            DATA_RATE_SLOWDOWN_FACTOR: int=1,
-            TRIGGER_RATE_HZ: int=1,
-            HSI_DEVICE_ID: int=0,
-            MEAN_SIGNAL_MULTIPLICITY: int=0,
-            SIGNAL_EMULATION_MODE: int=0,
-            ENABLED_SIGNALS: int=0b00000001,
-            PARTITION="UNKNOWN",
-            HOST="localhost"):
+    def __init__(self,
+                 NW_SPECS: list,
+                 RUN_NUMBER=333,
+                 CLOCK_SPEED_HZ: int=50000000,
+                 DATA_RATE_SLOWDOWN_FACTOR: int=1,
+                 TRIGGER_RATE_HZ: int=1,
+                 HSI_DEVICE_ID: int=0,
+                 MEAN_SIGNAL_MULTIPLICITY: int=0,
+                 SIGNAL_EMULATION_MODE: int=0,
+                 ENABLED_SIGNALS: int=0b00000001,
+                 PARTITION="UNKNOWN",
+                 HOST="localhost"):
         
         trigger_interval_ticks = 0
         required_eps = {PARTITION + '.hsievent'}
@@ -72,10 +71,11 @@ class FakeHSIApp(App):
     
         from appfwk.conf_utils import Module, ModuleGraph, Direction
         from appfwk.conf_utils import Connection as Conn
-        # from . import util
-        modules = {}
+        
+        modules = []
     
-        modules['fhsig'] = Module(plugin = "FakeHSIEventGenerator",
+        modules += [Module(name = 'fhsig',
+                                  plugin = "FakeHSIEventGenerator",
                                   conf =  fhsig.Conf(clock_frequency=CLOCK_SPEED_HZ/DATA_RATE_SLOWDOWN_FACTOR,
                                                      #timestamp_offset=???,
                                                      #hsi_device_id=???,
@@ -84,11 +84,12 @@ class FakeHSIApp(App):
                                                      signal_emulation_mode=SIGNAL_EMULATION_MODE,
                                                      enabled_signals=ENABLED_SIGNALS,
                                                      hsievent_connection_name=PARTITION+".hsievent",
-                                                     )
-                                  )
+                                                     ))]
     
         mgraph = ModuleGraph(modules)
         mgraph.add_endpoint("time_sync", "fhsig.time_sync_source", Direction.IN)
-        mgraph.add_endpoint("hsievent",  "fhsig.hsievent_sink",    Direction.OUT)
-        super().__init__(modulegraph=mgraph, host=HOST)
+        mgraph.add_endpoint("hsievents", "fhsig.hsievent_sink",    Direction.OUT)
+        super().__init__(modulegraph=mgraph, host=HOST, name="FakeHSIApp")
+        self.export("fake_hsi_app.dot")
+        
 

@@ -49,11 +49,7 @@ import dunedaq.dfmodules.requestreceiver as rrcv
 import dunedaq.networkmanager.nwmgr as nwmgr
 
 from appfwk.utils import acmd, mcmd, mrccmd, mspec
-from appfwk.conf_utils import ModuleGraph, Module
-
-import json
-import math
-from pprint import pprint
+from appfwk.conf_utils import App, ModuleGraph, Module, Direction, Connection
 
 
 #FIXME maybe one day, triggeralgs will define schemas... for now allow a dictionary of 4byte int, 4byte floats, and strings
@@ -76,267 +72,167 @@ def make_moo_record(conf_dict,name,path='temptypes'):
     moo.otypes.make_type(schema='record', fields=fields, name=name, path=path)
 
 #===============================================================================
-def generate(
-        NW_SPECS: list,
+class TriggerApp(App):
+    def __init__(self,
+                 NW_SPECS: list,
+                 
+                 SOFTWARE_TPG_ENABLED: bool = False,
+                 RU_CONFIG: list = [],
+
+                 ACTIVITY_PLUGIN: str = 'TriggerActivityMakerPrescalePlugin',
+                 ACTIVITY_CONFIG: dict = dict(prescale=10000),
+
+                 CANDIDATE_PLUGIN: str = 'TriggerCandidateMakerPrescalePlugin',
+                 CANDIDATE_CONFIG: int = dict(prescale=10),
+
+                 TOKEN_COUNT: int = 10,
+                 SYSTEM_TYPE = 'wib',
+                 TTCM_S1: int = 1,
+                 TTCM_S2: int = 2,
+                 TRIGGER_WINDOW_BEFORE_TICKS: int = 1000,
+                 TRIGGER_WINDOW_AFTER_TICKS: int = 1000,
+                 PARTITION="UNKNOWN",
+                 HOST="localhost"
+                 ):
+        """
+        { item_description }
+        """
         
-        SOFTWARE_TPG_ENABLED: bool = False,
-        RU_CONFIG: list = [],
+        # Generate schema for the maker plugins on the fly in the temptypes module
+        make_moo_record(ACTIVITY_CONFIG , 'ActivityConf' , 'temptypes')
+        make_moo_record(CANDIDATE_CONFIG, 'CandidateConf', 'temptypes')
+        import temptypes
 
-        ACTIVITY_PLUGIN: str = 'TriggerActivityMakerPrescalePlugin',
-        ACTIVITY_CONFIG: dict = dict(prescale=10000),
+        modules = []
+    
+        if SOFTWARE_TPG_ENABLED:
+            connections_request_receiver = {}
+            connections_tpset_receiver = {}
+            for ru in range(len(RU_CONFIG)):
+                for idy in range(RU_CONFIG[ru]["channel_count"]):
+                    connections_request_receiver[f'output_{ru}_{idy}'] = Connection(f'buf{ru}_{idy}.data_request_q{ru}_{idy}')
+                    connections_tpset_receiver  [f'output_{ru}_{idy}'] = Connection(f'buf{ru}_{idy}.tpset_q_for_buf{ru}_{idy}')
 
-        CANDIDATE_PLUGIN: str = 'TriggerCandidateMakerPrescalePlugin',
-        CANDIDATE_CONFIG: int = dict(prescale=10),
+            config_request_receiver = rrcv.ConfParams(map = [rrcv.geoidinst(region=RU_CONFIG[ru]["region_id"],
+                                                                            element=idy+RU_CONFIG[ru]["start_channel"],
+                                                                            system="DataSelection",
+                                                                            queueinstance=f"data_request_q{ru}_{idy}")
+                                                             for ru in range(len(RU_CONFIG)) for idy in range(RU_CONFIG[ru]["channel_count"])],
+                                                      general_queue_timeout = 100,
+                                                      connection_name = f"{PARTITION}.ds_tp_datareq_0")
+            
+            config_tpset_receiver = tpsrcv.ConfParams(map = [tpsrcv.geoidinst(region=RU_CONFIG[ru]["region_id"],
+                                                                              element=idy+RU_CONFIG[ru]["start_channel"],
+                                                                              system=SYSTEM_TYPE,
+                                                                              queueinstance=f"tpset_q_for_buf{ru}_{idy}")
+                                                             for ru in range(len(RU_CONFIG)) for idy in range(RU_CONFIG[ru]["channel_count"])],
+                                                      general_queue_timeout = 100,
+                                                      topic = f"TPSets")
+    
+            config_qton_fragment = qton.Conf(msg_type="std::unique_ptr<dunedaq::daqdataformats::Fragment>",
+                                             msg_module_name="FragmentNQ",
+                                             sender_config=nos.Conf(name=f"{PARTITION}.frags_tpset_ds_0",stype="msgpack"))
 
-        TOKEN_COUNT: int = 10,
-        SYSTEM_TYPE = 'wib',
-        TTCM_S1: int = 1,
-        TTCM_S2: int = 2,
-        TRIGGER_WINDOW_BEFORE_TICKS: int = 1000,
-        TRIGGER_WINDOW_AFTER_TICKS: int = 1000,
-        PARTITION="UNKNOWN"
-):
-    """
-    { item_description }
-    """
-    cmd_data = {}
+            config_tcm =  tcm.Conf(candidate_maker=CANDIDATE_PLUGIN,
+                                   candidate_maker_config=temptypes.CandidateConf(**CANDIDATE_CONFIG))
+            
+            modules += [Module(name = 'request_receiver',
+                               plugin = 'RequestReceiver',
+                               connections = connections_request_receiver,
+                               conf = config_request_receiver),
+                        
+                        Module(name = 'tpset_receiver',
+                               plugin = 'TPSetReceiver',
+                               connections = connections_tpset_receiver,
+                               conf = config_tpset_receiver),
+                        
+                        Module(name = 'qton_fragments',
+                               plugin = 'QueueToNetwork',
+                               connections = {}, # all the incoming links in TPSetBufferCreators
+                               conf = config_qton_fragment),
+                        
+                        Module(name = 'tcm',
+                               plugin = 'TriggerCandidateMaker',
+                               connections = {#'input' : Connection(f'tcm.taset_q'),
+                                   'output': Connection(f'mlt.trigger_candidate_q')},
+                               conf = config_tcm)]
+            
+            for ru in range(len(RU_CONFIG)):
+                
+                modules += [Module(name = f'tpset_subscriber_{ru}',
+                                   plugin = 'NetworkToQueue',
+                                   connections = {'output': Connection(f'zip_{ru}.tpsets_from_netq_{ru}')},
+                                   conf = ntoq.Conf(msg_type="dunedaq::trigger::TPSet",
+                                                    msg_module_name="TPSetNQ",
+                                                    receiver_config=nor.Conf(name=f'{PARTITION}.tpsets_{ru}',
+                                                                             subscriptions=["TPSets"]))),
+                            
+                            Module(name = f'zip_{ru}',
+                                   plugin = 'TPZipper',
+                                   connections = {# 'input' are App.network_endpoints, from RU
+                                       'output': Connection(f'tam_{ru}.input')},
+                                   conf = tzip.ConfParams(cardinality=RU_CONFIG[ru]['channel_count'],
+                                                          max_latency_ms=1000,
+                                                          region_id=0,
+                                                          element_id=0)),
+                            
+                            Module(name = f'tam_{ru}',
+                                   plugin = 'TriggerActivityMaker',
+                                   connections = {'output': Connection('tcm.taset_q')},
+                                   conf = tam.Conf(activity_maker=ACTIVITY_PLUGIN,
+                                                   geoid_region=0,  # Fake placeholder
+                                                   geoid_element=0,  # Fake placeholder
+                                                   window_time=10000,  # should match whatever makes TPSets, in principle
+                                                   buffer_time=625000,  # 10ms in 62.5 MHz ticks
+                                                   activity_maker_config=temptypes.ActivityConf(**ACTIVITY_CONFIG)))]
 
-    # Define modules and queues
-    queue_bare_specs = [
-        app.QueueSpec(inst='trigger_candidate_q', kind='FollyMPMCQueue', capacity=1000),
-        app.QueueSpec(inst="hsievent_from_netq", kind='FollyMPMCQueue', capacity=1000),
-    ]
+                for idy in range(RU_CONFIG[ru]["channel_count"]):
+                    modules += [Module(name = f'buf{ru}_{idy}',
+                                       plugin = 'TPSetBufferCreator',
+                                       connections = {#'tpset_source': Connection(f"tpset_q_for_buf{ru}_{idy}"),#already in request_receiver
+                                                      #'data_request_source': Connection(f"data_request_q{ru}_{idy}"), #ditto
+                                                      'fragment_sink': Connection('qton_fragments.fragment_q')},
+                                       conf = buf.Conf(tpset_buffer_size=10000, region=RU_CONFIG[ru]["region_id"], element=idy + RU_CONFIG[ru]["start_channel"]))]
 
-    if SOFTWARE_TPG_ENABLED:
-        queue_bare_specs.extend([
-                app.QueueSpec(inst=f"fragment_q", kind='FollyMPMCQueue', capacity=1000),
-                app.QueueSpec(inst=f'taset_q', kind='FollyMPMCQueue', capacity=1000),
-        ])
-        for ru in range(len(RU_CONFIG)):
-            queue_bare_specs.extend([
-                app.QueueSpec(inst=f"tpsets_from_netq_{ru}", kind='FollySPSCQueue', capacity=1000),
-                app.QueueSpec(inst=f'zipped_tpset_q_{ru}', kind='FollySPSCQueue', capacity=1000),
-            ])
-            for idx in range(RU_CONFIG[ru]["channel_count"]):
-                queue_bare_specs.extend([
-                    app.QueueSpec(inst=f"tpset_q_for_buf{ru}_{idx}", kind='FollySPSCQueue', capacity=1000),
-                    app.QueueSpec(inst=f"data_request_q{ru}_{idx}", kind='FollySPSCQueue', capacity=1000),
-                ])
+        modules += [Module(name = 'ttcm',
+                           plugin = 'TimingTriggerCandidateMaker',
+                           connections={"output": Connection("mlt.trigger_candidate_q")},
+                           conf=ttcm.Conf(s1=ttcm.map_t(signal_type=TTCM_S1,
+                                                        time_before=TRIGGER_WINDOW_BEFORE_TICKS,
+                                                        time_after=TRIGGER_WINDOW_AFTER_TICKS),
+                                          s2=ttcm.map_t(signal_type=TTCM_S2,
+                                                        time_before=TRIGGER_WINDOW_BEFORE_TICKS,
+                                                        time_after=TRIGGER_WINDOW_AFTER_TICKS),
+                                          hsievent_connection_name = PARTITION+".hsievent"))]
+                    
+        # We need to populate the list of links based on the fragment
+        # producers available in the system. This is a bit of a
+        # chicken-and-egg problem, because the trigger app itself creates
+        # fragment producers (see below). Eventually when the MLT is its
+        # own process, this problem will probably go away, but for now, we
+        # leave the list of links here blank, and replace it in
+        # util.connect_fragment_producers
+        modules += [Module(name = 'mlt',
+                           plugin = 'ModuleLevelTrigger',
+                           conf=mlt.ConfParams(links=[], # To be updated later - see comment above
+                                               td_connection_name=PARTITION+".trigdec",
+                                               token_connection_name=PARTITION+".triginh"))]
+        
+        mgraph = ModuleGraph(modules)
+        mgraph.add_endpoint("hsievents",  "ttcm.input", Direction.IN)
+        if SOFTWARE_TPG_ENABLED:
+            for idx in range(len(RU_CONFIG)):
+                mgraph.add_endpoint(f"tpsets_into_chain_link{idx}", f"tpset_receiver.input", Direction.IN)
+                mgraph.add_endpoint(f"tpsets_into_buffer_link{idx}", f"tpset_subscriber_{idx}.tpset_source", Direction.IN)
 
-    # Only needed to reproduce the same order as when using jsonnet
-    queue_specs = app.QueueSpecs(sorted(queue_bare_specs, key=lambda x: x.inst))
-
-    mod_specs = []
-
-    if SOFTWARE_TPG_ENABLED:
-        mod_specs.extend([
-            mspec(f"request_receiver", "RequestReceiver", [app.QueueInfo(name="output", inst=f"data_request_q{ru}_{idy}", dir="output") for ru in range(len(RU_CONFIG)) for idy in range(RU_CONFIG[ru]["channel_count"])])
-        ] + [
-            mspec(f"tpset_receiver", "TPSetReceiver", [app.QueueInfo(name="output", inst=f"tpset_q_for_buf{ru}_{idy}", dir="output") for ru in range(len(RU_CONFIG)) for idy in range(RU_CONFIG[ru]["channel_count"])])
-        ] + [
-            mspec(f"qton_fragments", "QueueToNetwork", [app.QueueInfo(name="input", inst=f"fragment_q", dir="input")]),
-                mspec(f'tcm', 'TriggerCandidateMaker', [ # TASet -> TC
-                    app.QueueInfo(name='input', inst=f'taset_q', dir='input'),
-                    app.QueueInfo(name='output', inst=f'trigger_candidate_q', dir='output'),
-                ])
-        ])
-        for ru in range(len(RU_CONFIG)):
-            mod_specs.extend([
-                mspec(f"tpset_subscriber_{ru}", "NetworkToQueue", [
-                    app.QueueInfo(name="output", inst=f"tpsets_from_netq_{ru}", dir="output")
-                ]),
-                mspec(f"zip_{ru}", "TPZipper", [
-                    app.QueueInfo(name="input", inst=f"tpsets_from_netq_{ru}", dir="input"),
-                    app.QueueInfo(name="output", inst=f"zipped_tpset_q_{ru}", dir="output"), #FIXME need to fanout this zipped_tpset_q if using multiple algorithms
-                ]),
-
-                ### Algorithm(s)
-
-                mspec(f'tam_{ru}', 'TriggerActivityMaker', [ # TPSet -> TASet
-                    app.QueueInfo(name='input', inst=f'zipped_tpset_q_{ru}', dir='input'),
-                    app.QueueInfo(name='output', inst=f'taset_q', dir='output'),
-                ]),
-
-            ])
-            for idy in range(RU_CONFIG[ru]["channel_count"]):
-                mod_specs.extend([
-                mspec(f"buf{ru}_{idy}", "TPSetBufferCreator", [
-                    app.QueueInfo(name="tpset_source", inst=f"tpset_q_for_buf{ru}_{idy}", dir="input"),
-                    app.QueueInfo(name="data_request_source", inst=f"data_request_q{ru}_{idy}", dir="input"),
-                    app.QueueInfo(name="fragment_sink", inst=f"fragment_q", dir="output"),
-                ])
-            ])
-
-    mod_specs += ([
-
-        ### Timing TCs
-        mspec("ntoq_hsievent", "NetworkToQueue", [
-            app.QueueInfo(name="output", inst="hsievent_from_netq", dir="output")
-        ]),
-
-        mspec("ttcm", "TimingTriggerCandidateMaker", [
-            app.QueueInfo(name="input", inst="hsievent_from_netq", dir="input"),
-            app.QueueInfo(name="output", inst="trigger_candidate_q", dir="output"),
-        ]),
-
-        ### Module level trigger
-
-        mspec("mlt", "ModuleLevelTrigger", [
-            app.QueueInfo(name="trigger_candidate_source", inst="trigger_candidate_q", dir="input"),
-        ]),
-
-    ])
-
-    cmd_data['init'] = app.Init(queues=queue_specs, modules=mod_specs, nwconnections=NW_SPECS)
-
-    # Generate schema for the maker plugins on the fly in the temptypes module
-    make_moo_record(ACTIVITY_CONFIG,'ActivityConf','temptypes')
-    make_moo_record(CANDIDATE_CONFIG,'CandidateConf','temptypes')
-    import temptypes
-
-    tp_confs = []
-
-    if SOFTWARE_TPG_ENABLED:
-        tp_confs.extend([
-            ("request_receiver", rrcv.ConfParams(
-                                                 map = [rrcv.geoidinst(region=RU_CONFIG[ru]["region_id"], element=idy + RU_CONFIG[ru]["start_channel"], system="DataSelection" , queueinstance=f"data_request_q{ru}_{idy}") for ru in range(len(RU_CONFIG)) for idy in range(RU_CONFIG[ru]["channel_count"])],
-                                                 general_queue_timeout = 100,
-                                                 connection_name = f"{PARTITION}.ds_tp_datareq_0")),
-            ("tpset_receiver", tpsrcv.ConfParams(
-                                                 map = [tpsrcv.geoidinst(region=RU_CONFIG[ru]["region_id"] , element=idy + RU_CONFIG[ru]["start_channel"], system=SYSTEM_TYPE , queueinstance=f"tpset_q_for_buf{ru}_{idy}") for ru in range(len(RU_CONFIG)) for idy in range(RU_CONFIG[ru]["channel_count"])],
-                                                 general_queue_timeout = 100,
-                                                 topic = f"TPSets")),
-            (f"qton_fragments", qton.Conf(msg_type="std::unique_ptr<dunedaq::daqdataformats::Fragment>",
-                                          msg_module_name="FragmentNQ",
-                                          sender_config=nos.Conf(name=f"{PARTITION}.frags_tpset_ds_0",
-                                                                 stype="msgpack"))),
-                (f'tcm', tcm.Conf(
-                    candidate_maker=CANDIDATE_PLUGIN,
-                    candidate_maker_config=temptypes.CandidateConf(**CANDIDATE_CONFIG)
-                )),
-        ])
-        for idx in range(len(RU_CONFIG)):
-            tp_confs.extend([
-                (f"tpset_subscriber_{idx}", ntoq.Conf(
-                    msg_type="dunedaq::trigger::TPSet",
-                    msg_module_name="TPSetNQ",
-                    receiver_config=nor.Conf(name=f'{PARTITION}.tpsets_{idx}',
-                                             subscriptions=["TPSets"])
-                )),
-                (f"zip_{idx}", tzip.ConfParams(
-                    cardinality=RU_CONFIG[idx]["channel_count"],
-                    max_latency_ms=1000,
-                    region_id=0, # Fake placeholder
-                    element_id=0 # Fake placeholder
-                )),
-
-                ### Algorithms
-
-                (f'tam_{idx}', tam.Conf(
-                    activity_maker=ACTIVITY_PLUGIN,
-                    geoid_region=0, # Fake placeholder
-                    geoid_element=0, # Fake placeholder
-                    window_time=10000, # should match whatever makes TPSets, in principle
-                    buffer_time=625000, # 10ms in 62.5 MHz ticks
-                    activity_maker_config=temptypes.ActivityConf(**ACTIVITY_CONFIG)
-                )),
-
-            ])
-            for idy in range(RU_CONFIG[idx]["channel_count"]):
-                tp_confs.extend([
-                    (f"buf{idx}_{idy}", buf.Conf(tpset_buffer_size=10000, region=RU_CONFIG[idx]["region_id"], element=idy + RU_CONFIG[idx]["start_channel"])) 
-                ])
+                mgraph.add_fragment_producer(region=0, element=idx, system="DataSelection",
+                                             requests_in=f"request_receiver.data_request_source",
+                                             fragments_out=f"qton_fragments.fragment_sink")
 
 
-    total_link_count = 0
-    for ru in range(len(RU_CONFIG)):
-        total_link_count += RU_CONFIG[ru]["channel_count"]
+        mgraph.add_endpoint("trigger_decisions", "mlt.trigger_decision_sink", Direction.OUT)
+        mgraph.add_endpoint("tokens", "mlt.token_source", Direction.IN)
 
-    cmd_data['conf'] = acmd(tp_confs + [
+        super().__init__(modulegraph=mgraph, host=HOST, name='TriggerApp')
+        self.export("trigger_app.dot")
 
-
-        ### Timing TCs
-
-        ("ntoq_hsievent", ntoq.Conf(
-            msg_type="dunedaq::dfmessages::HSIEvent",
-            msg_module_name="HSIEventNQ",
-            receiver_config=nor.Conf(name=PARTITION+".hsievent")
-        )),
-
-        ("ttcm", ttcm.Conf(
-            s1=ttcm.map_t(signal_type=TTCM_S1,
-                          time_before=TRIGGER_WINDOW_BEFORE_TICKS,
-                          time_after=TRIGGER_WINDOW_AFTER_TICKS),
-            s2=ttcm.map_t(signal_type=TTCM_S2,
-                          time_before=TRIGGER_WINDOW_BEFORE_TICKS,
-                          time_after=TRIGGER_WINDOW_AFTER_TICKS)
-            )
-        ),
-
-        # Module level trigger
-        ("mlt", mlt.ConfParams(
-            # This line requests the raw data from upstream DAQ _and_ the raw TPs from upstream DAQ
-            td_connection_name=PARTITION+".trigdec",
-            token_connection_name=PARTITION+".triginh",
-            links=[
-                mlt.GeoID(system=SYSTEM_TYPE, region=RU_CONFIG[ru]["region_id"], element=RU_CONFIG[ru]["start_channel"] + idx)
-                    for ru in range(len(RU_CONFIG)) for idx in range(RU_CONFIG[ru]["channel_count"])
-            ] + ([
-                mlt.GeoID(system="DataSelection", region=RU_CONFIG[ru]["region_id"], element=RU_CONFIG[ru]["start_channel"] + idx) 
-                    for ru in range(len(RU_CONFIG)) for idx in range(RU_CONFIG[ru]["channel_count"])
-            ] if SOFTWARE_TPG_ENABLED else []) + ([
-                mlt.GeoID(system=SYSTEM_TYPE, region=RU_CONFIG[ru]["region_id"], element=RU_CONFIG[ru]["start_channel"] + idx + total_link_count)
-                    for ru in range(len(RU_CONFIG)) for idx in range(RU_CONFIG[ru]["channel_count"])
-            ] if SOFTWARE_TPG_ENABLED else []),
-            initial_token_count=TOKEN_COUNT
-        )),
-    ])
-
-    # We start modules in "downstream-to-upstream" order, so that each
-    # module is ready before its input starts sending data. The stop
-    # order is the reverse (upstream-to-downstream), so each module
-    # can process all of its input then stop, ensuring all data gets
-    # processed
-    start_order = [
-        "buf.*",
-        "mlt",
-        "ttcm",
-        "ntoq_hsievent",
-        "ntoq_token"
-    ]
-
-    if SOFTWARE_TPG_ENABLED:
-        start_order += [
-            "qton_fragments",
-            "tcm",
-            "tam_.*",
-            "zip_.*",
-            "tpset_subscriber_.*",
-            "tpset_receiver",
-            "request_receiver"
-        ]
-
-    stop_order = start_order[::-1]
-
-    startpars = rccmd.StartParams(run=1)
-    cmd_data['start'] = acmd([ (m, startpars) for m in start_order ])
-    cmd_data['stop'] = acmd([ (m, None) for m in stop_order ])
-
-    cmd_data['pause'] = acmd([
-        ("mlt", None)
-    ])
-
-    resumepars = rccmd.ResumeParams(trigger_interval_ticks=50000000)
-    cmd_data['resume'] = acmd([
-        ("mlt", resumepars)
-    ])
-
-    cmd_data['scrap'] = acmd([
-        ("", None)
-    ])
-
-    cmd_data['record'] = acmd([
-        ("", None)
-    ])
-
-    return cmd_data
