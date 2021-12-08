@@ -228,7 +228,7 @@ def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowd
                                                     RAW_RECORDING_OUTPUT_DIR = raw_recording_output_dir,
                                                     FRONTEND_TYPE = frontend_type,
                                                     SYSTEM_TYPE = system_type,
-                                                    REGION_ID = region_id,
+                                                    REGION_ID = region_id + hostidx,
                                                     DQM_ENABLED=enable_dqm,
                                                     DQM_KAFKA_ADDRESS=dqm_kafka_address,
                                                     SOFTWARE_TPG_ENABLED = enable_software_tpg,
