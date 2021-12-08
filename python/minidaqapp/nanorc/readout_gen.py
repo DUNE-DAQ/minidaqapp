@@ -63,16 +63,16 @@ def generate(# NETWORK_ENDPOINTS,
 
     if not USE_FAKE_DATA_PRODUCERS and not FLX_INPUT:
         modules["fake_source"] = Module(plugin = "FakeCardReader",
-                                        connections = { f"output_{idx-MIN_LINK}" : Conn(f"datahandler_{idx}.raw_input",
-                                                                                        queue_name=f"{FRONTEND_TYPE}_{idx}",
-                                                                                        queue_kind="FollySPSCQueue",
-                                                                                        queue_capacity=100000)
-                                                        for idx in range(MIN_LINK,MAX_LINK) },
-                                        conf = sec.Conf(link_confs = [ sec.LinkConfiguration(geoid=sec.GeoID(system = SYSTEM_TYPE, region = 0, element = idx),
+                                        connections = { f"output_{idx}" : Conn(f"datahandler_{idx}.raw_input",
+                                                                               queue_name=f"{FRONTEND_TYPE}_{idx}",
+                                                                               queue_kind="FollySPSCQueue",
+                                                                               queue_capacity=100000)
+                                                        for idx in range(NUMBER_OF_DATA_PRODUCERS) },
+                                        conf = sec.Conf(link_confs = [ sec.LinkConfiguration(geoid=sec.GeoID(system = SYSTEM_TYPE, region = REGION_ID, element = idx),
                                                                                                    slowdown=DATA_RATE_SLOWDOWN_FACTOR,
-                                                                                                   queue_name=f"output_{idx-MIN_LINK}",
+                                                                                                   queue_name=f"output_{idx}",
                                                                                                    data_filename = DATA_FILE)
-                                                                          for idx in range(MIN_LINK,MAX_LINK) ],
+                                                                          for idx in range(NUMBER_OF_DATA_PRODUCERS) ],
                                                            # input_limit=10485100, # default
                                                            queue_timeout_ms = QUEUE_POP_WAIT_MS))
 
@@ -109,16 +109,16 @@ def generate(# NETWORK_ENDPOINTS,
                                                source_queue_timeout_ms= QUEUE_POP_WAIT_MS,
                                                # fake_trigger_flag=0, default
                                                region_id = REGION_ID,
-                                               element_id = TOTAL_NUMBER_OF_DATA_PRODUCERS + idx,
+                                               element_id = idx,
                                            ),
                                            latencybufferconf= rconf.LatencyBufferConf(
                                                latency_buffer_size = LATENCY_BUFFER_SIZE,
                                                region_id = REGION_ID,
-                                               element_id = TOTAL_NUMBER_OF_DATA_PRODUCERS + idx,
+                                               element_id = idx,
                                            ),
                                            rawdataprocessorconf= rconf.RawDataProcessorConf(
                                                region_id = REGION_ID,
-                                               element_id = TOTAL_NUMBER_OF_DATA_PRODUCERS + idx,
+                                               element_id = idx,
                                                enable_software_tpg = False,
                                            ),
                                            requesthandlerconf= rconf.RequestHandlerConf(
@@ -126,8 +126,7 @@ def generate(# NETWORK_ENDPOINTS,
                                                pop_limit_pct = 0.8,
                                                pop_size_pct = 0.1,
                                                region_id = REGION_ID,
-                                               element_id = TOTAL_NUMBER_OF_DATA_PRODUCERS + idx,
-                                               # output_file = f"output_{idx + MIN_LINK}.out",
+                                               element_id = idx,
                                                stream_buffer_size = 100 if FRONTEND_TYPE=='pacman' else 8388608,
                                                enable_raw_recording = False,
                                            )))
@@ -165,7 +164,7 @@ def generate(# NETWORK_ENDPOINTS,
                                                            pop_size_pct = 0.1,
                                                            region_id = REGION_ID,
                                                            element_id = idx,
-                                                           output_file = f"output_{idx + MIN_LINK}.out",
+                                                           output_file = f"output_host{HOSTIDX}_{idx}.out",
                                                            stream_buffer_size = 8388608,
                                                            enable_raw_recording = RAW_RECORDING_ENABLED,
                                                        )))
@@ -174,18 +173,18 @@ def generate(# NETWORK_ENDPOINTS,
         for idx in range(NUMBER_OF_DATA_PRODUCERS):
             modules[f"data_recorder_{idx}"] = Module(plugin = "DataRecorder",
                                                      connections = {}, # No outgoing connections
-                                                     conf = dr.Conf(output_file = f"output_{idx + MIN_LINK}.out",
+                                                     conf = dr.Conf(output_file = f"output_host{HOSTIDX}_{idx}.out",
                                                                     compression_algorithm = "None",
                                                                     stream_buffer_size = 8388608))
     if DQM_ENABLED:
         modules["trb_dqm"] = Module(plugin = "TriggerRecordBuilder",
                                     connections = {},
                                     conf = trb.ConfParams(general_queue_timeout = QUEUE_POP_WAIT_MS,
-                                                          map=trb.mapgeoidqueue([trb.geoidinst(region = 0,
+                                                          map=trb.mapgeoidqueue([trb.geoidinst(region = REGION_ID,
                                                                                                element = idx,
                                                                                                system = "TPC",
                                                                                                queuename = f"data_requests_dqm_{idx}")
-                                                                                 for idx in range(MIN_LINK, MAX_LINK)])))
+                                                                                 for idx in range(NUMBER_OF_DATA_PRODUCERS)])))
         modules["dqmprocessor"] = Module(plugin = "DQMProcessor",
                                          connections = {},
                                          conf = dqmprocessor.Conf(mode='normal', # normal or debug
@@ -212,7 +211,7 @@ def generate(# NETWORK_ENDPOINTS,
         mgraph.add_endpoint(f"tpsets_{idx}", f"datahandler_{idx}.tpset_out",    Direction.OUT)
         # TODO: Should we just have one timesync outgoing endpoint?
         mgraph.add_endpoint(f"timesync_{idx}", f"datahandler_{idx}.timesync",    Direction.OUT)
-        mgraph.add_endpoint(f"timesync_{idx+NUMBER_OF_DATA_PRODUCERS}", f"tp_datahandler_{idx}.timesync",    Direction.OUT)
+        mgraph.add_endpoint(f"tp_timesync_{idx}", f"tp_datahandler_{idx}.timesync",    Direction.OUT)
 
         # Add fragment producers for raw data
         mgraph.add_fragment_producer(region = REGION_ID, element = idx, system = SYSTEM_TYPE,

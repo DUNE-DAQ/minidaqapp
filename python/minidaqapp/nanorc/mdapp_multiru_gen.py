@@ -301,21 +301,22 @@ def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowd
                                                  receiver="trigger.tokens"),
     }
 
-    app_connections.update({ f"ruemu0.tpsets_{idx}": util.Publisher(msg_type="dunedaq::trigger::TPSet",
-                                                                    msg_module_name="TPSetNQ",
-                                                                    subscribers=[f"trigger.tpsets_into_buffer_link{idx}",
-                                                                                 f"trigger.tpsets_into_chain_link{idx}"])
-                             for idx in range(total_number_of_data_producers) })
+    total_idx=0
+    for ru_app_name in ru_app_names:
+        for idx in range(number_of_data_producers):
+            app_connections.update({ f"{ru_app_name}.tpsets_{idx}": util.Publisher(msg_type="dunedaq::trigger::TPSet",
+                                                                                        msg_module_name="TPSetNQ",
+                                                                                        subscribers=[f"trigger.tpsets_into_buffer_link{total_idx}",
+                                                                                                     f"trigger.tpsets_into_chain_link{total_idx}"])})
+            total_idx+=1
     
-    app_connections.update({ f"ruemu0.timesync_{idx}": util.Publisher(msg_type="dunedaq::dfmessages::TimeSync",
-                                                                      msg_module_name="TimeSyncNQ",
-                                                                      subscribers=["hsi.time_sync"])
-                             for idx in range(total_number_of_data_producers) })
+            app_connections.update({ f"{ru_app_name}.timesync_{idx}": util.Publisher(msg_type="dunedaq::dfmessages::TimeSync",
+                                                                              msg_module_name="TimeSyncNQ",
+                                                                              subscribers=["hsi.time_sync"])})
 
-    app_connections.update({ f"ruemu0.timesync_{total_number_of_data_producers+idx}": util.Publisher(msg_type="dunedaq::dfmessages::TimeSync",
-                                                                      msg_module_name="TimeSyncNQ",
-                                                                      subscribers=["hsi.time_sync"])
-                             for idx in range(total_number_of_data_producers) })
+            app_connections.update({ f"{ru_app_name}.tp_timesync_{idx}": util.Publisher(msg_type="dunedaq::dfmessages::TimeSync",
+                                                                              msg_module_name="TimeSyncNQ",
+                                                                              subscribers=["hsi.time_sync"])})
 
     the_system.app_connections=app_connections
     the_system.app_start_order=["dataflow", "trigger"]+ru_app_names+["hsi"]
