@@ -42,7 +42,7 @@ import click
 @click.option('--disable-trace', is_flag=True, help="Do not enable TRACE (default TRACE_FILE is /tmp/trace_buffer_\${HOSTNAME}_\${USER})")
 @click.option('-f', '--use-felix', is_flag=True, help="Use real felix cards instead of fake ones")
 @click.option('--use-ssp', is_flag=True, help="Use real SSPs instead of fake sources")
-@click.option('--host-df', default='localhost')
+@click.option('--host-df', multiple=True, default=['localhost'], help="This option is repeatable, with each repetition adding another dataflow app.")
 @click.option('--host-ru', multiple=True, default=['localhost'], help="This option is repeatable, with each repetition adding an additional ru process.")
 @click.option('--host-trigger', default='localhost', help='Host to run the trigger app on')
 @click.option('--host-hsi', default='localhost', help='Host to run the HSI app on')
@@ -192,20 +192,21 @@ def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowd
 
     # network connections map
     nw_specs = [nwmgr.Connection(name=partition_name + ".hsievent",topics=[],  address="tcp://{host_trigger}:12344"),
-        nwmgr.Connection(name=partition_name + ".trigdec",topics=[],  address="tcp://{host_df}:12345"),
-        nwmgr.Connection(name=partition_name + ".triginh",topics=[],   address="tcp://{host_trigger}:12346"),
-        nwmgr.Connection(name=partition_name + ".frags_0", topics=[],  address="tcp://{host_df}:12347")]
+        nwmgr.Connection(name=partition_name + ".triginh",topics=[],   address="tcp://{host_trigger}:12345")]
 
-    port = 12348
+    port = 12346
+
+    for hostidx in range(len(host_df)):
+        nw_specs.append(nwmgr.Connection(name=f"{partition_name}.trigdec_{hostidx}",topics=[],  address="tcp://{host_df" + f"{hostidx}" + "}:" +f"{port}"))
+        port = port + 1
+        nw_specs.append(nwmgr.Connection(name=f"{partition_name}.frags_{hostidx}", topics=[],  address="tcp://{host_df" + f"{hostidx}" + "}:" + f"{port}"))
+        port = port + 1
+
     if control_timing_hw and use_hsi_hw:
         nw_specs.append(nwmgr.Connection(name=partition_name + ".hsicmds",  topics=[], address="tcp://{host_timing_hw}:" + f"{port}"))
         port = port + 1
 
     if enable_software_tpg:
-        nw_specs.append(nwmgr.Connection(name=partition_name + ".tp_frags_0", topics=[],  address="tcp://{host_df}:" + f"{port}"))
-        port = port + 1
-        nw_specs.append(nwmgr.Connection(name=f'{partition_name}.frags_tpset_ds_0', topics=[],  address="tcp://{host_df}:" + f"{port}"))
-        port = port + 1
         nw_specs.append(nwmgr.Connection(name=f"{partition_name}.ds_tp_datareq_0",topics=[],   address="tcp://{host_trigger}:" + f"{port}"))
         port = port + 1
 
@@ -293,6 +294,7 @@ def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowd
         CANDIDATE_PLUGIN = trigger_candidate_plugin,
         CANDIDATE_CONFIG = eval(trigger_candidate_config),
         TOKEN_COUNT = trigemu_token_count,
+        DF_COUNT = len(host_df),
         SYSTEM_TYPE = system_type,
         TTCM_S1=ttcm_s1,
         TTCM_S2=ttcm_s2,
@@ -303,8 +305,9 @@ def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowd
 
     console.log("trigger cmd data:", cmd_data_trigger)
 
-    cmd_data_dataflow = dataflow_gen.generate(nw_specs,
+    cmd_data_dataflow = [ dataflow_gen.generate(nw_specs,
         RU_CONFIG = ru_configs,
+        HOSTIDX = hostidx,
         RUN_NUMBER = run_number,
         OUTPUT_PATH = output_path,
         SYSTEM_TYPE = system_type,
@@ -313,7 +316,7 @@ def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowd
         PARTITION=partition_name,
         OPERATIONAL_ENVIRONMENT = op_env,
         TPC_REGION_NAME_PREFIX = tpc_region_name_prefix,
-        MAX_FILE_SIZE = max_file_size)
+        MAX_FILE_SIZE = max_file_size) for hostidx in range(len(host_df)) ]
     console.log("dataflow cmd data:", cmd_data_dataflow)
 
     cmd_data_readout = [ readout_gen.generate(nw_specs,
@@ -362,7 +365,7 @@ def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowd
     app_thi="thi"
     app_hsi = "hsi"
     app_trigger = "trigger"
-    app_df = "dataflow"
+    app_df = [f"dataflow{idx}" for idx in range(len(host_df))]
     app_dqm = [f"dqm{idx}" for idx in range(len(host_ru))]
     app_ru = [f"ruflx{idx}" if use_felix else f"ruemu{idx}" for idx in range(len(host_ru))]
     if use_ssp:
@@ -370,7 +373,7 @@ def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowd
 
     jf_hsi = join(data_dir, app_hsi)
     jf_trigemu = join(data_dir, app_trigger)
-    jf_df = join(data_dir, app_df)
+    jf_df = [join(data_dir, app_df[idx]) for idx in range(len(host_df))]
     jf_dqm = [join(data_dir, app_dqm[idx]) for idx in range(len(host_ru))]
     jf_ru = [join(data_dir, app_ru[idx]) for idx in range(len(host_ru))]
     if control_timing_hw:
@@ -378,10 +381,10 @@ def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowd
 
     cmd_set = ["init", "conf", "start", "stop", "pause", "resume", "scrap", "record"]
     
-    apps = [app_hsi, app_trigger, app_df] + app_ru
+    apps = [app_hsi, app_trigger] + app_df + app_ru
     if enable_dqm:
         apps += app_dqm
-    cmds_data = [cmd_data_hsi, cmd_data_trigger, cmd_data_dataflow] + cmd_data_readout
+    cmds_data = [cmd_data_hsi, cmd_data_trigger] + cmd_data_dataflow + cmd_data_readout
     if enable_dqm:
         cmds_data += cmd_data_dqm
     if control_timing_hw:
@@ -397,7 +400,7 @@ def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowd
 
     console.log(f"Generating top-level command json files")
 
-    start_order = [app_df] + [app_trigger] + app_ru + [app_hsi] + app_dqm
+    start_order = app_df + [app_trigger] + app_ru + [app_hsi] + app_dqm
     if not control_timing_hw and use_hsi_hw:
         resume_order = [app_trigger]
     else:
@@ -422,7 +425,8 @@ def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowd
                 if control_timing_hw:
                     del cfg['apps'][app_thi]
             elif c in ('resume', 'pause'):
-                del cfg['apps'][app_df]
+                for dfapp in app_df:
+                    del cfg['apps'][dfapp]
                 if control_timing_hw:
                     del cfg['apps'][app_thi]
                 elif use_hsi_hw:
@@ -474,7 +478,6 @@ def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowd
                 "DUNEDAQ_ERS_DEBUG_LEVEL": "getenv:-1",
             },
             "hosts": {
-                "host_df": host_df,
                 "host_trigger": host_trigger,
                 "host_hsi": host_hsi,
             },
@@ -489,11 +492,6 @@ def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowd
                     "host": "host_trigger",
                     "port": 3333
                 },
-                app_df: {
-                    "exec": "daq_application",
-                    "host": "host_df",
-                    "port": 3334
-                },
             },
             "response_listener": {
                 "port": 56789
@@ -504,7 +502,15 @@ def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowd
         if use_kafka:
             cfg["env"]["DUNEDAQ_ERS_STREAM_LIBS"] = "erskafka"
 
-        appport = 3335
+        appport = 3334
+        for hostidx in range(len(host_df)):
+            cfg["hosts"][f"host_df{hostidx}"] = host_df[hostidx]
+            cfg["apps"][app_df[hostidx]] = {
+                    "exec": "daq_application",
+                    "host": f"host_df{hostidx}",
+                    "port": appport }
+            appport = appport + 1
+
         for hostidx in range(len(host_ru)):
             cfg["hosts"][f"host_ru{hostidx}"] = host_ru[hostidx]
             cfg["apps"][app_ru[hostidx]] = {

@@ -90,6 +90,7 @@ def generate(
         CANDIDATE_CONFIG: int = dict(prescale=10),
 
         TOKEN_COUNT: int = 10,
+        DF_COUNT: int = 1,
         SYSTEM_TYPE = 'wib',
         TTCM_S1: int = 1,
         TTCM_S2: int = 2,
@@ -139,7 +140,7 @@ def generate(
         ] + [
             mspec(f"tpset_receiver", "TPSetReceiver", [app.QueueInfo(name="output", inst=f"tpset_q_for_buf{ru}_{idy}", dir="output") for ru in range(len(RU_CONFIG)) for idy in range(RU_CONFIG[ru]["channel_count"])])
         ] + [
-            mspec(f"qton_fragments", "QueueToNetwork", [app.QueueInfo(name="input", inst=f"fragment_q", dir="input")]),
+            mspec(f"fragment_sender", "FragmentSender", [app.QueueInfo(name="input_queue", inst=f"fragment_q", dir="input")]),
                 mspec(f'tcm', 'TriggerCandidateMaker', [ # TASet -> TC
                     app.QueueInfo(name='input', inst=f'taset_q', dir='input'),
                     app.QueueInfo(name='output', inst=f'trigger_candidate_q', dir='output'),
@@ -213,10 +214,7 @@ def generate(
                                                  map = [tpsrcv.geoidinst(region=RU_CONFIG[ru]["region_id"] , element=idy + RU_CONFIG[ru]["start_channel"], system=SYSTEM_TYPE , queueinstance=f"tpset_q_for_buf{ru}_{idy}") for ru in range(len(RU_CONFIG)) for idy in range(RU_CONFIG[ru]["channel_count"])],
                                                  general_queue_timeout = 100,
                                                  topic = f"TPSets")),
-            (f"qton_fragments", qton.Conf(msg_type="std::unique_ptr<dunedaq::daqdataformats::Fragment>",
-                                          msg_module_name="FragmentNQ",
-                                          sender_config=nos.Conf(name=f"{PARTITION}.frags_tpset_ds_0",
-                                                                 stype="msgpack"))),
+            (f"fragment_sender", None),
                 (f'tcm', tcm.Conf(
                     candidate_maker=CANDIDATE_PLUGIN,
                     candidate_maker_config=temptypes.CandidateConf(**CANDIDATE_CONFIG)
@@ -292,7 +290,7 @@ def generate(
 
         ("dfo", dfo.ConfParams(
             token_connection=PARTITION+".triginh",
-            dataflow_applications=[dfo.app_config(decision_connection=f"{PARTITION}.trigdec", capacity=TOKEN_COUNT)]
+            dataflow_applications=[dfo.app_config(decision_connection=f"{PARTITION}.trigdec_{dfidx}", capacity=TOKEN_COUNT) for dfidx in range(DF_COUNT)]
         )),
     ])
 
@@ -311,7 +309,7 @@ def generate(
 
     if SOFTWARE_TPG_ENABLED:
         start_order += [
-            "qton_fragments",
+            "fragment_sender",
             "tcm",
             "tam_.*",
             "zip_.*",
