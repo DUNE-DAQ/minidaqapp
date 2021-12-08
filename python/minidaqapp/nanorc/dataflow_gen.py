@@ -100,10 +100,7 @@ def generate(NW_SPECS,
         mspec(f"tpset_subscriber_{idx}", "NetworkToQueue", [app.QueueInfo(name="output", inst=f"tpsets_from_netq", dir="output")])  for idx in range(len(RU_CONFIG))
     ] if TPSET_WRITING_ENABLED else []) + ([
         mspec("tpswriter", "TPSetWriter", [app.QueueInfo(name="tpset_source", inst="tpsets_from_netq", dir="input")])
-    ] if TPSET_WRITING_ENABLED else []) + ([
-        mspec("tp_fragment_receiver", "FragmentReceiver", [app.QueueInfo(name="output", inst="data_fragments_q", dir="output")]),
-        mspec("ds_tpset_fragment_receiver", "FragmentReceiver", [app.QueueInfo(name="output", inst="data_fragments_q", dir="output")]),
-    ] if SOFTWARE_TPG_ENABLED else []) 
+    ] if TPSET_WRITING_ENABLED else [])
 
 
     cmd_data['init'] = app.Init(queues=queue_specs, modules=mod_specs, nwconnections=NW_SPECS)
@@ -160,15 +157,7 @@ def generate(NW_SPECS,
                 ("fragment_receiver", frcv.ConfParams(
                     general_queue_timeout=QUEUE_POP_WAIT_MS,
                     connection_name=PARTITION+".frags_0"
-                )), 
-                ("tp_fragment_receiver", frcv.ConfParams(
-                    general_queue_timeout=QUEUE_POP_WAIT_MS,
-                    connection_name=PARTITION+".tp_frags_0"
-                )), 
-                ("ds_tpset_fragment_receiver", frcv.ConfParams(
-                    general_queue_timeout=QUEUE_POP_WAIT_MS,
-                    connection_name=PARTITION+".frags_tpset_ds_0"
-                )), 
+                ))
             ] + [
                 (f"tpset_subscriber_{idx}", ntoq.Conf(
                     msg_type="dunedaq::trigger::TPSet",
@@ -191,16 +180,12 @@ def generate(NW_SPECS,
             + [
             ("datawriter", startpars),
             ("fragment_receiver", startpars),
-            ("tp_fragment_receiver",startpars),
-            ("ds_tpset_fragment_receiver",startpars),
             ("trb", startpars),
             ("trigdec_receiver", startpars)])
 
     cmd_data['stop'] = acmd([("trigdec_receiver", None),
             ("trb", None),
             ("fragment_receiver", None),
-              ("tp_fragment_receiver",None),
-              ("ds_tpset_fragment_receiver",None),
             ("datawriter", None),
             ] + ([
               ("tpset_subscriber_.*", None),
@@ -215,8 +200,6 @@ def generate(NW_SPECS,
     cmd_data['scrap'] = acmd([
             ("fragment_receiver", None),
             ("trigdec_receiver", None),
-            ("tp_fragment_receiver",None),
-            ("ds_tpset_fragment_receiver",None),
             ("qton_token", None)])
 
     cmd_data['record'] = acmd([("", None)])
