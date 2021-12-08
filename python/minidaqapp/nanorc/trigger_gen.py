@@ -101,12 +101,15 @@ def generate(
     { item_description }
     """
     cmd_data = {}
+    
+    required_eps = {PARTITION + '.hsievent'}
+    if not required_eps.issubset([nw.name for nw in NW_SPECS]):
+        raise RuntimeError(f"ERROR: not all the required endpoints ({', '.join(required_eps)}) found in list of endpoints {' '.join([nw.name for nw in NW_SPECS])}")
 
     # Define modules and queues
     queue_bare_specs = [
         app.QueueSpec(inst='trigger_candidate_q', kind='FollyMPMCQueue', capacity=1000),
-        app.QueueSpec(inst='trigger_decision_q', kind='StdDeQueue', capacity=1),
-        app.QueueSpec(inst="hsievent_from_netq", kind='FollyMPMCQueue', capacity=1000),
+        app.QueueSpec(inst='trigger_decision_q', kind='StdDeQueue', capacity=1)
     ]
 
     if SOFTWARE_TPG_ENABLED:
@@ -172,12 +175,7 @@ def generate(
     mod_specs += ([
 
         ### Timing TCs
-        mspec("ntoq_hsievent", "NetworkToQueue", [
-            app.QueueInfo(name="output", inst="hsievent_from_netq", dir="output")
-        ]),
-
         mspec("ttcm", "TimingTriggerCandidateMaker", [
-            app.QueueInfo(name="input", inst="hsievent_from_netq", dir="input"),
             app.QueueInfo(name="output", inst="trigger_candidate_q", dir="output"),
         ]),
 
@@ -266,19 +264,14 @@ def generate(
 
         ### Timing TCs
 
-        ("ntoq_hsievent", ntoq.Conf(
-            msg_type="dunedaq::dfmessages::HSIEvent",
-            msg_module_name="HSIEventNQ",
-            receiver_config=nor.Conf(name=PARTITION+".hsievent")
-        )),
-
         ("ttcm", ttcm.Conf(
             s1=ttcm.map_t(signal_type=TTCM_S1,
                           time_before=TRIGGER_WINDOW_BEFORE_TICKS,
                           time_after=TRIGGER_WINDOW_AFTER_TICKS),
             s2=ttcm.map_t(signal_type=TTCM_S2,
                           time_before=TRIGGER_WINDOW_BEFORE_TICKS,
-                          time_after=TRIGGER_WINDOW_AFTER_TICKS)
+                          time_after=TRIGGER_WINDOW_AFTER_TICKS),
+                          hsievent_connection_name = PARTITION+".hsievent",
             )
         ),
 
@@ -313,7 +306,6 @@ def generate(
         "mlt",
         "dfo",
         "ttcm",
-        "ntoq_hsievent",
         "ntoq_token"
     ]
 
