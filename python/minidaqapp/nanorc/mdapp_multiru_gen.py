@@ -192,9 +192,10 @@ def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowd
 
     # network connections map
     nw_specs = [nwmgr.Connection(name=partition_name + ".hsievent",topics=[],  address="tcp://{host_trigger}:12344"),
-        nwmgr.Connection(name=partition_name + ".triginh",topics=[],   address="tcp://{host_trigger}:12345")]
+        nwmgr.Connection(name=partition_name+".dfo_trigdec", topics=[], address="tcp://{host_trigger}:12345"),
+        nwmgr.Connection(name=partition_name + ".triginh",topics=[],   address="tcp://{host_trigger}:12346")]
 
-    port = 12346
+    port = 12347
 
     for hostidx in range(len(host_df)):
         nw_specs.append(nwmgr.Connection(name=f"{partition_name}.trigdec_{hostidx}",topics=[],  address="tcp://{host_df" + f"{hostidx}" + "}:" +f"{port}"))
