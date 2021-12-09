@@ -101,10 +101,7 @@ def generate(NW_SPECS,
         mspec(f"tpset_subscriber_{idx}", "NetworkToQueue", [app.QueueInfo(name="output", inst=f"tpsets_from_netq", dir="output")])  for idx in range(len(RU_CONFIG))
     ] if TPSET_WRITING_ENABLED else []) + ([
         mspec("tpswriter", "TPSetWriter", [app.QueueInfo(name="tpset_source", inst="tpsets_from_netq", dir="input")])
-    ] if TPSET_WRITING_ENABLED else []) + ([
-        mspec("tp_fragment_receiver", "FragmentReceiver", [app.QueueInfo(name="output", inst="data_fragments_q", dir="output")]),
-        mspec("ds_tpset_fragment_receiver", "FragmentReceiver", [app.QueueInfo(name="output", inst="data_fragments_q", dir="output")]),
-    ] if SOFTWARE_TPG_ENABLED else []) 
+    ] if TPSET_WRITING_ENABLED else [])
 
 
     cmd_data['init'] = app.Init(queues=queue_specs, modules=mod_specs, nwconnections=NW_SPECS)
