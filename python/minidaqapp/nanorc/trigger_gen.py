@@ -205,7 +205,7 @@ def generate(
                                                  topic = f"TPSets")),
             (f"qton_fragments", qton.Conf(msg_type="std::unique_ptr<dunedaq::daqdataformats::Fragment>",
                                           msg_module_name="FragmentNQ",
-                                          sender_config=nos.Conf(name=f"{PARTITION}.frags_tpset_ds_0",
+                                          sender_config=nos.Conf(name=f"{PARTITION}.frags_0",
                                                                  stype="msgpack"))),
                 (f'tcm', tcm.Conf(
                     candidate_maker=CANDIDATE_PLUGIN,
