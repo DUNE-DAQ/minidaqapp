@@ -365,8 +365,6 @@ def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowd
                                               USE_FAKE_DATA_PRODUCERS = use_fake_data_producers,
                                               HOST=host_ru[i])
         console.log(f"{ru_name} app: {the_system.apps[ru_name]}")
-
-    exit(0)
     
     the_system.apps['dataflow'] = DataFlowApp(
         NW_SPECS = nw_specs,
@@ -385,6 +383,7 @@ def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowd
         HOST=host_df
     )
 
+    exit(0)
     #     console.log("dataflow cmd data:", cmd_data_dataflow)
     
     # a.append(this_readout_mgraph)

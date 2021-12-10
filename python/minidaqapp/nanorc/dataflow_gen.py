@@ -41,12 +41,10 @@ import dunedaq.nwqueueadapters.networkobjectsender as nos
 import dunedaq.networkmanager.nwmgr as nwmgr
 
 from appfwk.utils import acmd, mcmd, mrccmd, mspec
-from appfwk.conf_utils import App, ModuleGraph, Module, Direction, Connection
+from appfwk.conf_utils import App, ModuleGraph, Module, Direction, Connection, data_request_endpoint_name
 
 # Time to wait on pop()
 QUEUE_POP_WAIT_MS = 100
-# local clock speed Hz
-# CLOCK_SPEED_HZ = 50000000;
 
 class DataFlowApp(App):
     def __init__(self,
@@ -71,20 +69,10 @@ class DataFlowApp(App):
         if not required_eps.issubset([nw.name for nw in NW_SPECS]):
             raise RuntimeError(f"ERROR: not all the required endpoints ({', '.join(required_eps)}) found in list of endpoints {' '.join([nw.name for nw in NW_SPECS])}")
 
-        # trb_geoid_list = []
-        # for idx, producer in enumerate(FRAGMENT_PRODUCERS):
-        #     trb_geoid_list.append(trb.geoidinst(region = producer.geoid.region,
-        #                                         element = producer.geoid.element,
-        #                                         system = producer.geoid.system,
-        #                                         connection_name = 
-        #                                         )
-
         modules = []
         total_link_count = 0
         for ru in range(len(RU_CONFIG)):
             total_link_count += RU_CONFIG[ru]["channel_count"]
-
-        trb_geoid_map = trb.mapgeoidqueue(trb_geoid_list)
         
         modules += [Module(name = 'trigdec_receiver',
                            plugin = 'TriggerDecisionReceiver',
@@ -125,7 +113,7 @@ class DataFlowApp(App):
                                                  ] if SOFTWARE_TPG_ENABLED else [])))),
                     Module(name = 'datawriter',
                            plugin = 'DataWriter',
-                           connections = {'trigger_record_input_queue': Connection('datawriter.trigger_record_q')},
+                           connections = {}, # {'trigger_record_input_queue': Connection('datawriter.trigger_record_q')},
                            conf = dw.ConfParams(
                                initial_token_count=TOKEN_COUNT,
                                token_connection=PARTITION+".triginh",
@@ -187,14 +175,18 @@ class DataFlowApp(App):
                                                       connection_name=PARTITION+".frags_tpset_ds_0"))]
                         
         mgraph=ModuleGraph(modules)
-        mgraph.add_endpoint("fragments",         "trb.data_fragment_input_queue",    Direction.IN)
-        mgraph.add_endpoint("trigger_decisions", "trb.trigger_decision_input_queue", Direction.IN)
-        mgraph.add_endpoint("tokens",            "datawriter.token_output_queue",    Direction.OUT)
+        # PAR 2021-12-10 All of the dataflow app's sending and
+        # receiving is done via NetworkManager, so there are no
+        # endpoints for the moment
+        
+        # mgraph.add_endpoint("fragments",         "trb.data_fragment_input_queue",    Direction.IN)
+        # mgraph.add_endpoint("trigger_decisions", "trb.trigger_decision_input_queue", Direction.IN)
+        # mgraph.add_endpoint("tokens",            "datawriter.token_output_queue",    Direction.OUT)
 
-        for i, producer in enumerate(FRAGMENT_PRODUCERS):
-            queue_name=f"data_request_{i}_output_queue"
-            mgraph.add_endpoint(util.data_request_endpoint_name(producer), f"trb.{queue_name}", Direction.OUT)
+        # for i, producer in enumerate(FRAGMENT_PRODUCERS):
+        #     queue_name=f"data_request_{i}_output_queue"
+        #     mgraph.add_endpoint(data_request_endpoint_name(producer), f"trb.{queue_name}", Direction.OUT)
         
         super().__init__(modulegraph=mgraph, host=HOST)
-        self.export("trigger_app.dot")
+        self.export("dataflow_app.dot")
 
