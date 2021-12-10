@@ -321,25 +321,6 @@ def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowd
 
     # console.log("trigger cmd data:", cmd_data_trigger)
 
-    the_system.apps['dataflow'] = DataFlowApp(
-        NW_SPECS = nw_specs,
-        FRAGMENT_PRODUCERS = the_system.get_fragment_producers(),
-        RU_CONFIG = ru_configs,
-        RUN_NUMBER = run_number,
-        OUTPUT_PATH = output_path,
-        TOKEN_COUNT = df_token_count,
-        SYSTEM_TYPE = system_type,
-        SOFTWARE_TPG_ENABLED = enable_software_tpg,
-        TPSET_WRITING_ENABLED = enable_tpset_writing,
-        PARTITION=partition_name,
-        OPERATIONAL_ENVIRONMENT = op_env,
-        TPC_REGION_NAME_PREFIX = tpc_region_name_prefix,
-        MAX_FILE_SIZE = max_file_size,
-        HOST=host_df
-    )
-    exit(0)
-    #     console.log("dataflow cmd data:", cmd_data_dataflow)
-    
     #-------------------------------------------------------------------
     # Readout apps
     
@@ -369,6 +350,7 @@ def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowd
                                               DATA_RATE_SLOWDOWN_FACTOR = data_rate_slowdown_factor,
                                               DATA_FILE = data_file,
                                               FLX_INPUT = use_felix,
+                                              SSP_INPUT = use_ssp,
                                               CLOCK_SPEED_HZ = CLOCK_SPEED_HZ,
                                               RUIDX = i,
                                               # CARDID = cardid[i],
@@ -383,6 +365,28 @@ def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowd
                                               USE_FAKE_DATA_PRODUCERS = use_fake_data_producers,
                                               HOST=host_ru[i])
         console.log(f"{ru_name} app: {the_system.apps[ru_name]}")
+
+    exit(0)
+    
+    the_system.apps['dataflow'] = DataFlowApp(
+        NW_SPECS = nw_specs,
+        FRAGMENT_PRODUCERS = the_system.get_fragment_producers(),
+        RU_CONFIG = ru_configs,
+        RUN_NUMBER = run_number,
+        OUTPUT_PATH = output_path,
+        TOKEN_COUNT = df_token_count,
+        SYSTEM_TYPE = system_type,
+        SOFTWARE_TPG_ENABLED = enable_software_tpg,
+        TPSET_WRITING_ENABLED = enable_tpset_writing,
+        PARTITION=partition_name,
+        OPERATIONAL_ENVIRONMENT = op_env,
+        TPC_REGION_NAME_PREFIX = tpc_region_name_prefix,
+        MAX_FILE_SIZE = max_file_size,
+        HOST=host_df
+    )
+
+    #     console.log("dataflow cmd data:", cmd_data_dataflow)
+    
     # a.append(this_readout_mgraph)
     # for i,ru_name in enumerate(ru_app_names):
     #  = util.App(modulegraph=mgraphs_readout[i], host=host_ru[i])

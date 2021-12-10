@@ -84,171 +84,199 @@ class ReadoutApp(App):
         MIN_LINK = RU_CONFIG[RUIDX]["start_channel"]
         MAX_LINK = MIN_LINK + RU_CONFIG[RUIDX]["channel_count"]
         
-        
-        modules = {}
-        
+        print(f"ReadoutApp.__init__ with RUIDX={RUIDX}, MIN_LINK={MIN_LINK}, MAX_LINK={MAX_LINK}")
+        modules = []
+
+        total_link_count = 0
+        for ru in range(len(RU_CONFIG)):
+            total_link_count += RU_CONFIG[ru]["channel_count"]
+
         if SOFTWARE_TPG_ENABLED:
             connections = {}
+
+            request_receiver_geoid_map = []
+            for idx in range(MIN_LINK, MAX_LINK):
+                queue_inst = f"data_requests_{idx}"
+                request_receiver_geoid_map.append(rrcv.geoidinst(region = RU_CONFIG[RUIDX]["region_id"],
+                                                                 element = idx,
+                                                                 system = SYSTEM_TYPE,
+                                                                 queueinstance = queue_inst))
+                connections[f'output_{idx}'] = Connection(f"datahandler_{idx}.data_requests_0",
+                                                          queue_name = queue_inst)
+                
+                if SOFTWARE_TPG_ENABLED:
+                    queue_inst = f"tp_requests_{idx}"
+                    request_receiver_geoid_map.append(rrcv.geoidinst(region = RU_CONFIG[RUIDX]["region_id"],
+                                                                     element = idx+total_link_count, system=SYSTEM_TYPE,
+                                                                     queueinstance = queue_inst))
+                    connections[f'tp_output_{idx}'] = Connection(f"tp_datahandler_{idx}.data_requests_0",
+                                                                 queue_name = queue_inst)
+
+            modules += [Module(name = "request_receiver",
+                               plugin = "RequestReceiver",
+                               connections = connections,
+                               conf = rrcv.ConfParams(map = request_receiver_geoid_map,
+                                                      general_queue_timeout = QUEUE_POP_WAIT_MS,
+                                                      connection_name = f"{PARTITION}.datareq_{RUIDX}"))]
             for idx in range(MIN_LINK,MAX_LINK):
-                connections[f'output_{idx}'] = Connections(f'data_requests_{idx}', Direction.OUT)
-
-            modules["request_receiver"] = Module(plugin="RequestReceiver",
-                                                 connections = connections,
-                                                 conf = rrcv.ConfParams(
-                                                     map = [rrcv.geoidinst(region=RU_CONFIG[RUIDX]["region_id"],
-                                                                           element=idx, system=SYSTEM_TYPE,
-                                                                           queueinstance=f"data_requests_{idx}") for idx in range(MIN_LINK,MAX_LINK)] +
-                                                     [rrcv.geoidinst(region=RU_CONFIG[RUIDX]["region_id"],
-                                                                     element=idx+total_link_count, system=SYSTEM_TYPE,
-                                                                     queueinstance=f"tp_requests_{idx}") for idx in range(MIN_LINK,MAX_LINK) if SOFTWARE_TPG_ENABLED],
-                                                     general_queue_timeout = QUEUE_POP_WAIT_MS,
-                                                     connection_name = f"{PARTITION}.datareq_{RUIDX}"))
-            for idx in range(MIN_LINK,MAX_LINK):
-                module[f"tp_datahandler_{idx}"] = Module(plugin="DataLinkHandler",
-                                                         connections = {},
-                                                         conf = rconf.Conf(
-                                                             readoutmodelconf=rconf.ReadoutModelConf(
-                                                                 source_queue_timeout_ms = QUEUE_POP_WAIT_MS,
-                                                                 region_id = RU_CONFIG[RUIDX]["region_id"],
-                                                                 element_id = TOTAL_NUMBER_OF_DATA_PRODUCERS+idx
-                                                             ),
-                                                             latencybufferconf= rconf.LatencyBufferConf(
-                                                                 latency_buffer_size = LATENCY_BUFFER_SIZE,
-                                                                 region_id = RU_CONFIG[RUIDX]["region_id"],
-                                                                 element_id = TOTAL_NUMBER_OF_DATA_PRODUCERS + idx,
-                                                             ),
-                                                             rawdataprocessorconf= rconf.RawDataProcessorConf(
-                                                                 region_id = RU_CONFIG[RUIDX]["region_id"],
-                                                                 element_id = TOTAL_NUMBER_OF_DATA_PRODUCERS + idx,
-                                                                 enable_software_tpg = False,
-                                                             ),
-                                                             requesthandlerconf= rconf.RequestHandlerConf(
-                                                                 latency_buffer_size = LATENCY_BUFFER_SIZE,
-                                                                 pop_limit_pct = 0.8,
-                                                                 pop_size_pct = 0.1,
-                                                                 region_id = RU_CONFIG[RUIDX]["region_id"],
-                                                                 element_id = TOTAL_NUMBER_OF_DATA_PRODUCERS + idx,
-                                                                 # output_file = f"output_{idx + MIN_LINK}.out",
-                                                                 stream_buffer_size = 100 if FRONTEND_TYPE=='pacman' else 8388608,
-                                                                 enable_raw_recording = False,
-                                                             )
-                                                         ))
-
-                modules[f"tpset_publisher"] = Module(plugin="QueueToNetwork",
-                                                     connections = {'input': Connection('tpset_queue', Direction.IN)},
-                                                     conf = qton.Conf(msg_type="dunedaq::trigger::TPSet",
-                                                                 msg_module_name="TPSetNQ",
-                                                                 sender_config=nos.Conf(name=f"{PARTITION}.tpsets_{RUIDX}",
-                                                                                        topic="TPSets",
-                                                                                        stype="msgpack")))
-        # else:
-        #     modules[f"request_receiver"] = Module("RequestReceiver",
-        #                                           #conf [app.QueueInfo(name="output", inst=f"data_requests_{idx}", dir="output") 
-        #                                           )
-
+                modules += [Module(name = f"tp_datahandler_{idx}",
+                                   plugin = "DataLinkHandler",
+                                   connections = {},
+                                   conf = rconf.Conf(readoutmodelconf = rconf.ReadoutModelConf(source_queue_timeout_ms = QUEUE_POP_WAIT_MS,
+                                                                                             region_id = RU_CONFIG[RUIDX]["region_id"],
+                                                                                             element_id = total_link_count+idx),
+                                                     latencybufferconf = rconf.LatencyBufferConf(latency_buffer_size = LATENCY_BUFFER_SIZE,
+                                                                                                region_id = RU_CONFIG[RUIDX]["region_id"],
+                                                                                                element_id = total_link_count + idx),
+                                                     rawdataprocessorconf = rconf.RawDataProcessorConf(region_id = RU_CONFIG[RUIDX]["region_id"],
+                                                                                                      element_id = total_link_count + idx,
+                                                                                                      enable_software_tpg = False),
+                                                     requesthandlerconf= rconf.RequestHandlerConf(latency_buffer_size = LATENCY_BUFFER_SIZE,
+                                                                                                  pop_limit_pct = 0.8,
+                                                                                                  pop_size_pct = 0.1,
+                                                                                                  region_id = RU_CONFIG[RUIDX]["region_id"],
+                                                                                                  element_id =total_link_count + idx,
+                                                                                                  # output_file = f"output_{idx + MIN_LINK}.out",
+                                                                                                  stream_buffer_size = 100 if FRONTEND_TYPE=='pacman' else 8388608,
+                                                                                                  enable_raw_recording = False)))]
+            # modules += [Module(name = f"tpset_publisher",
+            #                    plugin = "QueueToNetwork",
+            #                    # connections = {'input': Connection('tpset_queue', Direction.IN)},
+            #                    conf = qton.Conf(msg_type="dunedaq::trigger::TPSet",
+            #                                     msg_module_name="TPSetNQ",
+            #                                     sender_config=nos.Conf(name=f"{PARTITION}.tpsets_{RUIDX}",
+            #                                                            topic="TPSets",
+            #                                                            stype="msgpack")))]
         if FRONTEND_TYPE == 'wib':
-            modules["errored_frame_consumer"] = Module("ErroredFrameConsumer",
-                                                       connections={})
-        #     mod_specs += [
-        # #         mspec("errored_frame_consumer", "ErroredFrameConsumer", [app.QueueInfo(name="input_queue", inst="errored_frames_q", dir="input")])
-        # #     ]
-    
-    
+            modules += [Module(name = "errored_frame_consumer",
+                               plugin = "ErroredFrameConsumer",
+                               connections={})]
+
         # There are two flags to be checked so I think a for loop
         # is the closest way to the blocks that are being used here
     
         for idx in range(MIN_LINK,MAX_LINK):
             if USE_FAKE_DATA_PRODUCERS:
-                modules[f"fakedataprod_{idx}"] = Module(plugin='FakeDataProd',
-                                                        connections={'input': Connection(f'data_request_{idx}')})
+                modules += [Module(name = f"fakedataprod_{idx}",
+                                   plugin='FakeDataProd',
+                                   connections={'input': Connection(f'data_request_{idx}')})]
             else:
                 connections = {}
-                connections['raw_input'] = Connection(f"{FRONTEND_TYPE}_link_{idx}", Direction.IN)
-                connections['data_request_0'] = Connection(f'data_requests_{idx}', Direction.IN)
-                connections['fragment_queue'] =  Connection('fragment_q', Direction.OUT)
+                # connections['raw_input']      = Connection(f"{FRONTEND_TYPE}_link_{idx}", Direction.IN)
+                # connections['data_request_0'] = Connection(f'data_requests_{idx}',        Direction.IN)
+                connections['fragment_queue'] = Connection('fragment_sender.input_queue')
                 if SOFTWARE_TPG_ENABLED:
-                    connections['tp_out'] = Connection(f'sw_tp_link_{idx}', Direction.OUT)
-                    connections['tpset_out'] = Connection('tpset_queue', Direction.OUT)
+                    connections['tp_out']    = Connection(f"tp_datahandler_{idx}.raw_input",
+                                                          queue_name = f"sw_tp_link_{idx}",
+                                                          queue_kind = "FollySPSCQueue",
+                                                          queue_capacity = 100000)
+                    # connections['tpset_out'] = Connection('tpset_queue',       Direction.OUT)
                     
                 if FRONTEND_TYPE == 'wib':
-                    connections['errored_frames'] = Connection('error_frames_q', Direction.OUT)
+                    connections['errored_frames'] = Connection('errored_frame_consumer.input_queue')
 
-                modules[f"datahandler_{idx}"] = Module(plugin = "DataLinkHandler", 
-                                                       connections = connections)
+                modules += [Module(name = f"datahandler_{idx}",
+                                   plugin = "DataLinkHandler", 
+                                   connections = connections)]
+                        
         if not USE_FAKE_DATA_PRODUCERS:
             if FLX_INPUT:
                 connections = {}
                 for idx in range(MIN_LINK, MIN_LINK + min(5, RU_CONFIG[RUIDX]["channel_count"])):
-                    connections[f'output_{idx}'] = Connection(f'{FRONTEND_TYPE}_link_{idx}', Direction.OUT)
+                    connections[f'output_{idx}'] = Connection(f"datahandler_{idx}.raw_input",
+                                                              queue_name = f'{FRONTEND_TYPE}_link_{idx}',
+                                                              queue_kind = "FollySPSCQueue",
+                                                              queue_capacity = 100000)
                 
-                modules['flxcard_0'] = Module(plugin = 'FelixCardReader',
-                                              connections = connections,
-                                              conf = flxcr.Conf(card_id = RU_CONFIG[RUIDX]["card_id"],
-                                                                logical_unit = 0,
-                                                                dma_id = 0,
-                                                                chunk_trailer_size = 32,
-                                                                dma_block_size_kb = 4,
-                                                                dma_memory_size_gb = 4,
-                                                                numa_id = 0,
-                                                                num_links = min(5,RU_CONFIG[RUIDX]["channel_count"])))
+                modules += [Module(name = 'flxcard_0',
+                                   plugin = 'FelixCardReader',
+                                   connections = connections,
+                                   conf = flxcr.Conf(card_id = RU_CONFIG[RUIDX]["card_id"],
+                                                     logical_unit = 0,
+                                                     dma_id = 0,
+                                                     chunk_trailer_size = 32,
+                                                     dma_block_size_kb = 4,
+                                                     dma_memory_size_gb = 4,
+                                                     numa_id = 0,
+                                                     num_links = min(5,RU_CONFIG[RUIDX]["channel_count"])))]
                 
                 if RU_CONFIG[RUIDX]["channel_count"] > 5 :
                     connections = {}
                     for idx in range(MIN_LINK+5, MAX_LINK):
-                        connections[f'output_{idx}'] = Connection(f'{FRONTEND_TYPE}_link_{idx}', Direction.OUT)
+                        connections[f'output_{idx}'] = Connection(f"datahandler_{idx}.raw_input",
+                                                                  queue_name = f'{FRONTEND_TYPE}_link_{idx}',
+                                                                  queue_kind = "FollySPSCQueue",
+                                                                  queue_capacity = 100000)
                         
-                    modules["flxcard_1"] = Module(plugin = "FelixCardReader",
-                                                  connections = connections,
-                                                  conf = flxcr.Conf(card_id=RU_CONFIG[RUIDX]["card_id"],
-                                                                    logical_unit=1,
-                                                                    dma_id=0,
-                                                                    chunk_trailer_size= 32,
-                                                                    dma_block_size_kb= 4,
-                                                                    dma_memory_size_gb= 4,
-                                                                    numa_id=0,
-                                                                    num_links=max(0, RU_CONFIG[RUIDX]["channel_count"] - 5))
-                                                  )
+                    modules += [Module(name = "flxcard_1",
+                                       plugin = "FelixCardReader",
+                                       connections = connections,
+                                       conf = flxcr.Conf(card_id = RU_CONFIG[RUIDX]["card_id"],
+                                                         logical_unit = 1,
+                                                         dma_id = 0,
+                                                         chunk_trailer_size = 32,
+                                                         dma_block_size_kb = 4,
+                                                         dma_memory_size_gb = 4,
+                                                         numa_id = 0,
+                                                         num_links = max(0, RU_CONFIG[RUIDX]["channel_count"] - 5)))]
                     
             elif SSP_INPUT:
-                modules["ssp_0"] = Module(plugin = "SSPCardReader",
-                                          connections = {f'output_{idx}': Connection(f'{FRONTEND_TYPE}_link_{idx}',Direction.OUT)},
-                                          conf = flxcr.Conf(card_id=RU_CONFIG[RUIDX]["card_id"],
-                                                            logical_unit=0,
-                                                            dma_id=0,
-                                                            chunk_trailer_size= 32,
-                                                            dma_block_size_kb= 4,
-                                                            dma_memory_size_gb= 4,
-                                                            numa_id=0,
-                                                            num_links=RU_CONFIG[RUIDX]["channel_count"]))
+                modules += [Module(name = "ssp_0",
+                                   plugin = "SSPCardReader",
+                                   connections = {f'output_{idx}': Connection(f"datahandler_{idx}.raw_input",
+                                                                              queue_name = f'{FRONTEND_TYPE}_link_{idx}',
+                                                                              queue_kind = "FollySPSCQueue",
+                                                                              queue_capacity = 100000)},
+                                   conf = flxcr.Conf(card_id = RU_CONFIG[RUIDX]["card_id"],
+                                                     logical_unit = 0,
+                                                     dma_id = 0,
+                                                     chunk_trailer_size = 32,
+                                                     dma_block_size_kb = 4,
+                                                     dma_memory_size_gb = 4,
+                                                     numa_id = 0,
+                                                     num_links = RU_CONFIG[RUIDX]["channel_count"]))]
     
             else:
                 fake_source = "fake_source"
                 card_reader = "FakeCardReader"
-                conf = sec.Conf(link_confs=[sec.LinkConfiguration(geoid=sec.GeoID(system=SYSTEM_TYPE, region=RU_CONFIG[RUIDX]["region_id"], element=idx),
-                                                                  slowdown=DATA_RATE_SLOWDOWN_FACTOR,
-                                                                  queue_name=f"output_{idx}",
-                                                                  data_filename = DATA_FILE,
-                                                                  emu_frame_error_rate=0) for idx in range(MIN_LINK,MAX_LINK)],
-                         # input_limit=10485100, # default
-                         queue_timeout_ms = QUEUE_POP_WAIT_MS)
+                conf = sec.Conf(link_confs = [sec.LinkConfiguration(geoid=sec.GeoID(system=SYSTEM_TYPE,
+                                                                                    region=RU_CONFIG[RUIDX]["region_id"],
+                                                                                    element=idx),
+                                                                    slowdown=DATA_RATE_SLOWDOWN_FACTOR,
+                                                                    queue_name=f"output_{idx}",
+                                                                    data_filename = DATA_FILE,
+                                                                    emu_frame_error_rate=0) for idx in range(MIN_LINK,MAX_LINK)],
+                                # input_limit=10485100, # default
+                                queue_timeout_ms = QUEUE_POP_WAIT_MS)
                 
                 if FRONTEND_TYPE=='pacman':
                     fake_source = "pacman_source"
                     card_reader = "PacmanCardReader"
-                    conf = pcr.Conf(link_confs=[pcr.LinkConfiguration(geoid=pcr.GeoID(system=SYSTEM_TYPE, region=RU_CONFIG[RUIDX]["region_id"], element=idx))for idx in range(MIN_LINK,MAX_LINK)],
+                    conf = pcr.Conf(link_confs = [pcr.LinkConfiguration(geoid = pcr.GeoID(system = SYSTEM_TYPE,
+                                                                                          region = RU_CONFIG[RUIDX]["region_id"],
+                                                                                          element = idx))
+                                                  for idx in range(MIN_LINK,MAX_LINK)],
                                     zmq_receiver_timeout = 10000)
-                modules[fake_source] = Module(plugin = card_reader,
-                                              connections = {f'output_{idx}': Connection(f'{FRONTEND_TYPE}_link_{idx}', Direction.OUT)},
-                                              conf = conf)
-                #app.QueueInfo(name=f"output_{idx}", inst=f"{FRONTEND_TYPE}_link_{idx}", dir="output")
-                #for idx in range(MIN_LINK,MAX_LINK)
+                modules += [Module(name = fake_source,
+                                   plugin = card_reader,
+                                   connections = {f'output_{idx}': Connection(f"datahandler_{idx}.raw_input",
+                                                                              queue_name = f'{FRONTEND_TYPE}_link_{idx}',
+                                                                              queue_kind = "FollySPSCQueue",
+                                                                              queue_capacity = 100000)
+                                                  for idx in range(MIN_LINK, MAX_LINK)},
+                                   conf = conf)]
+
+        modules += [Module(name = "fragment_sender",
+                           plugin = "FragmentSender",
+                           conf = None)]
+                            
         mgraph = ModuleGraph(modules)
 
-        for idx in range(NUMBER_OF_DATA_PRODUCERS):
+        for idx in range(MIN_LINK, MAX_LINK):
             mgraph.add_endpoint(f"tpsets_{idx}", f"datahandler_{idx}.tpset_out",    Direction.OUT)
             # TODO: Should we just have one timesync outgoing endpoint?
             mgraph.add_endpoint(f"timesync_{idx}", f"datahandler_{idx}.timesync",    Direction.OUT)
-            mgraph.add_endpoint(f"timesync_{idx+NUMBER_OF_DATA_PRODUCERS}", f"tp_datahandler_{idx}.timesync",    Direction.OUT)
+            mgraph.add_endpoint(f"timesync_{idx+RU_CONFIG[RUIDX]['channel_count']}", f"tp_datahandler_{idx}.timesync",    Direction.OUT)
 
             # Add fragment producers for raw data
             mgraph.add_fragment_producer(region = RU_CONFIG[RUIDX]["region_id"], element = idx, system = SYSTEM_TYPE,
@@ -256,11 +284,12 @@ class ReadoutApp(App):
                                          fragments_out = f"datahandler_{idx}.data_response_0")
 
             # Add fragment producers for TPC TPs. Make sure the element index doesn't overlap with the ones for raw data
-            mgraph.add_fragment_producer(region = RU_CONFIG[RUIDX]["region_id"], element = idx + NUMBER_OF_DATA_PRODUCERS, system = SYSTEM_TYPE,
+            mgraph.add_fragment_producer(region = RU_CONFIG[RUIDX]["region_id"], element = idx + RU_CONFIG[RUIDX]["channel_count"], system = SYSTEM_TYPE,
                                          requests_in   = f"tp_datahandler_{idx}.data_requests_0",
                                          fragments_out = f"tp_datahandler_{idx}.data_response_0")
 
         super().__init__(mgraph, host=HOST)
+        self.export("readout_app.dot")
         # cmd_data['init'] = app.Init(queues=queue_specs, modules=mod_specs, nwconnections=NW_SPECS)
     
         # total_link_count = 0
