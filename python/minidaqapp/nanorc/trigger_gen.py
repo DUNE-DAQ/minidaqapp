@@ -109,7 +109,8 @@ def generate(
 
     # Define modules and queues
     queue_bare_specs = [
-        app.QueueSpec(inst='trigger_candidate_q', kind='FollyMPMCQueue', capacity=1000)
+        app.QueueSpec(inst='trigger_candidate_q', kind='FollyMPMCQueue', capacity=1000),
+        app.QueueSpec(inst='trigger_decision_q', kind='StdDeQueue', capacity=1)
     ]
 
     if SOFTWARE_TPG_ENABLED:
@@ -183,6 +184,7 @@ def generate(
 
         mspec("mlt", "ModuleLevelTrigger", [
             app.QueueInfo(name="trigger_candidate_source", inst="trigger_candidate_q", dir="input"),
+            app.QueueInfo(name="trigger_decision_sink", inst="trigger_decision_q", dir="output"), 
         ]),
 
         ### DFO
@@ -284,12 +286,10 @@ def generate(
                 mlt.GeoID(system=SYSTEM_TYPE, region=RU_CONFIG[ru]["region_id"], element=RU_CONFIG[ru]["start_channel"] + idx + total_link_count)
                     for ru in range(len(RU_CONFIG)) for idx in range(RU_CONFIG[ru]["channel_count"])
             ] if SOFTWARE_TPG_ENABLED else []),
-            td_connection_name=PARTITION+".dfo_trigdec"
         )),
 
         ("dfo", dfo.ConfParams(
             token_connection=PARTITION+".triginh",
-            trigger_decision_connection=PARTITION+".dfo_trigdec",
             dataflow_applications=[dfo.app_config(decision_connection=f"{PARTITION}.trigdec_{dfidx}", capacity=TOKEN_COUNT) for dfidx in range(DF_COUNT)]
         )),
     ])
