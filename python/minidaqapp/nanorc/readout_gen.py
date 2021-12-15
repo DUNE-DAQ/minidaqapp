@@ -65,6 +65,7 @@ def generate(NETWORK_ENDPOINTS,
         REGION_ID=0,
         DQM_ENABLED=False,
         SOFTWARE_TPG_ENABLED=False,
+        TPG_CHANNEL_MAP="VDColdboxChannelMap",
         USE_FAKE_DATA_PRODUCERS=False):
     """Generate the json configuration for the readout and DF process"""
 
@@ -295,6 +296,7 @@ def generate(NETWORK_ENDPOINTS,
                             region_id = REGION_ID,
                             element_id = idx,
                             enable_software_tpg = SOFTWARE_TPG_ENABLED,
+                            channel_map_name = TPG_CHANNEL_MAP,
                             emulator_mode = EMULATOR_MODE
                         ),
                         requesthandlerconf= rconf.RequestHandlerConf(

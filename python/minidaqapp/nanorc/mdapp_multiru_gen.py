@@ -74,6 +74,7 @@ import click
 @click.option('--dqm-impl', type=click.Choice(['local','cern','pocket'], case_sensitive=False), default='local', help="DQM destination (Kafka used for cern and pocket)")
 @click.option('--pocket-url', default='127.0.0.1', help="URL for connecting to Pocket services")
 @click.option('--enable-software-tpg', is_flag=True, default=False, help="Enable software TPG")
+@click.option('--tpg-channel-map', type=click.Choice(["VDColdboxChannelMap", "ProtoDUNESP1ChannelMap"]), default="VDColdboxChannelMap", help="Channel map for software TPG")
 @click.option('--enable-tpset-writing', is_flag=True, default=False, help="Enable the writing of TPSets to disk (only works with --enable-software-tpg")
 @click.option('--use-fake-data-producers', is_flag=True, default=False, help="Use fake data producers that respond with empty fragments immediately instead of (fake) cards and DLHs")
 @click.option('--dqm-cmap', type=click.Choice(['HD', 'VD']), default='HD', help="Which channel map to use for DQM")
@@ -83,13 +84,12 @@ import click
 @click.option('--tpc-region-name-prefix', default='APA', help="Prefix to be used for the 'Region' Group name inside the HDF5 file")
 @click.option('--op-env', default='swtest', help="Operational environment - used for raw data filename prefix and HDF5 Attribute inside the files")
 @click.argument('json_dir', type=click.Path())
-
 def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowdown_factor, run_number, trigger_rate_hz, trigger_window_before_ticks, trigger_window_after_ticks,
         token_count, data_file, output_path, disable_trace, use_felix, use_ssp, host_df, host_ru, host_trigger, host_hsi, host_timing_hw, control_timing_hw, timing_hw_connections_file, region_id,
         hsi_device_name, hsi_readout_period, hsi_endpoint_address, hsi_endpoint_partition, hsi_re_mask, hsi_fe_mask, hsi_inv_mask, hsi_source,
         use_hsi_hw, hsi_device_id, mean_hsi_signal_multiplicity, hsi_signal_emulation_mode, enabled_hsi_signals,
         ttcm_s1, ttcm_s2, trigger_activity_plugin, trigger_activity_config, trigger_candidate_plugin, trigger_candidate_config,
-        enable_raw_recording, raw_recording_output_dir, frontend_type, opmon_impl, enable_dqm, ers_impl, dqm_impl, pocket_url, enable_software_tpg, enable_tpset_writing, use_fake_data_producers, dqm_cmap,
+        enable_raw_recording, raw_recording_output_dir, frontend_type, opmon_impl, enable_dqm, ers_impl, dqm_impl, pocket_url, enable_software_tpg, tpg_channel_map, enable_tpset_writing, use_fake_data_producers, dqm_cmap,
         dqm_rawdisplay_params, dqm_meanrms_params, dqm_fourier_params,
         op_env, tpc_region_name_prefix, json_dir):
 
@@ -327,6 +327,7 @@ def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowd
             REGION_ID = region_id,
             DQM_ENABLED=enable_dqm,
             SOFTWARE_TPG_ENABLED = enable_software_tpg,
+            TPG_CHANNEL_MAP = tpg_channel_map,
             USE_FAKE_DATA_PRODUCERS = use_fake_data_producers
             ) for hostidx in range(len(host_ru))]
     console.log("readout cmd data:", cmd_data_readout)
