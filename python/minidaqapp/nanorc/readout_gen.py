@@ -295,7 +295,7 @@ def generate(NETWORK_ENDPOINTS,
                         rawdataprocessorconf= rconf.RawDataProcessorConf(
                             region_id = REGION_ID,
                             element_id = idx,
-                            enable_software_tpg = SOFTWARE_TPG_ENABLED,
+                            enable_software_tpg = SOFTWARE_TPG_ENABLED if idx!=1 else False,
                             channel_map_name = TPG_CHANNEL_MAP,
                             emulator_mode = EMULATOR_MODE
                         ),
