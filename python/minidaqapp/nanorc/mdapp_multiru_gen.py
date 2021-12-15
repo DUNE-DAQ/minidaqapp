@@ -81,6 +81,7 @@ import click
 @click.option('--dqm-rawdisplay-params', nargs=3, default=[60, 10, 50], help="Parameters that control the data sent for the raw display plot")
 @click.option('--dqm-meanrms-params', nargs=3, default=[10, 1, 100], help="Parameters that control the data sent for the mean/rms plot")
 @click.option('--dqm-fourier-params', nargs=3, default=[600, 60, 100], help="Parameters that control the data sent for the fourier transform plot")
+@click.option('--dqm-fouriersum-params', nargs=3, default=[600, 60, 1000], help="Parameters that control the data sent for the summed fourier transform plot")
 @click.option('--tpc-region-name-prefix', default='APA', help="Prefix to be used for the 'Region' Group name inside the HDF5 file")
 @click.option('--op-env', default='swtest', help="Operational environment - used for raw data filename prefix and HDF5 Attribute inside the files")
 @click.argument('json_dir', type=click.Path())
@@ -90,7 +91,7 @@ def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowd
         use_hsi_hw, hsi_device_id, mean_hsi_signal_multiplicity, hsi_signal_emulation_mode, enabled_hsi_signals,
         ttcm_s1, ttcm_s2, trigger_activity_plugin, trigger_activity_config, trigger_candidate_plugin, trigger_candidate_config,
         enable_raw_recording, raw_recording_output_dir, frontend_type, opmon_impl, enable_dqm, ers_impl, dqm_impl, pocket_url, enable_software_tpg, tpg_channel_map, enable_tpset_writing, use_fake_data_producers, dqm_cmap,
-        dqm_rawdisplay_params, dqm_meanrms_params, dqm_fourier_params,
+        dqm_rawdisplay_params, dqm_meanrms_params, dqm_fourier_params,  dqm_fouriersum_params,
         op_env, tpc_region_name_prefix, json_dir):
 
     """
@@ -350,6 +351,7 @@ def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowd
                 DQM_RAWDISPLAY_PARAMS=dqm_rawdisplay_params,
                 DQM_MEANRMS_PARAMS=dqm_meanrms_params,
                 DQM_FOURIER_PARAMS=dqm_fourier_params,
+                DQM_FOURIERSUM_PARAMS=dqm_fouriersum_params,
                 ) for hostidx in range(len(host_ru))]
         console.log("dqm cmd data:", cmd_data_dqm)
 
