@@ -293,9 +293,11 @@ def generate(
             links=[
                 mlt.GeoID(system=SYSTEM_TYPE, region=REGION_ID, element=idx)
                 for idx in range(NUMBER_OF_RAWDATA_PRODUCERS + NUMBER_OF_TPSET_PRODUCERS)
-            ] + [
-                mlt.GeoID(system="DataSelection", region=REGION_ID, element=idx) for idx in range(NUMBER_OF_TPSET_PRODUCERS)
-                ],
+            ],
+            # PAR 2021-12-15 For testing VD coldbox, don't request data from TPSet buffers, because not all links are enabled. They only return dummy data anyway
+            # + [
+            #                 mlt.GeoID(system="DataSelection", region=REGION_ID, element=idx) for idx in range(NUMBER_OF_TPSET_PRODUCERS)
+            #                 ],
             initial_token_count=TOKEN_COUNT
         )),
     ])
