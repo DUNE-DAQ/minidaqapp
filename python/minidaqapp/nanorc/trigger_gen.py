@@ -231,7 +231,7 @@ def generate(
     cmd_data['conf'] = acmd(tp_confs + [
 
         ("zip", tzip.ConfParams(
-             cardinality=NUMBER_OF_TPSET_PRODUCERS,
+             cardinality=NUMBER_OF_TPSET_PRODUCERS - 1, # minus one because we hacked readout_gen to not generate TPs for link 1
              max_latency_ms=2000,
              region_id=0, # Fake placeholder
              element_id=0 # Fake placeholder
