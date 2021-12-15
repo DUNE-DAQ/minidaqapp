@@ -23,6 +23,7 @@ moo.otypes.load_types('nwqueueadapters/queuetonetwork.jsonnet')
 moo.otypes.load_types('nwqueueadapters/networktoqueue.jsonnet')
 moo.otypes.load_types('nwqueueadapters/networkobjectreceiver.jsonnet')
 moo.otypes.load_types('nwqueueadapters/networkobjectsender.jsonnet')
+moo.otypes.load_types('dfmodules/datafloworchestrator.jsonnet')
 moo.otypes.load_types('dfmodules/requestreceiver.jsonnet')
 moo.otypes.load_types('networkmanager/nwmgr.jsonnet')
 
@@ -46,6 +47,7 @@ import dunedaq.nwqueueadapters.queuetonetwork as qton
 import dunedaq.nwqueueadapters.networkobjectreceiver as nor
 import dunedaq.nwqueueadapters.networkobjectsender as nos
 import dunedaq.dfmodules.requestreceiver as rrcv
+import dunedaq.dfmodules.datafloworchestrator as dfo
 import dunedaq.networkmanager.nwmgr as nwmgr
 
 from appfwk.utils import acmd, mcmd, mrccmd, mspec
@@ -88,6 +90,7 @@ def generate(
         CANDIDATE_CONFIG: int = dict(prescale=10),
 
         TOKEN_COUNT: int = 10,
+        DF_COUNT: int = 1,
         SYSTEM_TYPE = 'wib',
         TTCM_S1: int = 1,
         TTCM_S2: int = 2,
@@ -107,6 +110,7 @@ def generate(
     # Define modules and queues
     queue_bare_specs = [
         app.QueueSpec(inst='trigger_candidate_q', kind='FollyMPMCQueue', capacity=1000),
+        app.QueueSpec(inst='trigger_decision_q', kind='StdDeQueue', capacity=2)
     ]
 
     if SOFTWARE_TPG_ENABLED:
@@ -136,7 +140,7 @@ def generate(
         ] + [
             mspec(f"tpset_receiver", "TPSetReceiver", [app.QueueInfo(name="output", inst=f"tpset_q_for_buf{ru}_{idy}", dir="output") for ru in range(len(RU_CONFIG)) for idy in range(RU_CONFIG[ru]["channel_count"])])
         ] + [
-            mspec(f"qton_fragments", "QueueToNetwork", [app.QueueInfo(name="input", inst=f"fragment_q", dir="input")]),
+            mspec(f"fragment_sender", "FragmentSender", [app.QueueInfo(name="input_queue", inst=f"fragment_q", dir="input")]),
                 mspec(f'tcm', 'TriggerCandidateMaker', [ # TASet -> TC
                     app.QueueInfo(name='input', inst=f'taset_q', dir='input'),
                     app.QueueInfo(name='output', inst=f'trigger_candidate_q', dir='output'),
@@ -180,6 +184,13 @@ def generate(
 
         mspec("mlt", "ModuleLevelTrigger", [
             app.QueueInfo(name="trigger_candidate_source", inst="trigger_candidate_q", dir="input"),
+            app.QueueInfo(name="trigger_decision_sink", inst="trigger_decision_q", dir="output"), 
+        ]),
+
+        ### DFO
+
+        mspec("dfo", "DataFlowOrchestrator", [
+            app.QueueInfo(name="trigger_decision_queue", inst="trigger_decision_q", dir="input"), 
         ]),
 
     ])
@@ -203,10 +214,7 @@ def generate(
                                                  map = [tpsrcv.geoidinst(region=RU_CONFIG[ru]["region_id"] , element=idy + RU_CONFIG[ru]["start_channel"], system=SYSTEM_TYPE , queueinstance=f"tpset_q_for_buf{ru}_{idy}") for ru in range(len(RU_CONFIG)) for idy in range(RU_CONFIG[ru]["channel_count"])],
                                                  general_queue_timeout = 100,
                                                  topic = f"TPSets")),
-            (f"qton_fragments", qton.Conf(msg_type="std::unique_ptr<dunedaq::daqdataformats::Fragment>",
-                                          msg_module_name="FragmentNQ",
-                                          sender_config=nos.Conf(name=f"{PARTITION}.frags_0",
-                                                                 stype="msgpack"))),
+            (f"fragment_sender", None),
                 (f'tcm', tcm.Conf(
                     candidate_maker=CANDIDATE_PLUGIN,
                     candidate_maker_config=temptypes.CandidateConf(**CANDIDATE_CONFIG)
@@ -268,8 +276,6 @@ def generate(
         # Module level trigger
         ("mlt", mlt.ConfParams(
             # This line requests the raw data from upstream DAQ _and_ the raw TPs from upstream DAQ
-            td_connection_name=PARTITION+".trigdec",
-            token_connection_name=PARTITION+".triginh",
             links=[
                 mlt.GeoID(system=SYSTEM_TYPE, region=RU_CONFIG[ru]["region_id"], element=RU_CONFIG[ru]["start_channel"] + idx)
                     for ru in range(len(RU_CONFIG)) for idx in range(RU_CONFIG[ru]["channel_count"])
@@ -280,7 +286,11 @@ def generate(
                 mlt.GeoID(system=SYSTEM_TYPE, region=RU_CONFIG[ru]["region_id"], element=RU_CONFIG[ru]["start_channel"] + idx + total_link_count)
                     for ru in range(len(RU_CONFIG)) for idx in range(RU_CONFIG[ru]["channel_count"])
             ] if SOFTWARE_TPG_ENABLED else []),
-            initial_token_count=TOKEN_COUNT
+        )),
+
+        ("dfo", dfo.ConfParams(
+            token_connection=PARTITION+".triginh",
+            dataflow_applications=[dfo.app_config(decision_connection=f"{PARTITION}.trigdec_{dfidx}", capacity=TOKEN_COUNT) for dfidx in range(DF_COUNT)]
         )),
     ])
 
@@ -291,6 +301,7 @@ def generate(
     # processed
     start_order = [
         "buf.*",
+        "dfo",
         "mlt",
         "ttcm",
         "ntoq_token"
@@ -298,7 +309,7 @@ def generate(
 
     if SOFTWARE_TPG_ENABLED:
         start_order += [
-            "qton_fragments",
+            "fragment_sender",
             "tcm",
             "tam_.*",
             "zip_.*",
@@ -323,7 +334,7 @@ def generate(
     ])
 
     cmd_data['scrap'] = acmd([
-        ("", None)
+        ("dfo", None)
     ])
 
     cmd_data['record'] = acmd([
