@@ -232,7 +232,7 @@ def generate(
 
         ("zip", tzip.ConfParams(
              cardinality=NUMBER_OF_TPSET_PRODUCERS,
-             max_latency_ms=1000,
+             max_latency_ms=2000,
              region_id=0, # Fake placeholder
              element_id=0 # Fake placeholder
         )),
