@@ -110,7 +110,7 @@ def generate(
     # Define modules and queues
     queue_bare_specs = [
         app.QueueSpec(inst='trigger_candidate_q', kind='FollyMPMCQueue', capacity=1000),
-        app.QueueSpec(inst='trigger_decision_q', kind='StdDeQueue', capacity=2)
+        app.QueueSpec(inst='trigger_decision_q', kind='FollySPSCQueue', capacity=2)
     ]
 
     if SOFTWARE_TPG_ENABLED:
