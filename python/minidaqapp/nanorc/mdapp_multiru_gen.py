@@ -94,6 +94,7 @@ import click
 @click.option('--op-env', default='swtest', help="Operational environment - used for raw data filename prefix and HDF5 Attribute inside the files")
 @click.option('--tpc-region-name-prefix', default='APA', help="Prefix to be used for the 'Region' Group name inside the HDF5 file")
 @click.option('--max-file-size', default=4*1024*1024*1024, help="The size threshold when raw data files are closed (in bytes)")
+@click.option('--log-redirection', default='.', help="Place where the logs should go, if it's anything else than \".\" the logs will be on the host where the app will run")
 @click.argument('json_dir', type=click.Path())
 
 def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowdown_factor, run_number, trigger_rate_hz, trigger_window_before_ticks, trigger_window_after_ticks,
@@ -102,7 +103,7 @@ def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowd
         use_hsi_hw, hsi_device_id, mean_hsi_signal_multiplicity, hsi_signal_emulation_mode, enabled_hsi_signals,
         ttcm_s1, ttcm_s2, trigger_activity_plugin, trigger_activity_config, trigger_candidate_plugin, trigger_candidate_config,
         enable_raw_recording, raw_recording_output_dir, frontend_type, opmon_impl, enable_dqm, ers_impl, dqm_impl, pocket_url, enable_software_tpg, enable_tpset_writing, use_fake_data_producers, dqm_cmap,
-        dqm_rawdisplay_params, dqm_meanrms_params, dqm_fourier_params, dqm_fouriersum_params,
+        dqm_rawdisplay_params, dqm_meanrms_params, dqm_fourier_params, dqm_fouriersum_params,log_redirection,
         op_env, tpc_region_name_prefix, max_file_size, json_dir):
 
     """
@@ -462,7 +463,7 @@ def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowd
                 "cmd": ["CMD_FAC=rest://localhost:${APP_PORT}",
                     "INFO_SVC=" + info_svc_uri,
                     "cd ${APP_WD}",
-                    "daq_application --name ${APP_NAME} -c ${CMD_FAC} -i ${INFO_SVC}"]
+                        "daq_application --name ${APP_NAME} -c ${CMD_FAC} -i ${INFO_SVC}" if log_redirection == "." else "daq_application --name ${APP_NAME} -c ${CMD_FAC} -i ${INFO_SVC}  2>&1 > "+log_redirection+"/`date +%F-%T`_${APP_NAME}_${APP_PORT}.log"]
             }
         }
 
