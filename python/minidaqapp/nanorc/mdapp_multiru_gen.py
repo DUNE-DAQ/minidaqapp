@@ -463,7 +463,9 @@ def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowd
                 "cmd": ["CMD_FAC=rest://localhost:${APP_PORT}",
                     "INFO_SVC=" + info_svc_uri,
                     "cd ${APP_WD}",
-                        "daq_application --name ${APP_NAME} -c ${CMD_FAC} -i ${INFO_SVC}" if log_redirection == "." else "daq_application --name ${APP_NAME} -c ${CMD_FAC} -i ${INFO_SVC}  2>&1 > "+log_redirection+"/`date +%F-%T`_${APP_NAME}_${APP_PORT}.log"]
+                    "daq_application --name ${APP_NAME} -c ${CMD_FAC} -i ${INFO_SVC}" + 
+                        ( "" if log_redirection == "." else "2>&1 > "+log_redirection+"/`date +%F-%T`_${APP_NAME}_${APP_PORT}.log" )
+                    ]
             }
         }
 
