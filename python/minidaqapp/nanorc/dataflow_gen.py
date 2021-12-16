@@ -48,7 +48,7 @@ QUEUE_POP_WAIT_MS = 100
 
 class DataFlowApp(App):
     def __init__(self,
-                 NW_SPECS,
+                 # NW_SPECS,
                  FRAGMENT_PRODUCERS,
                  RU_CONFIG=[],
                  RUN_NUMBER=333,
@@ -66,8 +66,8 @@ class DataFlowApp(App):
         """Generate the json configuration for the readout and DF process"""
 
         required_eps = {PARTITION+'.trigdec', PARTITION+'.triginh'}
-        if not required_eps.issubset([nw.name for nw in NW_SPECS]):
-            raise RuntimeError(f"ERROR: not all the required endpoints ({', '.join(required_eps)}) found in list of endpoints {' '.join([nw.name for nw in NW_SPECS])}")
+        # if not required_eps.issubset([nw.name for nw in NW_SPECS]):
+        #     raise RuntimeError(f"ERROR: not all the required endpoints ({', '.join(required_eps)}) found in list of endpoints {' '.join([nw.name for nw in NW_SPECS])}")
 
         modules = []
         total_link_count = 0
@@ -82,14 +82,13 @@ class DataFlowApp(App):
         
                     Module(name = 'fragment_receiver',
                            plugin = 'FragmentReceiver',
-                           connections = {'output': Connection('trb.data_fragments_q', Direction.OUT)},
+                           connections = {'output': Connection('trb.data_fragments_q')},
                            conf = frcv.ConfParams(general_queue_timeout=QUEUE_POP_WAIT_MS,
                                                   connection_name=PARTITION+".frags_0")),
                     
                     Module(name = 'trb',
                            plugin = 'TriggerRecordBuilder',
-                           connections = {'trigger_decision_input_queue': Connection('trigdec_receiver.trigger_decision_q'),
-                                          'trigger_record_output_queue': Connection('datawriter.trigger_record_q')},
+                           connections = {'trigger_record_output_queue': Connection('datawriter.trigger_record_q')},
                            conf = trb.ConfParams(general_queue_timeout=QUEUE_POP_WAIT_MS,
                                                  reply_connection_name = PARTITION+".frags_0",
                                                  map=trb.mapgeoidconnections([
@@ -164,13 +163,13 @@ class DataFlowApp(App):
         if SOFTWARE_TPG_ENABLED:
             modules += [Module(name = 'tp_fragment_receiver',
                                plugin = "FragmentReceiver",
-                               connections = {'output': Connection("trb.data_fragments_q", Direction.OUT)},
+                               connections = {'output': Connection("trb.data_fragments_q")},
                                conf = frcv.ConfParams(general_queue_timeout=QUEUE_POP_WAIT_MS,
                                                       connection_name=PARTITION+".tp_frags_0")),
                         
                         Module(name = 'ds_tpset_fragment_receiver',
                                plugin = "FragmentReceiver",
-                               connections = {"output": Connection("trb.data_fragments_q", Direction.OUT)},
+                               connections = {"output": Connection("trb.data_fragments_q")},
                                conf = frcv.ConfParams(general_queue_timeout=QUEUE_POP_WAIT_MS,
                                                       connection_name=PARTITION+".frags_tpset_ds_0"))]
                         
