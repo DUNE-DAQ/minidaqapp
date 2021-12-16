@@ -42,7 +42,7 @@ def generate(NW_SPECS,
         DQM_RAWDISPLAY_PARAMS=[60, 10, 50],
         DQM_MEANRMS_PARAMS=[10, 1, 100],
         DQM_FOURIER_PARAMS=[600, 60, 100],
-        DQM_FOURIERSUM_PARAMS=[10, 1, 8192]):
+        DQM_FOURIERSUM_PARAMS=[10, 1, 8192],
         PARTITION="UNKNOWN"):
     """Generate the json configuration for the dqm process"""
 
