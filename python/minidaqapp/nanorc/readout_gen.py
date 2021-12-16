@@ -52,7 +52,7 @@ QUEUE_POP_WAIT_MS = 100
 
 class ReadoutApp(App):
     def __init__(self,
-                 NW_SPECS,
+                 # NW_SPECS,
                  RU_CONFIG=[],
                  EMULATOR_MODE=False,
                  DATA_RATE_SLOWDOWN_FACTOR=1,
@@ -76,8 +76,8 @@ class ReadoutApp(App):
         cmd_data = {}
     
         required_eps = {f'{PARTITION}.timesync_{RUIDX}'}
-        if not required_eps.issubset([nw.name for nw in NW_SPECS]):
-            raise RuntimeError(f"ERROR: not all the required endpoints ({', '.join(required_eps)}) found in list of endpoints {' '.join([nw.name for nw in NW_SPECS])}")
+        # if not required_eps.issubset([nw.name for nw in NW_SPECS]):
+        #     raise RuntimeError(f"ERROR: not all the required endpoints ({', '.join(required_eps)}) found in list of endpoints {' '.join([nw.name for nw in NW_SPECS])}")
     
         RATE_KHZ = CLOCK_SPEED_HZ / (25 * 12 * DATA_RATE_SLOWDOWN_FACTOR * 1000)
     
@@ -273,10 +273,11 @@ class ReadoutApp(App):
         mgraph = ModuleGraph(modules)
 
         for idx in range(MIN_LINK, MAX_LINK):
-            mgraph.add_endpoint(f"tpsets_{idx}", f"datahandler_{idx}.tpset_out",    Direction.OUT)
             # TODO: Should we just have one timesync outgoing endpoint?
             mgraph.add_endpoint(f"timesync_{idx}", f"datahandler_{idx}.timesync",    Direction.OUT)
-            mgraph.add_endpoint(f"timesync_{idx+RU_CONFIG[RUIDX]['channel_count']}", f"tp_datahandler_{idx}.timesync",    Direction.OUT)
+            if SOFTWARE_TPG_ENABLED:
+                mgraph.add_endpoint(f"tpsets_{idx}", f"datahandler_{idx}.tpset_out",    Direction.OUT)
+                mgraph.add_endpoint(f"timesync_{idx+RU_CONFIG[RUIDX]['channel_count']}", f"tp_datahandler_{idx}.timesync",    Direction.OUT)
 
             # Add fragment producers for raw data
             mgraph.add_fragment_producer(region = RU_CONFIG[RUIDX]["region_id"], element = idx, system = SYSTEM_TYPE,
@@ -284,9 +285,10 @@ class ReadoutApp(App):
                                          fragments_out = f"datahandler_{idx}.data_response_0")
 
             # Add fragment producers for TPC TPs. Make sure the element index doesn't overlap with the ones for raw data
-            mgraph.add_fragment_producer(region = RU_CONFIG[RUIDX]["region_id"], element = idx + RU_CONFIG[RUIDX]["channel_count"], system = SYSTEM_TYPE,
-                                         requests_in   = f"tp_datahandler_{idx}.data_requests_0",
-                                         fragments_out = f"tp_datahandler_{idx}.data_response_0")
+            if SOFTWARE_TPG_ENABLED:
+                mgraph.add_fragment_producer(region = RU_CONFIG[RUIDX]["region_id"], element = idx + RU_CONFIG[RUIDX]["channel_count"], system = SYSTEM_TYPE,
+                                             requests_in   = f"tp_datahandler_{idx}.data_requests_0",
+                                             fragments_out = f"tp_datahandler_{idx}.data_response_0")
 
         super().__init__(mgraph, host=HOST)
         self.export("readout_app.dot")

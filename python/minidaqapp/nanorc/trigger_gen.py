@@ -74,7 +74,7 @@ def make_moo_record(conf_dict,name,path='temptypes'):
 #===============================================================================
 class TriggerApp(App):
     def __init__(self,
-                 NW_SPECS: list,
+                 # NW_SPECS: list,
                  
                  SOFTWARE_TPG_ENABLED: bool = False,
                  RU_CONFIG: list = [],

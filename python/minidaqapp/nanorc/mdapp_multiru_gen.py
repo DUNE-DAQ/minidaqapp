@@ -287,7 +287,7 @@ def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowd
         #     PARTITION=partition_name)
     else:
         the_system.apps["hsi"] = FakeHSIApp(
-            NW_SPECS=nw_specs,
+            # NW_SPECS=nw_specs,
             RUN_NUMBER = run_number,
             CLOCK_SPEED_HZ = CLOCK_SPEED_HZ,
             DATA_RATE_SLOWDOWN_FACTOR = data_rate_slowdown_factor,
@@ -303,7 +303,7 @@ def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowd
     console.log("hsi cmd data:", the_system.apps["hsi"])
 
     the_system.apps['trigger'] = TriggerApp(
-        NW_SPECS = nw_specs,
+        # NW_SPECS = nw_specs,
         SOFTWARE_TPG_ENABLED = enable_software_tpg,
         RU_CONFIG = ru_configs,
         ACTIVITY_PLUGIN = trigger_activity_plugin,
@@ -343,7 +343,7 @@ def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowd
         ru_name = ru_app_names[i]
         the_system.apps[ru_name] = ReadoutApp(# NUMBER_OF_DATA_PRODUCERS = number_of_data_producers,
                                               PARTITION=partition_name,
-                                              NW_SPECS=nw_specs,
+                                              # NW_SPECS=nw_specs,
                                               RU_CONFIG=ru_configs,
                                               # TOTAL_NUMBER_OF_DATA_PRODUCERS=total_number_of_data_producers,
                                               EMULATOR_MODE = emulator_mode,
@@ -367,7 +367,7 @@ def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowd
         console.log(f"{ru_name} app: {the_system.apps[ru_name]}")
     
     the_system.apps['dataflow'] = DataFlowApp(
-        NW_SPECS = nw_specs,
+        # NW_SPECS = nw_specs,
         FRAGMENT_PRODUCERS = the_system.get_fragment_producers(),
         RU_CONFIG = ru_configs,
         RUN_NUMBER = run_number,
@@ -383,7 +383,7 @@ def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowd
         HOST=host_df
     )
 
-    exit(0)
+    # exit(0)
     #     console.log("dataflow cmd data:", cmd_data_dataflow)
     
     # a.append(this_readout_mgraph)
@@ -626,22 +626,23 @@ def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowd
     #         json.dump(mdapp_info, f, indent=4, sort_keys=True)
     
     #     console.log(f"MDAapp config generated in {json_dir}")
-    from appfwk.conf_utils import connect_all_fragment_producers, add_network, make_app_command_data
+    from appfwk.conf_utils import connect_all_fragment_producers, add_network, make_app_command_data, set_mlt_links
+    the_system.export("system_no_frag_prod_connection.dot")
     connect_all_fragment_producers(the_system, verbose=True)
-
+    
     # console.log("After connecting fragment producers, trigger mgraph:", the_system.apps['trigger'].modulegraph)
     # console.log("After connecting fragment producers, the_system.app_connections:", the_system.app_connections)
 
-    # util.set_mlt_links(the_system, "trigger", verbose=True)
+    set_mlt_links(the_system, "trigger", verbose=True)
     
-    # util.add_network("trigger", the_system, verbose=True)
-    # console.log("After adding network, trigger mgraph:", the_system.apps['trigger'].modulegraph)
-    add_network("hsi", the_system, verbose=True)
+    # add_network("trigger", the_system, partition_name=partition_name, verbose=True)
+    # # console.log("After adding network, trigger mgraph:", the_system.apps['trigger'].modulegraph)
+    # add_network("hsi", the_system, partition_name=partition_name, verbose=True)
     # for ru_app_name in ru_app_names:
-    #     util.add_network(ru_app_name, the_system, verbose=True)
+    #     add_network(ru_app_name, the_system, partition_name=partition_name, verbose=True)
 
-    # util.add_network("dataflow", the_system, verbose=True)
-    
+    # add_network("dataflow", the_system, partition_name=partition_name, verbose=True)
+    the_system.export("system.dot")
 
     ####################################################################
     # Application command data generation
@@ -661,7 +662,7 @@ def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowd
     
     # Arrange per-app command data into the format used by util.write_json_files()
     app_command_datas = {
-        name : make_app_command_data(app, nw_specs)
+        name : make_app_command_data(the_system, app)
         for name,app in the_system.apps.items()
     }
 

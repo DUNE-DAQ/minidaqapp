@@ -42,14 +42,16 @@ import dunedaq.nwqueueadapters.networkobjectsender as nos
 
 from appfwk.utils import acmd, mcmd, mrccmd, mspec
 from appfwk.conf_utils import ModuleGraph, App
-
+    
+from appfwk.conf_utils import Module, ModuleGraph, Direction
+from appfwk.conf_utils import Connection as Conn
+        
 import math
-
 
 #===============================================================================
 class FakeHSIApp(App):
     def __init__(self,
-                 NW_SPECS: list,
+                 # NW_SPECS: list,
                  RUN_NUMBER=333,
                  CLOCK_SPEED_HZ: int=50000000,
                  DATA_RATE_SLOWDOWN_FACTOR: int=1,
@@ -63,28 +65,23 @@ class FakeHSIApp(App):
         
         trigger_interval_ticks = 0
         required_eps = {PARTITION + '.hsievent'}
-        if not required_eps.issubset([nw.name for nw in NW_SPECS]):
-            raise RuntimeError(f"ERROR: not all the required endpoints ({', '.join(required_eps)}) found in list of endpoints {' '.join([nw.name for nw in NW_SPECS])}")
+        # if not required_eps.issubset([nw.name for nw in NW_SPECS]):
+        #     raise RuntimeError(f"ERROR: not all the required endpoints ({', '.join(required_eps)}) found in list of endpoints {' '.join([nw.name for nw in NW_SPECS])}")
 
         if TRIGGER_RATE_HZ > 0:
             trigger_interval_ticks = math.floor((1 / TRIGGER_RATE_HZ) * CLOCK_SPEED_HZ / DATA_RATE_SLOWDOWN_FACTOR)
-    
-        from appfwk.conf_utils import Module, ModuleGraph, Direction
-        from appfwk.conf_utils import Connection as Conn
-        
+
         modules = []
-    
         modules += [Module(name = 'fhsig',
-                                  plugin = "FakeHSIEventGenerator",
-                                  conf =  fhsig.Conf(clock_frequency=CLOCK_SPEED_HZ/DATA_RATE_SLOWDOWN_FACTOR,
-                                                     #timestamp_offset=???,
-                                                     #hsi_device_id=???,
-                                                     trigger_interval_ticks=trigger_interval_ticks,
-                                                     mean_signal_multiplicity=MEAN_SIGNAL_MULTIPLICITY,
-                                                     signal_emulation_mode=SIGNAL_EMULATION_MODE,
-                                                     enabled_signals=ENABLED_SIGNALS,
-                                                     hsievent_connection_name=PARTITION+".hsievent",
-                                                     ))]
+                           plugin = "FakeHSIEventGenerator",
+                           conf =  fhsig.Conf(clock_frequency=CLOCK_SPEED_HZ/DATA_RATE_SLOWDOWN_FACTOR,
+                                              # timestamp_offset=???,
+                                              # hsi_device_id=???,
+                                              trigger_interval_ticks=trigger_interval_ticks,
+                                              mean_signal_multiplicity=MEAN_SIGNAL_MULTIPLICITY,
+                                              signal_emulation_mode=SIGNAL_EMULATION_MODE,
+                                              enabled_signals=ENABLED_SIGNALS,
+                                              hsievent_connection_name=PARTITION+".hsievent"))]
     
         mgraph = ModuleGraph(modules)
         mgraph.add_endpoint("time_sync", "fhsig.time_sync_source", Direction.IN)
