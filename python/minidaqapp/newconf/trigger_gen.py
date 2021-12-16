@@ -215,10 +215,8 @@ class TriggerApp(App):
         # leave the list of links here blank, and replace it in
         # util.connect_fragment_producers
         modules += [DAQModule(name = 'mlt',
-                           plugin = 'ModuleLevelTrigger',
-                           conf=mlt.ConfParams(links=[], # To be updated later - see comment above
-                                               td_connection_name=PARTITION+".trigdec",
-                                               token_connection_name=PARTITION+".triginh"))]
+                              plugin = 'ModuleLevelTrigger',
+                              conf=mlt.ConfParams(links=[]))] # To be updated later - see comment above
         
         mgraph = ModuleGraph(modules)
         mgraph.add_endpoint("hsievents",  "ttcm.input", Direction.IN)
