@@ -52,6 +52,7 @@ QUEUE_POP_WAIT_MS = 100
 
 def generate(NW_SPECS,
         RU_CONFIG=[],
+        HOSTIDX=0,
         RUN_NUMBER=333,
         OUTPUT_PATH=".",
         TOKEN_COUNT=0,
@@ -66,7 +67,7 @@ def generate(NW_SPECS,
 
     cmd_data = {}
 
-    required_eps = {PARTITION+'.trigdec', PARTITION+'.triginh'}
+    required_eps = {PARTITION+f'.trigdec_{HOSTIDX}', PARTITION+'.triginh'}
     if not required_eps.issubset([nw.name for nw in NW_SPECS]):
         raise RuntimeError(f"ERROR: not all the required endpoints ({', '.join(required_eps)}) found in list of endpoints {' '.join([nw.name for nw in NW_SPECS])}")
 
@@ -100,10 +101,7 @@ def generate(NW_SPECS,
         mspec(f"tpset_subscriber_{idx}", "NetworkToQueue", [app.QueueInfo(name="output", inst=f"tpsets_from_netq", dir="output")])  for idx in range(len(RU_CONFIG))
     ] if TPSET_WRITING_ENABLED else []) + ([
         mspec("tpswriter", "TPSetWriter", [app.QueueInfo(name="tpset_source", inst="tpsets_from_netq", dir="input")])
-    ] if TPSET_WRITING_ENABLED else []) + ([
-        mspec("tp_fragment_receiver", "FragmentReceiver", [app.QueueInfo(name="output", inst="data_fragments_q", dir="output")]),
-        mspec("ds_tpset_fragment_receiver", "FragmentReceiver", [app.QueueInfo(name="output", inst="data_fragments_q", dir="output")]),
-    ] if SOFTWARE_TPG_ENABLED else []) 
+    ] if TPSET_WRITING_ENABLED else [])
 
 
     cmd_data['init'] = app.Init(queues=queue_specs, modules=mod_specs, nwconnections=NW_SPECS)
@@ -114,10 +112,10 @@ def generate(NW_SPECS,
 
     cmd_data['conf'] = acmd([
                 ("trigdec_receiver", tdrcv.ConfParams(general_queue_timeout=QUEUE_POP_WAIT_MS,
-                                                      connection_name=PARTITION+".trigdec")),
+                                                      connection_name=f"{PARTITION}.trigdec_{HOSTIDX}")),
 
                 ("trb", trb.ConfParams( general_queue_timeout=QUEUE_POP_WAIT_MS,
-                                        reply_connection_name = PARTITION+".frags_0",
+                                        reply_connection_name = f"{PARTITION}.frags_{HOSTIDX}",
                                         map=trb.mapgeoidconnections([
                                                 trb.geoidinst(region=RU_CONFIG[ru]["region_id"], element=idx + RU_CONFIG[ru]["start_channel"], system=SYSTEM_TYPE, connection_name=f"{PARTITION}.datareq_{ru}") for ru in range(len(RU_CONFIG)) for idx in range(RU_CONFIG[ru]["channel_count"])
                                         ] + ([
@@ -127,7 +125,7 @@ def generate(NW_SPECS,
 
                                         ] if SOFTWARE_TPG_ENABLED else [])
                                                               ) )),
-                ("datawriter", dw.ConfParams(initial_token_count=TOKEN_COUNT,
+                ("datawriter", dw.ConfParams(decision_connection=f"{PARTITION}.trigdec_{HOSTIDX}",
                                              token_connection=PARTITION+".triginh",
                                 data_store_parameters=hdf5ds.ConfParams(name="data_store",
                                 version = 3,
@@ -159,15 +157,7 @@ def generate(NW_SPECS,
             ] + [
                 ("fragment_receiver", frcv.ConfParams(
                     general_queue_timeout=QUEUE_POP_WAIT_MS,
-                    connection_name=PARTITION+".frags_0"
-                )), 
-                ("tp_fragment_receiver", frcv.ConfParams(
-                    general_queue_timeout=QUEUE_POP_WAIT_MS,
-                    connection_name=PARTITION+".tp_frags_0"
-                )), 
-                ("ds_tpset_fragment_receiver", frcv.ConfParams(
-                    general_queue_timeout=QUEUE_POP_WAIT_MS,
-                    connection_name=PARTITION+".frags_tpset_ds_0"
+                    connection_name=f"{PARTITION}.frags_{HOSTIDX}"
                 )), 
             ] + [
                 (f"tpset_subscriber_{idx}", ntoq.Conf(
@@ -191,16 +181,12 @@ def generate(NW_SPECS,
             + [
             ("datawriter", startpars),
             ("fragment_receiver", startpars),
-            ("tp_fragment_receiver",startpars),
-            ("ds_tpset_fragment_receiver",startpars),
             ("trb", startpars),
             ("trigdec_receiver", startpars)])
 
     cmd_data['stop'] = acmd([("trigdec_receiver", None),
             ("trb", None),
             ("fragment_receiver", None),
-              ("tp_fragment_receiver",None),
-              ("ds_tpset_fragment_receiver",None),
             ("datawriter", None),
             ] + ([
               ("tpset_subscriber_.*", None),
@@ -215,8 +201,6 @@ def generate(NW_SPECS,
     cmd_data['scrap'] = acmd([
             ("fragment_receiver", None),
             ("trigdec_receiver", None),
-            ("tp_fragment_receiver",None),
-            ("ds_tpset_fragment_receiver",None),
             ("qton_token", None)])
 
     cmd_data['record'] = acmd([("", None)])
