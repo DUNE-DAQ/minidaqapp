@@ -77,19 +77,19 @@ class DataFlowApp(App):
         
         modules += [DAQModule(name = 'trigdec_receiver',
                            plugin = 'TriggerDecisionReceiver',
-                           connections = {'output': Connection('trb.trigger_decision_q')},
+                           connections = {'output': Connection('trb.trigger_decision_input_queue')},
                            conf = tdrcv.ConfParams(general_queue_timeout=QUEUE_POP_WAIT_MS,
                                                    connection_name=PARTITION+".trigdec")),
         
                     DAQModule(name = 'fragment_receiver',
                            plugin = 'FragmentReceiver',
-                           connections = {'output': Connection('trb.data_fragments_q')},
+                           connections = {'output': Connection('trb.data_fragment_input_queue')},
                            conf = frcv.ConfParams(general_queue_timeout=QUEUE_POP_WAIT_MS,
                                                   connection_name=PARTITION+".frags_0")),
                     
                     DAQModule(name = 'trb',
                            plugin = 'TriggerRecordBuilder',
-                           connections = {'trigger_record_output_queue': Connection('datawriter.trigger_record_q')},
+                           connections = {'trigger_record_output_queue': Connection('datawriter.trigger_record_input_queue')},
                            conf = trb.ConfParams(general_queue_timeout=QUEUE_POP_WAIT_MS,
                                                  reply_connection_name = PARTITION+".frags_0",
                                                  map=trb.mapgeoidconnections([
