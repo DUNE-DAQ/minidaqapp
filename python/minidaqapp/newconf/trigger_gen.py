@@ -5,33 +5,19 @@ moo.io.default_load_path = get_moo_model_path()
 
 # Load configuration types
 import moo.otypes
-moo.otypes.load_types('rcif/cmd.jsonnet')
-moo.otypes.load_types('appfwk/cmd.jsonnet')
-moo.otypes.load_types('appfwk/app.jsonnet')
 
 moo.otypes.load_types('trigger/triggeractivitymaker.jsonnet')
 moo.otypes.load_types('trigger/triggercandidatemaker.jsonnet')
 moo.otypes.load_types('trigger/triggerzipper.jsonnet')
-moo.otypes.load_types('trigger/intervaltccreator.jsonnet')
 moo.otypes.load_types('trigger/moduleleveltrigger.jsonnet')
 moo.otypes.load_types('trigger/fakedataflow.jsonnet')
 moo.otypes.load_types('trigger/timingtriggercandidatemaker.jsonnet')
 moo.otypes.load_types('trigger/tpsetbuffercreator.jsonnet')
 moo.otypes.load_types('trigger/tpsetreceiver.jsonnet')
 
-moo.otypes.load_types('nwqueueadapters/queuetonetwork.jsonnet')
-moo.otypes.load_types('nwqueueadapters/networktoqueue.jsonnet')
-moo.otypes.load_types('nwqueueadapters/networkobjectreceiver.jsonnet')
-moo.otypes.load_types('nwqueueadapters/networkobjectsender.jsonnet')
 moo.otypes.load_types('dfmodules/requestreceiver.jsonnet')
-moo.otypes.load_types('networkmanager/nwmgr.jsonnet')
 
 # Import new types
-import dunedaq.cmdlib.cmd as basecmd # AddressedCmd,
-import dunedaq.rcif.cmd as rccmd # AddressedCmd,
-import dunedaq.appfwk.cmd as cmd # AddressedCmd,
-import dunedaq.appfwk.app as app # AddressedCmd,
-import dunedaq.trigger.intervaltccreator as itcc
 import dunedaq.trigger.triggeractivitymaker as tam
 import dunedaq.trigger.triggercandidatemaker as tcm
 import dunedaq.trigger.triggerzipper as tzip
@@ -41,14 +27,8 @@ import dunedaq.trigger.timingtriggercandidatemaker as ttcm
 import dunedaq.trigger.tpsetbuffercreator as buf
 import dunedaq.trigger.tpsetreceiver as tpsrcv
 
-import dunedaq.nwqueueadapters.networktoqueue as ntoq
-import dunedaq.nwqueueadapters.queuetonetwork as qton
-import dunedaq.nwqueueadapters.networkobjectreceiver as nor
-import dunedaq.nwqueueadapters.networkobjectsender as nos
 import dunedaq.dfmodules.requestreceiver as rrcv
-import dunedaq.networkmanager.nwmgr as nwmgr
 
-from appfwk.utils import acmd, mcmd, mrccmd, mspec
 from appfwk.app import App, ModuleGraph
 from appfwk.daqmodule import DAQModule
 from appfwk.conf_utils import Direction, Connection
