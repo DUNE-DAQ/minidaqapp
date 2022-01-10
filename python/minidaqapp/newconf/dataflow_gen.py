@@ -55,7 +55,6 @@ class DataFlowApp(App):
                  RU_CONFIG=[],
                  RUN_NUMBER=333,
                  OUTPUT_PATH=".",
-                 TOKEN_COUNT=0,
                  SYSTEM_TYPE="TPC",
                  SOFTWARE_TPG_ENABLED=False,
                  TPSET_WRITING_ENABLED=False,
@@ -116,7 +115,6 @@ class DataFlowApp(App):
                            plugin = 'DataWriter',
                            connections = {}, # {'trigger_record_input_queue': Connection('datawriter.trigger_record_q')},
                            conf = dw.ConfParams(
-                               initial_token_count=TOKEN_COUNT,
                                token_connection=PARTITION+".triginh",
                                data_store_parameters=hdf5ds.ConfParams(
                                    name="data_store",
