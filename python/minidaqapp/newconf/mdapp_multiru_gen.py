@@ -251,6 +251,8 @@ def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowd
     for nw in nw_specs:
         print(f'{nwmgr.Name} {nwmgr.Topic} {nwmgr.Address}')
         
+    the_system.network_endpoints = nw_specs
+    
     if control_timing_hw:
         pass
         # PL: TODO
