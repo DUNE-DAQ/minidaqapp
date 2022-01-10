@@ -138,7 +138,7 @@ class TriggerApp(App):
                             
                             DAQModule(name = f'tam_{ru}',
                                    plugin = 'TriggerActivityMaker',
-                                   connections = {'output': Connection('tcm.taset_q')},
+                                   connections = {'output': Connection('tcm.input')},
                                    conf = tam.Conf(activity_maker=ACTIVITY_PLUGIN,
                                                    geoid_region=0,  # Fake placeholder
                                                    geoid_element=0,  # Fake placeholder
@@ -149,9 +149,9 @@ class TriggerApp(App):
                 for idy in range(RU_CONFIG[ru]["channel_count"]):
                     modules += [DAQModule(name = f'buf{ru}_{idy}',
                                        plugin = 'TPSetBufferCreator',
-                                       connections = {#'tpset_source': Connection(f"tpset_q_for_buf{ru}_{idy}"),#already in request_receiver
+                                       connections = {},#'tpset_source': Connection(f"tpset_q_for_buf{ru}_{idy}"),#already in request_receiver
                                                       #'data_request_source': Connection(f"data_request_q{ru}_{idy}"), #ditto
-                                                      'fragment_sink': Connection('qton_fragments.fragment_q')},
+                                                      # 'fragment_sink': Connection('qton_fragments.fragment_q')},
                                        conf = buf.Conf(tpset_buffer_size=10000, region=RU_CONFIG[ru]["region_id"], element=idy + RU_CONFIG[ru]["start_channel"]))]
 
         modules += [DAQModule(name = 'ttcm',
@@ -179,13 +179,15 @@ class TriggerApp(App):
         mgraph = ModuleGraph(modules)
         mgraph.add_endpoint("hsievents",  "ttcm.input", Direction.IN)
         if SOFTWARE_TPG_ENABLED:
-            for idx in range(len(RU_CONFIG)):
-                mgraph.add_endpoint(f"tpsets_into_chain_link{idx}", f"tpset_receiver.input", Direction.IN)
-                mgraph.add_endpoint(f"tpsets_into_buffer_link{idx}", f"tpset_subscriber_{idx}.tpset_source", Direction.IN)
+            for apa_idx,ru_config in enumerate(RU_CONFIG):
+                mgraph.add_endpoint(f"tpsets_into_chain_apa{apa_idx}", f"zip_{apa_idx}.input", Direction.IN)
 
-                mgraph.add_fragment_producer(region=0, element=idx, system="DataSelection",
-                                             requests_in=f"request_receiver.data_request_source",
-                                             fragments_out=f"qton_fragments.fragment_sink")
+                for link_idx in range(ru_config["channel_count"]):
+                    buf_name=f'buf{ru}_{idy}'
+                    mgraph.add_endpoint(f"tpsets_into_buffer_apa{apa_idx}_link{link_idx}", f"{buf_name}.tpset_source", Direction.IN)
+                    mgraph.add_fragment_producer(region=apa_idx, element=link_idx, system="DataSelection",
+                                                 requests_in=f"{buf_name}.data_request_source",
+                                                 fragments_out=f"{buf_name}.fragment_sink")
 
 
         mgraph.add_endpoint("trigger_decisions", "mlt.trigger_decision_sink", Direction.OUT)
