@@ -126,8 +126,8 @@ def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowd
 
     console.log(f"Generating configs for hosts trigger={host_trigger} dataflow={host_df} readout={host_ru} hsi={host_hsi} dqm={host_ru}")
 
-    the_system = System()
-    
+    the_system = System(partition_name)
+   
     total_number_of_data_producers = 0
 
     if use_ssp:
