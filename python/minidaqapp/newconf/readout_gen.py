@@ -123,7 +123,7 @@ class ReadoutApp(App):
             for idx in range(MIN_LINK,MAX_LINK):
                 modules += [DAQModule(name = f"tp_datahandler_{idx}",
                                    plugin = "DataLinkHandler",
-                                   connections = {},
+                                   connections =  {'fragment_queue': Connection('fragment_sender.input_queue')},
                                    conf = rconf.Conf(readoutmodelconf = rconf.ReadoutModelConf(source_queue_timeout_ms = QUEUE_POP_WAIT_MS,
                                                                                              region_id = RU_CONFIG[RUIDX]["region_id"],
                                                                                              element_id = total_link_count+idx),
