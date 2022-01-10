@@ -111,10 +111,6 @@ class TriggerApp(App):
                                                       general_queue_timeout = 100,
                                                       topic = f"TPSets")
     
-            config_qton_fragment = qton.Conf(msg_type="std::unique_ptr<dunedaq::daqdataformats::Fragment>",
-                                             msg_module_name="FragmentNQ",
-                                             sender_config=nos.Conf(name=f"{PARTITION}.frags_tpset_ds_0",stype="msgpack"))
-
             config_tcm =  tcm.Conf(candidate_maker=CANDIDATE_PLUGIN,
                                    candidate_maker_config=temptypes.CandidateConf(**CANDIDATE_CONFIG))
             
@@ -122,16 +118,6 @@ class TriggerApp(App):
                                plugin = 'RequestReceiver',
                                connections = connections_request_receiver,
                                conf = config_request_receiver),
-                        
-                        DAQModule(name = 'tpset_receiver',
-                               plugin = 'TPSetReceiver',
-                               connections = connections_tpset_receiver,
-                               conf = config_tpset_receiver),
-                        
-                        DAQModule(name = 'qton_fragments',
-                               plugin = 'QueueToNetwork',
-                               connections = {}, # all the incoming links in TPSetBufferCreators
-                               conf = config_qton_fragment),
                         
                         DAQModule(name = 'tcm',
                                plugin = 'TriggerCandidateMaker',
@@ -141,15 +127,7 @@ class TriggerApp(App):
             
             for ru in range(len(RU_CONFIG)):
                 
-                modules += [DAQModule(name = f'tpset_subscriber_{ru}',
-                                   plugin = 'NetworkToQueue',
-                                   connections = {'output': Connection(f'zip_{ru}.tpsets_from_netq_{ru}')},
-                                   conf = ntoq.Conf(msg_type="dunedaq::trigger::TPSet",
-                                                    msg_module_name="TPSetNQ",
-                                                    receiver_config=nor.Conf(name=f'{PARTITION}.tpsets_{ru}',
-                                                                             subscriptions=["TPSets"]))),
-                            
-                            DAQModule(name = f'zip_{ru}',
+                modules += [DAQModule(name = f'zip_{ru}',
                                    plugin = 'TPZipper',
                                    connections = {# 'input' are App.network_endpoints, from RU
                                        'output': Connection(f'tam_{ru}.input')},
