@@ -7,6 +7,7 @@ import rich.traceback
 from rich.console import Console
 from os.path import exists, join
 from appfwk.system import System
+from appfwk.conf_utils import AppConnection
 
 CLOCK_SPEED_HZ = 50000000
 
@@ -623,9 +624,27 @@ def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowd
     #             "build_info": buildinfo
     #         }
     #         json.dump(mdapp_info, f, indent=4, sort_keys=True)
+
+
+    # TODO PAR 2021-12-11 Fix up the indexing here. There's one output
+    # endpoint per link in the ru apps (maybe there should just be one
+    # per app?), and all the TPSets from one RU go to the same TA
+    # input in the trigger app
+    for apa_idx,ru_app_name in enumerate(ru_app_names):
+        ru_config=ru_configs[apa_idx]
+        min_link=ru_config["start_channel"]
+        max_link=min_link+ru_config["channel_count"]
+        for link in range(min_link, max_link):
+            the_system.app_connections.update(
+                { f"{ru_app_name}.tpsets_{link}": AppConnection(nwmgr_connection=f"{partition_name}.tpsets_apa{apa_idx}_link{link}",
+                                                                msg_type="dunedaq::trigger::TPSet",
+                                                                msg_module_name="TPSetNQ",
+                                                                receivers=[f"trigger.tpsets_into_buffer_apa{apa_idx}_link{link}",
+                                                                           f"trigger.tpsets_into_chain_apa{apa_idx}"])})
     
+
     #     console.log(f"MDAapp config generated in {json_dir}")
-    from appfwk.conf_utils import connect_all_fragment_producers, add_network, make_app_command_data, set_mlt_links
+    from appfwk.conf_utils import connect_all_fragment_producers, add_network, add_network2, make_app_command_data, set_mlt_links
     the_system.export("system_no_frag_prod_connection.dot")
     connect_all_fragment_producers(the_system, verbose=True)
     
@@ -634,7 +653,7 @@ def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowd
 
     set_mlt_links(the_system, "trigger", verbose=True)
     
-    # add_network("trigger", the_system, partition_name=partition_name, verbose=True)
+    add_network2("trigger", the_system, verbose=True)
     # # console.log("After adding network, trigger mgraph:", the_system.apps['trigger'].modulegraph)
     # add_network("hsi", the_system, partition_name=partition_name, verbose=True)
     # for ru_app_name in ru_app_names:
