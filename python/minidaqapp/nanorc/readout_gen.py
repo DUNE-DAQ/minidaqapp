@@ -327,6 +327,7 @@ def generate(NETWORK_ENDPOINTS,
                             region_id = REGION_ID,
                             element_id = TOTAL_NUMBER_OF_DATA_PRODUCERS + idx,
                             enable_software_tpg = False,
+                            channel_map_name = TPG_CHANNEL_MAP,
                         ),
                         requesthandlerconf= rconf.RequestHandlerConf(
                             latency_buffer_size = LATENCY_BUFFER_SIZE,
