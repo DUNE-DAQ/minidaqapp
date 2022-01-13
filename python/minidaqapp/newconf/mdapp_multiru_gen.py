@@ -666,7 +666,7 @@ def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowd
                                                                             
     
     #     console.log(f"MDAapp config generated in {json_dir}")
-    from appfwk.conf_utils import connect_all_fragment_producers, add_network, add_network2, make_app_command_data, set_mlt_links
+    from appfwk.conf_utils import connect_all_fragment_producers, add_network, make_app_command_data, set_mlt_links
     the_system.export("system_no_frag_prod_connection.dot")
     connect_all_fragment_producers(the_system, verbose=True)
     
@@ -675,13 +675,13 @@ def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowd
 
     set_mlt_links(the_system, "trigger", verbose=True)
     
-    add_network2("trigger", the_system, verbose=True)
+    add_network("trigger", the_system, verbose=True)
     # # console.log("After adding network, trigger mgraph:", the_system.apps['trigger'].modulegraph)
-    add_network2("hsi", the_system, verbose=True)
+    add_network("hsi", the_system, verbose=True)
     for ru_app_name in ru_app_names:
-        add_network2(ru_app_name, the_system, verbose=True)
+        add_network(ru_app_name, the_system, verbose=True)
 
-    add_network2("dataflow", the_system, verbose=True)
+    add_network("dataflow", the_system, verbose=True)
     the_system.export("system.dot")
 
     ####################################################################
