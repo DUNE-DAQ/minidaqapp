@@ -71,8 +71,7 @@ class FakeHSIApp(App):
         if TRIGGER_RATE_HZ > 0:
             trigger_interval_ticks = math.floor((1 / TRIGGER_RATE_HZ) * CLOCK_SPEED_HZ / DATA_RATE_SLOWDOWN_FACTOR)
 
-        modules = []
-        modules += [DAQModule(name = 'fhsig',
+        modules = [DAQModule(name = 'fhsig',
                            plugin = "FakeHSIEventGenerator",
                            conf =  fhsig.Conf(clock_frequency=CLOCK_SPEED_HZ/DATA_RATE_SLOWDOWN_FACTOR,
                                               # timestamp_offset=???,

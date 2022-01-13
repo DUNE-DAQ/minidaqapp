@@ -114,10 +114,11 @@ class TriggerApp(App):
             config_tcm =  tcm.Conf(candidate_maker=CANDIDATE_PLUGIN,
                                    candidate_maker_config=temptypes.CandidateConf(**CANDIDATE_CONFIG))
             
-            modules += [DAQModule(name = 'request_receiver',
-                               plugin = 'RequestReceiver',
-                               connections = connections_request_receiver,
-                               conf = config_request_receiver),
+            modules += [
+                # DAQModule(name = 'request_receiver',
+                #                plugin = 'RequestReceiver',
+                #                connections = connections_request_receiver,
+                #                conf = config_request_receiver),
                         
                         DAQModule(name = 'tcm',
                                plugin = 'TriggerCandidateMaker',
@@ -147,7 +148,7 @@ class TriggerApp(App):
                                                    activity_maker_config=temptypes.ActivityConf(**ACTIVITY_CONFIG)))]
 
                 for idy in range(RU_CONFIG[ru]["channel_count"]):
-                    modules += [DAQModule(name = f'buf{ru}_{idy}',
+                    modules += [DAQModule(name = f'buf_apa{ru}_link{idy}',
                                        plugin = 'TPSetBufferCreator',
                                        connections = {},#'tpset_source': Connection(f"tpset_q_for_buf{ru}_{idy}"),#already in request_receiver
                                                       #'data_request_source': Connection(f"data_request_q{ru}_{idy}"), #ditto
@@ -156,7 +157,7 @@ class TriggerApp(App):
 
         modules += [DAQModule(name = 'ttcm',
                            plugin = 'TimingTriggerCandidateMaker',
-                           connections={"output": Connection("mlt.trigger_candidate_q")},
+                           connections={"output": Connection("mlt.trigger_candidate_source")},
                            conf=ttcm.Conf(s1=ttcm.map_t(signal_type=TTCM_S1,
                                                         time_before=TRIGGER_WINDOW_BEFORE_TICKS,
                                                         time_after=TRIGGER_WINDOW_AFTER_TICKS),
@@ -183,7 +184,7 @@ class TriggerApp(App):
                 mgraph.add_endpoint(f"tpsets_into_chain_apa{apa_idx}", f"zip_{apa_idx}.input", Direction.IN)
 
                 for link_idx in range(ru_config["channel_count"]):
-                    buf_name=f'buf{ru}_{idy}'
+                    buf_name=f'buf_apa{apa_idx}_link{link_idx}'
                     mgraph.add_endpoint(f"tpsets_into_buffer_apa{apa_idx}_link{link_idx}", f"{buf_name}.tpset_source", Direction.IN)
                     mgraph.add_fragment_producer(region=apa_idx, element=link_idx, system="DataSelection",
                                                  requests_in=f"{buf_name}.data_request_source",

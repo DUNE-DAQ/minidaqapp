@@ -114,16 +114,17 @@ class ReadoutApp(App):
                     connections[f'tp_output_{idx}'] = Connection(f"tp_datahandler_{idx}.data_requests_0",
                                                                  queue_name = queue_inst)
 
-            modules += [DAQModule(name = "request_receiver",
-                               plugin = "RequestReceiver",
-                               connections = connections,
-                               conf = rrcv.ConfParams(map = request_receiver_geoid_map,
-                                                      general_queue_timeout = QUEUE_POP_WAIT_MS,
-                                                      connection_name = f"{PARTITION}.datareq_{RUIDX}"))]
+            # modules += [
+            #     DAQModule(name = "request_receiver",
+            #                    plugin = "RequestReceiver",
+            #                    connections = connections,
+            #                    conf = rrcv.ConfParams(map = request_receiver_geoid_map,
+            #                                           general_queue_timeout = QUEUE_POP_WAIT_MS,
+            #                                           connection_name = f"{PARTITION}.datareq_{RUIDX}"))]
             for idx in range(MIN_LINK,MAX_LINK):
                 modules += [DAQModule(name = f"tp_datahandler_{idx}",
                                    plugin = "DataLinkHandler",
-                                   connections =  {'fragment_queue': Connection('fragment_sender.input_queue')},
+                                   connections =  {}, #{'fragment_queue': Connection('fragment_sender.input_queue')},
                                    conf = rconf.Conf(readoutmodelconf = rconf.ReadoutModelConf(source_queue_timeout_ms = QUEUE_POP_WAIT_MS,
                                                                                              region_id = RU_CONFIG[RUIDX]["region_id"],
                                                                                              element_id = total_link_count+idx),
@@ -166,7 +167,7 @@ class ReadoutApp(App):
                 connections = {}
                 # connections['raw_input']      = Connection(f"{FRONTEND_TYPE}_link_{idx}", Direction.IN)
                 # connections['data_request_0'] = Connection(f'data_requests_{idx}',        Direction.IN)
-                connections['fragment_queue'] = Connection('fragment_sender.input_queue')
+                # connections['fragment_queue'] = Connection('fragment_sender.input_queue')
                 if SOFTWARE_TPG_ENABLED:
                     connections['tp_out']    = Connection(f"tp_datahandler_{idx}.raw_input",
                                                           queue_name = f"sw_tp_link_{idx}",
@@ -178,8 +179,42 @@ class ReadoutApp(App):
                     connections['errored_frames'] = Connection('errored_frame_consumer.input_queue')
 
                 modules += [DAQModule(name = f"datahandler_{idx}",
-                                   plugin = "DataLinkHandler", 
-                                   connections = connections)]
+                                      plugin = "DataLinkHandler", 
+                                      connections = connections,
+                                      conf = rconf.Conf(
+                                          readoutmodelconf= rconf.ReadoutModelConf(
+                                              source_queue_timeout_ms= QUEUE_POP_WAIT_MS,
+                                              # fake_trigger_flag=0, # default
+                            region_id = RU_CONFIG[RUIDX]["region_id"],
+                                              element_id = idx,
+                                              timesync_connection_name = f"{PARTITION}.timesync_{RUIDX}",
+                                              timesync_topic_name = "Timesync",
+                                          ),
+                                          latencybufferconf= rconf.LatencyBufferConf(
+                                              latency_buffer_alignment_size = 4096,
+                                              latency_buffer_size = LATENCY_BUFFER_SIZE,
+                                              region_id = RU_CONFIG[RUIDX]["region_id"],
+                                              element_id = idx,
+                                          ),
+                                          rawdataprocessorconf= rconf.RawDataProcessorConf(
+                                              region_id = RU_CONFIG[RUIDX]["region_id"],
+                                              element_id = idx,
+                                              enable_software_tpg = SOFTWARE_TPG_ENABLED,
+                                              emulator_mode = EMULATOR_MODE,
+                                              error_counter_threshold=100,
+                                              error_reset_freq=10000
+                                          ),
+                                          requesthandlerconf= rconf.RequestHandlerConf(
+                                              latency_buffer_size = LATENCY_BUFFER_SIZE,
+                                              pop_limit_pct = 0.8,
+                                              pop_size_pct = 0.1,
+                                              region_id = RU_CONFIG[RUIDX]["region_id"],
+                                              element_id = idx,
+                                              output_file = path.join(RAW_RECORDING_OUTPUT_DIR, f"output_{RUIDX}_{idx}.out"),
+                                              stream_buffer_size = 8388608,
+                                              enable_raw_recording = RAW_RECORDING_ENABLED,
+                                          )))]
+                        
                         
         if not USE_FAKE_DATA_PRODUCERS:
             if FLX_INPUT:
@@ -268,9 +303,10 @@ class ReadoutApp(App):
                                                   for idx in range(MIN_LINK, MAX_LINK)},
                                    conf = conf)]
 
-        modules += [DAQModule(name = "fragment_sender",
-                           plugin = "FragmentSender",
-                           conf = None)]
+        # modules += [
+        #     DAQModule(name = "fragment_sender",
+        #                    plugin = "FragmentSender",
+        #                    conf = None)]
                             
         mgraph = ModuleGraph(modules)
 
@@ -284,199 +320,13 @@ class ReadoutApp(App):
             # Add fragment producers for raw data
             mgraph.add_fragment_producer(region = RU_CONFIG[RUIDX]["region_id"], element = idx, system = SYSTEM_TYPE,
                                          requests_in   = f"datahandler_{idx}.data_requests_0",
-                                         fragments_out = f"datahandler_{idx}.data_response_0")
+                                         fragments_out = f"datahandler_{idx}.fragment_queue")
 
             # Add fragment producers for TPC TPs. Make sure the element index doesn't overlap with the ones for raw data
             if SOFTWARE_TPG_ENABLED:
                 mgraph.add_fragment_producer(region = RU_CONFIG[RUIDX]["region_id"], element = idx + RU_CONFIG[RUIDX]["channel_count"], system = SYSTEM_TYPE,
                                              requests_in   = f"tp_datahandler_{idx}.data_requests_0",
-                                             fragments_out = f"tp_datahandler_{idx}.data_response_0")
+                                             fragments_out = f"tp_datahandler_{idx}.fragment_queue")
 
         super().__init__(mgraph, host=HOST)
         self.export("readout_app.dot")
-        # cmd_data['init'] = app.Init(queues=queue_specs, modules=mod_specs, nwconnections=NW_SPECS)
-    
-        # total_link_count = 0
-        # for ru in range(len(RU_CONFIG)):
-        #     total_link_count += RU_CONFIG[ru]["channel_count"]
-    
-        # conf_list = [("fake_source",sec.Conf(
-        #                         link_confs=[sec.LinkConfiguration(
-        #                         geoid=sec.GeoID(system=SYSTEM_TYPE, region=RU_CONFIG[RUIDX]["region_id"], element=idx),
-        #                             slowdown=DATA_RATE_SLOWDOWN_FACTOR,
-        #                             queue_name=f"output_{idx}",
-        #                             data_filename = DATA_FILE,
-        #                             emu_frame_error_rate=0,
-        #                             ) for idx in range(MIN_LINK,MAX_LINK)],
-        #                         # input_limit=10485100, # default
-        #                         queue_timeout_ms = QUEUE_POP_WAIT_MS)),
-        #             ("pacman_source",pcr.Conf(
-        #                                       link_confs=[pcr.LinkConfiguration(
-        #                                        geoid=pcr.GeoID(system=SYSTEM_TYPE, region=RU_CONFIG[RUIDX]["region_id"], element=idx),
-        #                                        ) for idx in range(MIN_LINK,MAX_LINK)],
-        #                                        zmq_receiver_timeout = 10000)),
-        #             ("flxcard_0",flxcr.Conf(card_id=RU_CONFIG[RUIDX]["card_id"],
-        #                         logical_unit=0,
-        #                         dma_id=0,
-        #                         chunk_trailer_size= 32,
-        #                         dma_block_size_kb= 4,
-        #                         dma_memory_size_gb= 4,
-        #                         numa_id=0,
-        #                         num_links=min(5,RU_CONFIG[RUIDX]["channel_count"]))),
-        #             ("flxcard_1",flxcr.Conf(card_id=RU_CONFIG[RUIDX]["card_id"],
-        #                         logical_unit=1,
-        #                         dma_id=0,
-        #                         chunk_trailer_size= 32,
-        #                         dma_block_size_kb= 4,
-        #                         dma_memory_size_gb= 4,
-        #                         numa_id=0,
-        #                         num_links=max(0, RU_CONFIG[RUIDX]["channel_count"] - 5))),
-        #             ("ssp_0",flxcr.Conf(card_id=RU_CONFIG[RUIDX]["card_id"],
-        #                         logical_unit=0,
-        #                         dma_id=0,
-        #                         chunk_trailer_size= 32,
-        #                         dma_block_size_kb= 4,
-        #                         dma_memory_size_gb= 4,
-        #                         numa_id=0,
-        #                         num_links=RU_CONFIG[RUIDX]["channel_count"])),
-        #         ] + [
-        #              ("request_receiver", rrcv.ConfParams(
-        #                         map = [rrcv.geoidinst(region=RU_CONFIG[RUIDX]["region_id"] , element=idx , system=SYSTEM_TYPE , queueinstance=f"data_requests_{idx}") for idx in range(MIN_LINK,MAX_LINK)] +
-        #                             [rrcv.geoidinst(region=RU_CONFIG[RUIDX]["region_id"] , element=idx + total_link_count, system=SYSTEM_TYPE , queueinstance=f"tp_requests_{idx}") for idx in range(MIN_LINK,MAX_LINK) if SOFTWARE_TPG_ENABLED],
-        #                         general_queue_timeout = QUEUE_POP_WAIT_MS,
-        #                         connection_name = f"{PARTITION}.datareq_{RUIDX}"
-        #              )) 
-        #         ] + [
-        #             (f"datahandler_{idx}", rconf.Conf(
-        #                     readoutmodelconf= rconf.ReadoutModelConf(
-        #                         source_queue_timeout_ms= QUEUE_POP_WAIT_MS,
-        #                         # fake_trigger_flag=0, # default
-        #                         region_id = RU_CONFIG[RUIDX]["region_id"],
-        #                         element_id = idx,
-        #                         timesync_connection_name = f"{PARTITION}.timesync_{RUIDX}",
-        #                         timesync_topic_name = "Timesync",
-        #                     ),
-        #                     latencybufferconf= rconf.LatencyBufferConf(
-        #                         latency_buffer_alignment_size = 4096,
-        #                         latency_buffer_size = LATENCY_BUFFER_SIZE,
-        #                         region_id = RU_CONFIG[RUIDX]["region_id"],
-        #                         element_id = idx,
-        #                     ),
-        #                     rawdataprocessorconf= rconf.RawDataProcessorConf(
-        #                         region_id = RU_CONFIG[RUIDX]["region_id"],
-        #                         element_id = idx,
-        #                         enable_software_tpg = SOFTWARE_TPG_ENABLED,
-        #                         emulator_mode = EMULATOR_MODE,
-        #                         error_counter_threshold=100,
-        #                         error_reset_freq=10000
-        #                     ),
-        #                     requesthandlerconf= rconf.RequestHandlerConf(
-        #                         latency_buffer_size = LATENCY_BUFFER_SIZE,
-        #                         pop_limit_pct = 0.8,
-        #                         pop_size_pct = 0.1,
-        #                         region_id = RU_CONFIG[RUIDX]["region_id"],
-        #                         element_id = idx,
-        #                         output_file = path.join(RAW_RECORDING_OUTPUT_DIR, f"output_{RUIDX}_{idx}.out"),
-        #                         stream_buffer_size = 8388608,
-        #                         enable_raw_recording = RAW_RECORDING_ENABLED,
-        #                     )
-        #                     )) for idx in range(MIN_LINK,MAX_LINK)
-        #         ] + [
-        #             (f"tp_datahandler_{idx}", rconf.Conf(
-        #                     readoutmodelconf= rconf.ReadoutModelConf(
-        #                         source_queue_timeout_ms= QUEUE_POP_WAIT_MS,
-        #                         # fake_trigger_flag=0, default
-        #                         region_id = RU_CONFIG[RUIDX]["region_id"],
-        #                         element_id = total_link_count+idx,
-        #                     ),
-        #                     latencybufferconf= rconf.LatencyBufferConf(
-        #                         latency_buffer_size = LATENCY_BUFFER_SIZE,
-        #                         region_id = RU_CONFIG[RUIDX]["region_id"],
-        #                         element_id =  total_link_count+idx,
-        #                     ),
-        #                     rawdataprocessorconf= rconf.RawDataProcessorConf(
-        #                         region_id = RU_CONFIG[RUIDX]["region_id"],
-        #                         element_id =  total_link_count+idx,
-        #                         enable_software_tpg = False,
-        #                     ),
-        #                     requesthandlerconf= rconf.RequestHandlerConf(
-        #                         latency_buffer_size = LATENCY_BUFFER_SIZE,
-        #                         pop_limit_pct = 0.8,
-        #                         pop_size_pct = 0.1,
-        #                         region_id = RU_CONFIG[RUIDX]["region_id"],
-        #                         element_id = total_link_count+idx,
-        #                         # output_file = f"output_{idx + MIN_LINK}.out",
-        #                         stream_buffer_size = 100 if FRONTEND_TYPE=='pacman' else 8388608,
-        #                         enable_raw_recording = False,
-        #                     )
-        #                     )) for idx in range(MIN_LINK,MAX_LINK)
-        #         ]
-    
-        # if SOFTWARE_TPG_ENABLED:
-    
-        #     conf_list.extend([
-        #                         (f"tpset_publisher", qton.Conf(msg_type="dunedaq::trigger::TPSet",
-        #                                                              msg_module_name="TPSetNQ",
-        #                                                              sender_config=nos.Conf(name=f"{PARTITION}.tpsets_{RUIDX}",
-        #                                                                                     topic="TPSets",
-        #                                                                                     stype="msgpack")))
-        #                     ])
-    
-        # if USE_FAKE_DATA_PRODUCERS:
-        #     conf_list.extend([
-        #         (f"fakedataprod_{idx}", fdp.ConfParams(
-        #             system_type = SYSTEM_TYPE,
-        #             apa_number = RU_CONFIG[RUIDX]["region_id"],
-        #             link_number = idx,
-        #             time_tick_diff = 25,
-        #             frame_size = 464,
-        #             response_delay = 0,
-        #             timesync_connection_name = f"{PARTITION}.timesync_{RUIDX}",
-        #             timesync_topic_name = "Timesync",
-        #             fragment_type = "FakeData")) for idx in range(MIN_LINK,MAX_LINK)
-        #     ])
-    
-        # conf_list.extend([
-        #     ("fragment_sender", None)
-        # ])
-    
-        # cmd_data['conf'] = acmd(conf_list)
-    
-    
-        # startpars = rccmd.StartParams(run=RUN_NUMBER)
-        # cmd_data['start'] = acmd([
-        #         ("datahandler_.*", startpars),
-        #         ("fake_source", startpars),
-        #         ("pacman_source", startpars),
-        #         ("flxcard.*", startpars),
-        #         ("request_receiver", startpars),
-        #         ("ssp.*", startpars),
-        #         ("ntoq_trigdec", startpars),
-        #         (f"tp_datahandler_.*", startpars),
-        #         (f"tpset_publisher", startpars),
-        #         ("fakedataprod_.*", startpars),
-        #         ("fragment_sender", startpars),
-        #         ("errored_frame_consumer", startpars)])
-    
-        # cmd_data['stop'] = acmd([
-        #         ("request_receiver", None),
-        #         ("flxcard.*", None),
-        #         ("ssp.*", None),
-        #         ("fake_source", None),
-        #         ("pacman_source", None),
-        #         ("datahandler_.*", None),
-        #         (f"tp_datahandler_.*", None),
-        #         (f"tpset_publisher", None),
-        #         ("fakedataprod_.*", None),
-        #         ("fragment_sender", None),
-        #         ("errored_frame_consumer", None)])
-    
-        # cmd_data['pause'] = acmd([("", None)])
-    
-        # cmd_data['resume'] = acmd([("", None)])
-    
-        # cmd_data['scrap'] = acmd([("", None)])
-    
-        # cmd_data['record'] = acmd([("", None)])
-    
-        # return cmd_data

@@ -75,17 +75,18 @@ class DataFlowApp(App):
         for ru in range(len(RU_CONFIG)):
             total_link_count += RU_CONFIG[ru]["channel_count"]
         
-        modules += [DAQModule(name = 'trigdec_receiver',
-                           plugin = 'TriggerDecisionReceiver',
-                           connections = {'output': Connection('trb.trigger_decision_input_queue')},
-                           conf = tdrcv.ConfParams(general_queue_timeout=QUEUE_POP_WAIT_MS,
-                                                   connection_name=PARTITION+".trigdec")),
+        modules += [
+            # DAQModule(name = 'trigdec_receiver',
+            #                plugin = 'TriggerDecisionReceiver',
+            #                connections = {'output': Connection('trb.trigger_decision_input_queue')},
+            #                conf = tdrcv.ConfParams(general_queue_timeout=QUEUE_POP_WAIT_MS,
+            #                                        connection_name=PARTITION+".trigdec")),
         
-                    DAQModule(name = 'fragment_receiver',
-                           plugin = 'FragmentReceiver',
-                           connections = {'output': Connection('trb.data_fragment_input_queue')},
-                           conf = frcv.ConfParams(general_queue_timeout=QUEUE_POP_WAIT_MS,
-                                                  connection_name=PARTITION+".frags_0")),
+                    # DAQModule(name = 'fragment_receiver',
+                    #        plugin = 'FragmentReceiver',
+                    #        connections = {'output': Connection('trb.data_fragment_input_queue')},
+                    #        conf = frcv.ConfParams(general_queue_timeout=QUEUE_POP_WAIT_MS,
+                    #                               connection_name=PARTITION+".frags_0")),
                     
                     DAQModule(name = 'trb',
                            plugin = 'TriggerRecordBuilder',
@@ -160,18 +161,18 @@ class DataFlowApp(App):
                                connections = {'tpset_source': Connection("tpsets_from_netq")},
                                conf = tpsw.ConfParams(max_file_size_bytes=1000000000))]
 
-        if SOFTWARE_TPG_ENABLED:
-            modules += [DAQModule(name = 'tp_fragment_receiver',
-                               plugin = "FragmentReceiver",
-                               connections = {'output': Connection("trb.data_fragments_q")},
-                               conf = frcv.ConfParams(general_queue_timeout=QUEUE_POP_WAIT_MS,
-                                                      connection_name=PARTITION+".tp_frags_0")),
+        # if SOFTWARE_TPG_ENABLED:
+        #     modules += [DAQModule(name = 'tp_fragment_receiver',
+        #                        plugin = "FragmentReceiver",
+        #                        connections = {'output': Connection("trb.data_fragments_q")},
+        #                        conf = frcv.ConfParams(general_queue_timeout=QUEUE_POP_WAIT_MS,
+        #                                               connection_name=PARTITION+".tp_frags_0")),
                         
-                        DAQModule(name = 'ds_tpset_fragment_receiver',
-                               plugin = "FragmentReceiver",
-                               connections = {"output": Connection("trb.data_fragments_q")},
-                               conf = frcv.ConfParams(general_queue_timeout=QUEUE_POP_WAIT_MS,
-                                                      connection_name=PARTITION+".frags_tpset_ds_0"))]
+        #                 DAQModule(name = 'ds_tpset_fragment_receiver',
+        #                        plugin = "FragmentReceiver",
+        #                        connections = {"output": Connection("trb.data_fragments_q")},
+        #                        conf = frcv.ConfParams(general_queue_timeout=QUEUE_POP_WAIT_MS,
+        #                                               connection_name=PARTITION+".frags_tpset_ds_0"))]
                         
         mgraph=ModuleGraph(modules)
         # PAR 2021-12-10 All of the dataflow app's sending and
@@ -179,7 +180,7 @@ class DataFlowApp(App):
         # endpoints for the moment
         
         # mgraph.add_endpoint("fragments",         "trb.data_fragment_input_queue",    Direction.IN)
-        # mgraph.add_endpoint("trigger_decisions", "trb.trigger_decision_input_queue", Direction.IN)
+        mgraph.add_endpoint("trigger_decisions", "trb.trigger_decision_input_queue", Direction.IN)
         # mgraph.add_endpoint("tokens",            "datawriter.token_output_queue",    Direction.OUT)
 
         # for i, producer in enumerate(FRAGMENT_PRODUCERS):

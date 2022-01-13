@@ -198,9 +198,9 @@ def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowd
 
     # network connections map
     nw_specs = [nwmgr.Connection(name=partition_name + ".hsievent",topics=[],  address="tcp://{host_trigger}:12344"),
-        nwmgr.Connection(name=partition_name + ".trigdec",topics=[],  address="tcp://{host_df}:12345"),
+        nwmgr.Connection(name=partition_name + ".trigdec",topics=[],  address="tcp://{host_dataflow}:12345"),
         nwmgr.Connection(name=partition_name + ".triginh",topics=[],   address="tcp://{host_trigger}:12346"),
-        nwmgr.Connection(name=partition_name + ".frags_0", topics=[],  address="tcp://{host_df}:12347")]
+        nwmgr.Connection(name=partition_name + ".fragments", topics=[],  address="tcp://{host_dataflow}:12347")]
 
     port = 12348
     if control_timing_hw:
@@ -208,9 +208,9 @@ def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowd
         port = port + 1
 
     if enable_software_tpg:
-        nw_specs.append(nwmgr.Connection(name=partition_name + ".tp_frags_0", topics=[],  address="tcp://{host_df}:" + f"{port}"))
+        nw_specs.append(nwmgr.Connection(name=partition_name + ".tp_frags_0", topics=[],  address="tcp://{host_dataflow}:" + f"{port}"))
         port = port + 1
-        nw_specs.append(nwmgr.Connection(name=f'{partition_name}.frags_tpset_ds_0', topics=[],  address="tcp://{host_df}:" + f"{port}"))
+        nw_specs.append(nwmgr.Connection(name=f'{partition_name}.frags_tpset_ds_0', topics=[],  address="tcp://{host_dataflow}:" + f"{port}"))
         port = port + 1
         nw_specs.append(nwmgr.Connection(name=f"{partition_name}.ds_tp_datareq_0",topics=[],   address="tcp://{host_trigger}:" + f"{port}"))
         port = port + 1
@@ -221,22 +221,19 @@ def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowd
     for region in region_id: ru_channel_counts[region] = 0
     regionidx = 0
 
-    for hostidx in range(len(host_ru)):
-        if enable_software_tpg:
-            nw_specs.append(nwmgr.Connection(name=f"{partition_name}.tpsets_{hostidx}", topics=["TPSets"], address = "tcp://{host_ru" + f"{hostidx}" + "}:" + f"{port}"))
-            port = port + 1
-
-
+    ru_app_names=[f"ruflx{idx}" if use_felix else f"ruemu{idx}" for idx in range(len(host_ru))]
+    
+    for hostidx,ru_host in enumerate(ru_app_names):
         if enable_dqm:
-            nw_specs.append(nwmgr.Connection(name=f"{partition_name}.fragx_dqm_{hostidx}", topics=[], address="tcp://{host_ru" + f"{hostidx}" + "}:" + f"{port}"))
+            nw_specs.append(nwmgr.Connection(name=f"{partition_name}.fragx_dqm_{hostidx}", topics=[], address=f"tcp://{{host_{ru_host}}}:{port}"))
             port = port + 1
 
-        nw_specs.append(nwmgr.Connection(name=f"{partition_name}.datareq_{hostidx}", topics=[], address="tcp://{host_ru" + f"{hostidx}" + "}:" + f"{port}"))
+        nw_specs.append(nwmgr.Connection(name=f"{partition_name}.datareq_{hostidx}", topics=[], address=f"tcp://{{host_{ru_host}}}:{port}"))
         port = port + 1
 
         # Should end up something like 'network_endpoints[timesync_0]:
         # "tcp://{host_ru0}:12347"'
-        nw_specs.append(nwmgr.Connection(name=f"{partition_name}.timesync_{hostidx}", topics=["Timesync"], address= "tcp://{host_ru" + f"{hostidx}" + "}:" + f"{port}"))
+        nw_specs.append(nwmgr.Connection(name=f"{partition_name}.timesync_{hostidx}", topics=["Timesync"], address=f"tcp://{{host_{ru_host}}}:{port}"))
         port = port + 1
 
         cardid = 0
@@ -328,8 +325,6 @@ def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowd
     cardid = {}
     host_id_dict = {}
 
-    ru_app_names=[f"ruflx{idx}" if use_felix else f"ruemu{idx}" for idx in range(len(host_ru))]
-
     for hostidx in range(len(host_ru)):
         if host_ru[hostidx] in host_id_dict:
             host_id_dict[host_ru[hostidx]] = host_id_dict[host_ru[hostidx]] + 1
@@ -338,6 +333,22 @@ def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowd
             cardid[hostidx] = 0
             host_id_dict[host_ru[hostidx]] = 0
         hostidx = hostidx + 1
+
+
+    # Set up the nwmgr endpoints for TPSets. Need to wait till now to do this so that ru_configs is filled
+    if enable_software_tpg:
+        for apa_idx,ru_app_name in enumerate(ru_app_names):
+            ru_config=ru_configs[apa_idx]
+            min_link=ru_config["start_channel"]
+            max_link=min_link+ru_config["channel_count"]
+            for link in range(min_link, max_link):
+                nw_specs.append(nwmgr.Connection(name=f"{partition_name}.tpsets_apa{apa_idx}_link{link}", topics=["TPSets"], address = f"tcp://{{host_{ru_app_name}}}:{port}"))
+                port += 1
+
+    for nw in nw_specs:
+        print(f'{nwmgr.Name} {nwmgr.Topic} {nwmgr.Address}')
+        
+    the_system.network_endpoints = nw_specs
 
     mgraphs_readout = []
     for i in range(len(host_ru)):
@@ -383,6 +394,9 @@ def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowd
         HOST=host_df
     )
 
+    for name,app in the_system.apps.items():
+        if app.name=="__app":
+            app.name=name
     # exit(0)
     #     console.log("dataflow cmd data:", cmd_data_dataflow)
     
@@ -643,6 +657,14 @@ def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowd
                                                                            f"trigger.tpsets_into_chain_apa{apa_idx}"])})
     
 
+
+    the_system.app_connections["trigger.trigger_decisions"] = AppConnection(nwmgr_connection=f"{partition_name}.trigdec",
+                                                                            msg_type="dunedaq::dfmessages::TriggerDecision",
+                                                                            msg_module_name="TriggerDecisionNQ",
+                                                                            receivers=["dataflow.trigger_decisions"])
+
+                                                                            
+    
     #     console.log(f"MDAapp config generated in {json_dir}")
     from appfwk.conf_utils import connect_all_fragment_producers, add_network, add_network2, make_app_command_data, set_mlt_links
     the_system.export("system_no_frag_prod_connection.dot")
@@ -655,11 +677,11 @@ def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowd
     
     add_network2("trigger", the_system, verbose=True)
     # # console.log("After adding network, trigger mgraph:", the_system.apps['trigger'].modulegraph)
-    # add_network("hsi", the_system, partition_name=partition_name, verbose=True)
-    # for ru_app_name in ru_app_names:
-    #     add_network(ru_app_name, the_system, partition_name=partition_name, verbose=True)
+    add_network2("hsi", the_system, verbose=True)
+    for ru_app_name in ru_app_names:
+        add_network2(ru_app_name, the_system, verbose=True)
 
-    # add_network("dataflow", the_system, partition_name=partition_name, verbose=True)
+    add_network2("dataflow", the_system, verbose=True)
     the_system.export("system.dot")
 
     ####################################################################
@@ -680,7 +702,7 @@ def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowd
     
     # Arrange per-app command data into the format used by util.write_json_files()
     app_command_datas = {
-        name : make_app_command_data(the_system, app)
+        name : make_app_command_data(the_system, app, verbose=True)
         for name,app in the_system.apps.items()
     }
 
