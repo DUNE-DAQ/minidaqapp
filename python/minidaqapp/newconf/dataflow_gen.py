@@ -66,55 +66,20 @@ class DataFlowApp(App):
         
         """Generate the json configuration for the readout and DF process"""
 
-        required_eps = {PARTITION+'.trigdec', PARTITION+'.triginh'}
-        # if not required_eps.issubset([nw.name for nw in NW_SPECS]):
-        #     raise RuntimeError(f"ERROR: not all the required endpoints ({', '.join(required_eps)}) found in list of endpoints {' '.join([nw.name for nw in NW_SPECS])}")
-
         modules = []
         total_link_count = 0
         for ru in range(len(RU_CONFIG)):
             total_link_count += RU_CONFIG[ru]["channel_count"]
         
-        modules += [
-            # DAQModule(name = 'trigdec_receiver',
-            #                plugin = 'TriggerDecisionReceiver',
-            #                connections = {'output': Connection('trb.trigger_decision_input_queue')},
-            #                conf = tdrcv.ConfParams(general_queue_timeout=QUEUE_POP_WAIT_MS,
-            #                                        connection_name=PARTITION+".trigdec")),
-        
-                    # DAQModule(name = 'fragment_receiver',
-                    #        plugin = 'FragmentReceiver',
-                    #        connections = {'output': Connection('trb.data_fragment_input_queue')},
-                    #        conf = frcv.ConfParams(general_queue_timeout=QUEUE_POP_WAIT_MS,
-                    #                               connection_name=PARTITION+".frags_0")),
-                    
-                    DAQModule(name = 'trb',
-                           plugin = 'TriggerRecordBuilder',
-                           connections = {'trigger_record_output_queue': Connection('datawriter.trigger_record_input_queue')},
-                           conf = trb.ConfParams(general_queue_timeout=QUEUE_POP_WAIT_MS,
-                                                 reply_connection_name = PARTITION+".frags_0",
-                                                 map=trb.mapgeoidconnections([
-                                                     trb.geoidinst(region=RU_CONFIG[ru]["region_id"],
-                                                                   element=idx+RU_CONFIG[ru]["start_channel"],
-                                                                   system=SYSTEM_TYPE,
-                                                                   connection_name=f"{PARTITION}.datareq_{ru}")
-                                                     for ru in range(len(RU_CONFIG)) for idx in range(RU_CONFIG[ru]["channel_count"])
-                                                 ] + ([
-                                                     trb.geoidinst(region=RU_CONFIG[ru]["region_id"],
-                                                                   element=idx+RU_CONFIG[ru]["start_channel"]+total_link_count,
-                                                                   system=SYSTEM_TYPE,
-                                                                   connection_name=f"{PARTITION}.datareq_{ru}")
-                                                     for ru in range(len(RU_CONFIG)) for idx in range(RU_CONFIG[ru]["channel_count"])
-                                                 ] if SOFTWARE_TPG_ENABLED else []) + ([
-                                                     trb.geoidinst(region=RU_CONFIG[ru]["region_id"],
-                                                                   element=idx+RU_CONFIG[ru]["start_channel"],
-                                                                   system="DataSelection",
-                                                                   connection_name=f"{PARTITION}.ds_tp_datareq_0")
-                                                     for ru in range(len(RU_CONFIG)) for idx in range(RU_CONFIG[ru]["channel_count"])
-                                                 ] if SOFTWARE_TPG_ENABLED else [])))),
+        modules += [DAQModule(name = 'trb',
+                              plugin = 'TriggerRecordBuilder',
+                              connections = {'trigger_record_output_queue': Connection('datawriter.trigger_record_input_queue')},
+                              conf = trb.ConfParams(general_queue_timeout=QUEUE_POP_WAIT_MS,
+                                                    reply_connection_name = PARTITION+".frags_0",
+                                                    map=trb.mapgeoidconnections([]))), # We patch this up in connect_fragment_producers
                     DAQModule(name = 'datawriter',
                            plugin = 'DataWriter',
-                           connections = {}, # {'trigger_record_input_queue': Connection('datawriter.trigger_record_q')},
+                           connections = {},
                            conf = dw.ConfParams(
                                token_connection=PARTITION+".triginh",
                                data_store_parameters=hdf5ds.ConfParams(
@@ -161,31 +126,9 @@ class DataFlowApp(App):
                                connections = {'tpset_source': Connection("tpsets_from_netq")},
                                conf = tpsw.ConfParams(max_file_size_bytes=1000000000))]
 
-        # if SOFTWARE_TPG_ENABLED:
-        #     modules += [DAQModule(name = 'tp_fragment_receiver',
-        #                        plugin = "FragmentReceiver",
-        #                        connections = {'output': Connection("trb.data_fragments_q")},
-        #                        conf = frcv.ConfParams(general_queue_timeout=QUEUE_POP_WAIT_MS,
-        #                                               connection_name=PARTITION+".tp_frags_0")),
-                        
-        #                 DAQModule(name = 'ds_tpset_fragment_receiver',
-        #                        plugin = "FragmentReceiver",
-        #                        connections = {"output": Connection("trb.data_fragments_q")},
-        #                        conf = frcv.ConfParams(general_queue_timeout=QUEUE_POP_WAIT_MS,
-        #                                               connection_name=PARTITION+".frags_tpset_ds_0"))]
-                        
         mgraph=ModuleGraph(modules)
-        # PAR 2021-12-10 All of the dataflow app's sending and
-        # receiving is done via NetworkManager, so there are no
-        # endpoints for the moment
-        
-        # mgraph.add_endpoint("fragments",         "trb.data_fragment_input_queue",    Direction.IN)
-        mgraph.add_endpoint("trigger_decisions", "trb.trigger_decision_input_queue", Direction.IN)
-        # mgraph.add_endpoint("tokens",            "datawriter.token_output_queue",    Direction.OUT)
 
-        # for i, producer in enumerate(FRAGMENT_PRODUCERS):
-        #     queue_name=f"data_request_{i}_output_queue"
-        #     mgraph.add_endpoint(data_request_endpoint_name(producer), f"trb.{queue_name}", Direction.OUT)
+        mgraph.add_endpoint("trigger_decisions", "trb.trigger_decision_input_queue", Direction.IN)
         
         super().__init__(modulegraph=mgraph, host=HOST)
         self.export("dataflow_app.dot")
