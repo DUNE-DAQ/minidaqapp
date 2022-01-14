@@ -114,16 +114,10 @@ class TriggerApp(App):
             config_tcm =  tcm.Conf(candidate_maker=CANDIDATE_PLUGIN,
                                    candidate_maker_config=temptypes.CandidateConf(**CANDIDATE_CONFIG))
             
-            modules += [
-                # DAQModule(name = 'request_receiver',
-                #                plugin = 'RequestReceiver',
-                #                connections = connections_request_receiver,
-                #                conf = config_request_receiver),
-                        
-                        DAQModule(name = 'tcm',
+            modules += [DAQModule(name = 'tcm',
                                plugin = 'TriggerCandidateMaker',
                                connections = {#'input' : Connection(f'tcm.taset_q'),
-                                   'output': Connection(f'mlt.trigger_candidate_q')},
+                                   'output': Connection(f'mlt.trigger_candidate_source')},
                                conf = config_tcm)]
             
             for ru in range(len(RU_CONFIG)):
