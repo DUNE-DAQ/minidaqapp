@@ -196,11 +196,8 @@ def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowd
 
     dqm_kafka_address = "dqmbroadcast:9092" if dqm_impl == 'cern' else pocket_url + ":30092" if dqm_impl == 'pocket' else ''
 
-    # network connections map
-    nw_specs = []
-
     if control_timing_hw:
-        nw_specs.append(nwmgr.Connection(name=partition_name + ".hsicmds",  topics=[], address="tcp://{host_timing_hw}:" + f"{the_system.next_unassigned_port()}"))
+        the_system.network_endpoints.append(nwmgr.Connection(name=partition_name + ".hsicmds",  topics=[], address="tcp://{host_timing_hw}:" + f"{the_system.next_unassigned_port()}"))
 
     host_id_dict = {}
     ru_configs = []
@@ -212,11 +209,11 @@ def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowd
     
     for hostidx,ru_host in enumerate(ru_app_names):
         if enable_dqm:
-            nw_specs.append(nwmgr.Connection(name=f"{partition_name}.fragx_dqm_{hostidx}", topics=[], address=f"tcp://{{host_{ru_host}}}:{the_system.next_unassigned_port()}"))
+            the_system.network_endpoints.append(nwmgr.Connection(name=f"{partition_name}.fragx_dqm_{hostidx}", topics=[], address=f"tcp://{{host_{ru_host}}}:{the_system.next_unassigned_port()}"))
 
         # Should end up something like 'network_endpoints[timesync_0]:
         # "tcp://{host_ru0}:12347"'
-        nw_specs.append(nwmgr.Connection(name=f"{partition_name}.timesync_{hostidx}", topics=["Timesync"], address=f"tcp://{{host_{ru_host}}}:{the_system.next_unassigned_port()}"))
+        the_system.network_endpoints.append(nwmgr.Connection(name=f"{partition_name}.timesync_{hostidx}", topics=["Timesync"], address=f"tcp://{{host_{ru_host}}}:{the_system.next_unassigned_port()}"))
         
 
         cardid = 0
@@ -229,11 +226,9 @@ def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowd
         ru_channel_counts[region_id[regionidx]] += number_of_data_producers
         if len(region_id) != 1: regionidx = regionidx + 1
 
-    for nw in nw_specs:
+    for nw in the_system.network_endpoints:
         print(f'{nwmgr.Name} {nwmgr.Topic} {nwmgr.Address}')
         
-    the_system.network_endpoints = nw_specs
-    
     if control_timing_hw:
         pass
         # PL: TODO
@@ -268,7 +263,6 @@ def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowd
         #     PARTITION=partition_name)
     else:
         the_system.apps["hsi"] = FakeHSIApp(
-            # NW_SPECS=nw_specs,
             RUN_NUMBER = run_number,
             CLOCK_SPEED_HZ = CLOCK_SPEED_HZ,
             DATA_RATE_SLOWDOWN_FACTOR = data_rate_slowdown_factor,
@@ -284,7 +278,6 @@ def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowd
     console.log("hsi cmd data:", the_system.apps["hsi"])
 
     the_system.apps['trigger'] = TriggerApp(
-        # NW_SPECS = nw_specs,
         SOFTWARE_TPG_ENABLED = enable_software_tpg,
         RU_CONFIG = ru_configs,
         ACTIVITY_PLUGIN = trigger_activity_plugin,
@@ -325,19 +318,17 @@ def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowd
             min_link=ru_config["start_channel"]
             max_link=min_link+ru_config["channel_count"]
             for link in range(min_link, max_link):
-                nw_specs.append(nwmgr.Connection(name=f"{partition_name}.tpsets_apa{apa_idx}_link{link}", topics=["TPSets"], address = f"tcp://{{host_{ru_app_name}}}:{the_system.next_unassigned_port()}"))
+                the_system.network_endpoints.append(nwmgr.Connection(name=f"{partition_name}.tpsets_apa{apa_idx}_link{link}", topics=["TPSets"], address = f"tcp://{{host_{ru_app_name}}}:{the_system.next_unassigned_port()}"))
 
-    for nw in nw_specs:
+    for nw in the_system.network_endpoints:
         print(f'{nwmgr.Name} {nwmgr.Topic} {nwmgr.Address}')
         
-    the_system.network_endpoints = nw_specs
 
     mgraphs_readout = []
     for i in range(len(host_ru)):
         ru_name = ru_app_names[i]
         the_system.apps[ru_name] = ReadoutApp(# NUMBER_OF_DATA_PRODUCERS = number_of_data_producers,
                                               PARTITION=partition_name,
-                                              # NW_SPECS=nw_specs,
                                               RU_CONFIG=ru_configs,
                                               # TOTAL_NUMBER_OF_DATA_PRODUCERS=total_number_of_data_producers,
                                               EMULATOR_MODE = emulator_mode,
@@ -361,7 +352,6 @@ def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowd
         console.log(f"{ru_name} app: {the_system.apps[ru_name]}")
     
     the_system.apps['dataflow'] = DataFlowApp(
-        # NW_SPECS = nw_specs,
         FRAGMENT_PRODUCERS = the_system.get_fragment_producers(),
         RU_CONFIG = ru_configs,
         RUN_NUMBER = run_number,
