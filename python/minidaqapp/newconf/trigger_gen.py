@@ -158,7 +158,7 @@ class TriggerApp(App):
                                           s2=ttcm.map_t(signal_type=TTCM_S2,
                                                         time_before=TRIGGER_WINDOW_BEFORE_TICKS,
                                                         time_after=TRIGGER_WINDOW_AFTER_TICKS),
-                                          hsievent_connection_name = PARTITION+".hsievent"))]
+                                          hsievent_connection_name = PARTITION+".hsievents"))]
                     
         # We need to populate the list of links based on the fragment
         # producers available in the system. This is a bit of a

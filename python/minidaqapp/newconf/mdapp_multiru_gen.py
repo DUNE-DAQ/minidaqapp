@@ -197,23 +197,10 @@ def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowd
     dqm_kafka_address = "dqmbroadcast:9092" if dqm_impl == 'cern' else pocket_url + ":30092" if dqm_impl == 'pocket' else ''
 
     # network connections map
-    nw_specs = [nwmgr.Connection(name=partition_name + ".hsievent",topics=[],  address="tcp://{host_trigger}:12344"),
-        nwmgr.Connection(name=partition_name + ".trigdec",topics=[],  address="tcp://{host_dataflow}:12345"),
-        nwmgr.Connection(name=partition_name + ".triginh",topics=[],   address="tcp://{host_trigger}:12346"),
-        nwmgr.Connection(name=partition_name + ".fragments", topics=[],  address="tcp://{host_dataflow}:12347")]
+    nw_specs = []
 
-    port = 12348
     if control_timing_hw:
-        nw_specs.append(nwmgr.Connection(name=partition_name + ".hsicmds",  topics=[], address="tcp://{host_timing_hw}:" + f"{port}"))
-        port = port + 1
-
-    if enable_software_tpg:
-        nw_specs.append(nwmgr.Connection(name=partition_name + ".tp_frags_0", topics=[],  address="tcp://{host_dataflow}:" + f"{port}"))
-        port = port + 1
-        nw_specs.append(nwmgr.Connection(name=f'{partition_name}.frags_tpset_ds_0', topics=[],  address="tcp://{host_dataflow}:" + f"{port}"))
-        port = port + 1
-        nw_specs.append(nwmgr.Connection(name=f"{partition_name}.ds_tp_datareq_0",topics=[],   address="tcp://{host_trigger}:" + f"{port}"))
-        port = port + 1
+        nw_specs.append(nwmgr.Connection(name=partition_name + ".hsicmds",  topics=[], address="tcp://{host_timing_hw}:" + f"{the_system.next_unassigned_port()}"))
 
     host_id_dict = {}
     ru_configs = []
@@ -225,16 +212,12 @@ def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowd
     
     for hostidx,ru_host in enumerate(ru_app_names):
         if enable_dqm:
-            nw_specs.append(nwmgr.Connection(name=f"{partition_name}.fragx_dqm_{hostidx}", topics=[], address=f"tcp://{{host_{ru_host}}}:{port}"))
-            port = port + 1
-
-        nw_specs.append(nwmgr.Connection(name=f"{partition_name}.datareq_{hostidx}", topics=[], address=f"tcp://{{host_{ru_host}}}:{port}"))
-        port = port + 1
+            nw_specs.append(nwmgr.Connection(name=f"{partition_name}.fragx_dqm_{hostidx}", topics=[], address=f"tcp://{{host_{ru_host}}}:{the_system.next_unassigned_port()}"))
 
         # Should end up something like 'network_endpoints[timesync_0]:
         # "tcp://{host_ru0}:12347"'
-        nw_specs.append(nwmgr.Connection(name=f"{partition_name}.timesync_{hostidx}", topics=["Timesync"], address=f"tcp://{{host_{ru_host}}}:{port}"))
-        port = port + 1
+        nw_specs.append(nwmgr.Connection(name=f"{partition_name}.timesync_{hostidx}", topics=["Timesync"], address=f"tcp://{{host_{ru_host}}}:{the_system.next_unassigned_port()}"))
+        
 
         cardid = 0
         if host_ru[hostidx] in host_id_dict:
@@ -342,8 +325,7 @@ def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowd
             min_link=ru_config["start_channel"]
             max_link=min_link+ru_config["channel_count"]
             for link in range(min_link, max_link):
-                nw_specs.append(nwmgr.Connection(name=f"{partition_name}.tpsets_apa{apa_idx}_link{link}", topics=["TPSets"], address = f"tcp://{{host_{ru_app_name}}}:{port}"))
-                port += 1
+                nw_specs.append(nwmgr.Connection(name=f"{partition_name}.tpsets_apa{apa_idx}_link{link}", topics=["TPSets"], address = f"tcp://{{host_{ru_app_name}}}:{the_system.next_unassigned_port()}"))
 
     for nw in nw_specs:
         print(f'{nwmgr.Name} {nwmgr.Topic} {nwmgr.Address}')
@@ -411,6 +393,7 @@ def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowd
                 { f"{ru_app_name}.tpsets_{link}": AppConnection(nwmgr_connection=f"{partition_name}.tpsets_apa{apa_idx}_link{link}",
                                                                 msg_type="dunedaq::trigger::TPSet",
                                                                 msg_module_name="TPSetNQ",
+                                                                topics=["TPSets"],
                                                                 receivers=[f"trigger.tpsets_into_buffer_apa{apa_idx}_link{link}",
                                                                            f"trigger.tpsets_into_chain_apa{apa_idx}"])})
     
@@ -419,8 +402,16 @@ def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowd
     the_system.app_connections["trigger.trigger_decisions"] = AppConnection(nwmgr_connection=f"{partition_name}.trigdec",
                                                                             msg_type="dunedaq::dfmessages::TriggerDecision",
                                                                             msg_module_name="TriggerDecisionNQ",
+                                                                            topics=[],
                                                                             receivers=["dataflow.trigger_decisions"])
-
+    the_system.app_connections["hsi.hsievents"] = AppConnection(nwmgr_connection=f"{partition_name}.hsievents",
+                                                                topics=[],
+                                                                use_nwqa=False,
+                                                                receivers=["trigger.hsievents"])
+    # TODO: How to do this more automatically?
+    the_system.network_endpoints.append(nwmgr.Connection(name=f"{the_system.partition_name}.triginh",
+                                                         topics=[],
+                                                         address=f"tcp://{{host_trigger}}:{the_system.next_unassigned_port()}"))
                                                                             
     
     #     console.log(f"MDAapp config generated in {json_dir}")

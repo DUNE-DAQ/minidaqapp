@@ -80,7 +80,7 @@ class FakeHSIApp(App):
                                               mean_signal_multiplicity=MEAN_SIGNAL_MULTIPLICITY,
                                               signal_emulation_mode=SIGNAL_EMULATION_MODE,
                                               enabled_signals=ENABLED_SIGNALS,
-                                              hsievent_connection_name=PARTITION+".hsievent"))]
+                                              hsievent_connection_name=PARTITION+".hsievents"))]
     
         mgraph = ModuleGraph(modules)
         mgraph.add_endpoint("time_sync", "fhsig.time_sync_source", Direction.IN)
