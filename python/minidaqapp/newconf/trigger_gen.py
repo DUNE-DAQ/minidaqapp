@@ -14,7 +14,7 @@ moo.otypes.load_types('trigger/fakedataflow.jsonnet')
 moo.otypes.load_types('trigger/timingtriggercandidatemaker.jsonnet')
 moo.otypes.load_types('trigger/tpsetbuffercreator.jsonnet')
 moo.otypes.load_types('trigger/tpsetreceiver.jsonnet')
-
+moo.otypes.load_types('dfmodules/datafloworchestrator.jsonnet')
 moo.otypes.load_types('dfmodules/requestreceiver.jsonnet')
 
 # Import new types
@@ -26,7 +26,7 @@ import dunedaq.trigger.fakedataflow as fdf
 import dunedaq.trigger.timingtriggercandidatemaker as ttcm
 import dunedaq.trigger.tpsetbuffercreator as buf
 import dunedaq.trigger.tpsetreceiver as tpsrcv
-
+import dunedaq.dfmodules.datafloworchestrator as dfo
 import dunedaq.dfmodules.requestreceiver as rrcv
 
 from appfwk.app import App, ModuleGraph
@@ -74,6 +74,8 @@ class TriggerApp(App):
                  TRIGGER_WINDOW_BEFORE_TICKS: int = 1000,
                  TRIGGER_WINDOW_AFTER_TICKS: int = 1000,
                  PARTITION="UNKNOWN",
+
+                 DF_COUNT: int = 1,
                  HOST="localhost"
                  ):
         """
@@ -146,7 +148,15 @@ class TriggerApp(App):
         # util.connect_fragment_producers
         modules += [DAQModule(name = 'mlt',
                               plugin = 'ModuleLevelTrigger',
+                              connections = {"trigger_decision_sink": Connection("dfo.trigger_decision_queue")},
                               conf=mlt.ConfParams(links=[]))] # To be updated later - see comment above
+
+
+        df_app_configs = [dfo.app_config(decision_connection=f"{PARTITION}.trigdec_{dfidx}", capacity=TOKEN_COUNT) for dfidx in range(DF_COUNT)]
+        modules += [DAQModule(name = "dfo",
+                              plugin = "DataFlowOrchestrator",
+                              conf = dfo.ConfParams(token_connection = PARTITION+".triginh",
+                                                    dataflow_applications=df_app_configs))]
         
         mgraph = ModuleGraph(modules)
         mgraph.add_endpoint("hsievents",  "ttcm.input", Direction.IN)
@@ -162,8 +172,11 @@ class TriggerApp(App):
                                                  fragments_out=f"{buf_name}.fragment_sink")
 
 
-        mgraph.add_endpoint("trigger_decisions", "mlt.trigger_decision_sink", Direction.OUT)
-        mgraph.add_endpoint("tokens", "mlt.token_source", Direction.IN)
+        # We have an outgoing endpoint for trigger decisions, but the
+        # TDs come directly from the DFO to a nwmgr connection, so the
+        # queue we connect to is None
+        mgraph.add_endpoint("trigger_decisions", None, Direction.OUT)
+        # mgraph.add_endpoint("tokens", "mlt.token_source", Direction.IN)
 
         super().__init__(modulegraph=mgraph, host=HOST, name='TriggerApp')
         self.export("trigger_app.dot")

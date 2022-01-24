@@ -51,8 +51,8 @@ QUEUE_POP_WAIT_MS = 100
 class DataFlowApp(App):
     def __init__(self,
                  # NW_SPECS,
-                 FRAGMENT_PRODUCERS,
                  RU_CONFIG=[],
+                 HOSTIDX=0,
                  RUN_NUMBER=333,
                  OUTPUT_PATH=".",
                  SYSTEM_TYPE="TPC",
@@ -80,7 +80,7 @@ class DataFlowApp(App):
                     DAQModule(name = 'datawriter',
                            plugin = 'DataWriter',
                            connections = {},
-                           conf = dw.ConfParams(
+                           conf = dw.ConfParams(decision_connection=f"{PARTITION}.trigdec_{HOSTIDX}",
                                token_connection=PARTITION+".triginh",
                                data_store_parameters=hdf5ds.ConfParams(
                                    name="data_store",

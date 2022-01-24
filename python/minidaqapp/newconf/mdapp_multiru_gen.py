@@ -352,8 +352,8 @@ def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowd
         console.log(f"{ru_name} app: {the_system.apps[ru_name]}")
     
     the_system.apps['dataflow'] = DataFlowApp(
-        FRAGMENT_PRODUCERS = the_system.get_fragment_producers(),
         RU_CONFIG = ru_configs,
+        HOSTIDX = 0,
         RUN_NUMBER = run_number,
         OUTPUT_PATH = output_path,
         SYSTEM_TYPE = system_type,
@@ -389,7 +389,7 @@ def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowd
     
 
 
-    the_system.app_connections["trigger.trigger_decisions"] = AppConnection(nwmgr_connection=f"{partition_name}.trigdec",
+    the_system.app_connections["trigger.trigger_decisions"] = AppConnection(nwmgr_connection=f"{partition_name}.trigdec_0",
                                                                             msg_type="dunedaq::dfmessages::TriggerDecision",
                                                                             msg_module_name="TriggerDecisionNQ",
                                                                             topics=[],
