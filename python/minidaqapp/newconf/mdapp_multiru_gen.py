@@ -43,7 +43,7 @@ import click
 @click.option('--disable-trace', is_flag=True, help="Do not enable TRACE (default TRACE_FILE is /tmp/trace_buffer_\${HOSTNAME}_\${USER})")
 @click.option('-f', '--use-felix', is_flag=True, help="Use real felix cards instead of fake ones")
 @click.option('--use-ssp', is_flag=True, help="Use real SSPs instead of fake sources")
-@click.option('--host-df', default='localhost')
+@click.option('--host-df', multiple=True, default=['localhost'], help="This option is repeatable, with each repetition adding another dataflow app.")
 @click.option('--host-ru', multiple=True, default=['localhost'], help="This option is repeatable, with each repetition adding an additional ru process.")
 @click.option('--host-trigger', default='localhost', help='Host to run the trigger app on')
 @click.option('--host-hsi', default='localhost', help='Host to run the HSI app on')
@@ -280,6 +280,7 @@ def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowd
     the_system.apps['trigger'] = TriggerApp(
         SOFTWARE_TPG_ENABLED = enable_software_tpg,
         RU_CONFIG = ru_configs,
+        DF_COUNT = len(host_df),
         ACTIVITY_PLUGIN = trigger_activity_plugin,
         ACTIVITY_CONFIG = eval(trigger_activity_config),
         CANDIDATE_PLUGIN = trigger_candidate_plugin,
@@ -325,12 +326,10 @@ def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowd
         
 
     mgraphs_readout = []
-    for i in range(len(host_ru)):
+    for i,host in enumerate(host_ru):
         ru_name = ru_app_names[i]
-        the_system.apps[ru_name] = ReadoutApp(# NUMBER_OF_DATA_PRODUCERS = number_of_data_producers,
-                                              PARTITION=partition_name,
+        the_system.apps[ru_name] = ReadoutApp(PARTITION=partition_name,
                                               RU_CONFIG=ru_configs,
-                                              # TOTAL_NUMBER_OF_DATA_PRODUCERS=total_number_of_data_producers,
                                               EMULATOR_MODE = emulator_mode,
                                               DATA_RATE_SLOWDOWN_FACTOR = data_rate_slowdown_factor,
                                               DATA_FILE = data_file,
@@ -338,33 +337,33 @@ def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowd
                                               SSP_INPUT = use_ssp,
                                               CLOCK_SPEED_HZ = CLOCK_SPEED_HZ,
                                               RUIDX = i,
-                                              # CARDID = cardid[i],
                                               RAW_RECORDING_ENABLED = enable_raw_recording,
                                               RAW_RECORDING_OUTPUT_DIR = raw_recording_output_dir,
                                               FRONTEND_TYPE = frontend_type,
                                               SYSTEM_TYPE = system_type,
-                                              # REGION_ID = region_id,
-                                              # DQM_ENABLED=enable_dqm,
-                                              # DQM_KAFKA_ADDRESS=dqm_kafka_address,
                                               SOFTWARE_TPG_ENABLED = enable_software_tpg,
                                               USE_FAKE_DATA_PRODUCERS = use_fake_data_producers,
-                                              HOST=host_ru[i])
+                                              HOST=host)
         console.log(f"{ru_name} app: {the_system.apps[ru_name]}")
-    
-    the_system.apps['dataflow'] = DataFlowApp(
-        RU_CONFIG = ru_configs,
-        HOSTIDX = 0,
-        RUN_NUMBER = run_number,
-        OUTPUT_PATH = output_path,
-        SYSTEM_TYPE = system_type,
-        SOFTWARE_TPG_ENABLED = enable_software_tpg,
-        TPSET_WRITING_ENABLED = enable_tpset_writing,
-        PARTITION=partition_name,
-        OPERATIONAL_ENVIRONMENT = op_env,
-        TPC_REGION_NAME_PREFIX = tpc_region_name_prefix,
-        MAX_FILE_SIZE = max_file_size,
-        HOST=host_df
-    )
+
+    df_app_names = []
+    for i,host in enumerate(host_df):
+        app_name = f'dataflow{i}'
+        df_app_names.append(app_name)
+        the_system.apps[app_name] = DataFlowApp(
+            RU_CONFIG = ru_configs,
+            HOSTIDX = i,
+            RUN_NUMBER = run_number,
+            OUTPUT_PATH = output_path,
+            SYSTEM_TYPE = system_type,
+            SOFTWARE_TPG_ENABLED = enable_software_tpg,
+            TPSET_WRITING_ENABLED = enable_tpset_writing,
+            PARTITION=partition_name,
+            OPERATIONAL_ENVIRONMENT = op_env,
+            TPC_REGION_NAME_PREFIX = tpc_region_name_prefix,
+            MAX_FILE_SIZE = max_file_size,
+            HOST=host
+        )
 
     for name,app in the_system.apps.items():
         if app.name=="__app":
@@ -389,11 +388,13 @@ def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowd
     
 
 
-    the_system.app_connections["trigger.trigger_decisions"] = AppConnection(nwmgr_connection=f"{partition_name}.trigdec_0",
-                                                                            msg_type="dunedaq::dfmessages::TriggerDecision",
-                                                                            msg_module_name="TriggerDecisionNQ",
-                                                                            topics=[],
-                                                                            receivers=["dataflow.trigger_decisions"])
+    for i,df_app_name in enumerate(df_app_names):
+        the_system.app_connections[f"trigger.trigger_decisions{i}"] = AppConnection(nwmgr_connection=f"{partition_name}.trigdec_{i}",
+                                                                                    msg_type="dunedaq::dfmessages::TriggerDecision",
+                                                                                    msg_module_name="TriggerDecisionNQ",
+                                                                                    topics=[],
+                                                                                    receivers=[f"{df_app_name}.trigger_decisions"])
+    
     the_system.app_connections["hsi.hsievents"] = AppConnection(nwmgr_connection=f"{partition_name}.hsievents",
                                                                 topics=[],
                                                                 use_nwqa=False,
@@ -421,7 +422,8 @@ def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowd
     for ru_app_name in ru_app_names:
         add_network(ru_app_name, the_system, verbose=True)
 
-    add_network("dataflow", the_system, verbose=True)
+    for df_app_name in df_app_names:
+        add_network(df_app_name, the_system, verbose=True)
     the_system.export("system.dot")
 
     ####################################################################

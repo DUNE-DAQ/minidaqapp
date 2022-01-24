@@ -168,11 +168,12 @@ class TriggerApp(App):
                                                  fragments_out=f"{buf_name}.fragment_sink")
 
 
-        # We have an outgoing endpoint for trigger decisions, but the
-        # TDs come directly from the DFO to a nwmgr connection, so the
-        # queue we connect to is None
-        mgraph.add_endpoint("trigger_decisions", None, Direction.OUT)
-        # mgraph.add_endpoint("tokens", "mlt.token_source", Direction.IN)
+        for i in range(DF_COUNT):
+            # We have an outgoing endpoint for trigger decisions, but the
+            # TDs come directly from the DFO to a nwmgr connection, so the
+            # queue we connect to is None
+            mgraph.add_endpoint(f"trigger_decisions{i}", None, Direction.OUT)
+            # mgraph.add_endpoint("tokens", "mlt.token_source", Direction.IN)
 
         super().__init__(modulegraph=mgraph, host=HOST, name='TriggerApp')
         self.export("trigger_app.dot")
