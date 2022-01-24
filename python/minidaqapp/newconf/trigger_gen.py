@@ -15,7 +15,6 @@ moo.otypes.load_types('trigger/timingtriggercandidatemaker.jsonnet')
 moo.otypes.load_types('trigger/tpsetbuffercreator.jsonnet')
 moo.otypes.load_types('trigger/tpsetreceiver.jsonnet')
 moo.otypes.load_types('dfmodules/datafloworchestrator.jsonnet')
-moo.otypes.load_types('dfmodules/requestreceiver.jsonnet')
 
 # Import new types
 import dunedaq.trigger.triggeractivitymaker as tam
@@ -27,7 +26,6 @@ import dunedaq.trigger.timingtriggercandidatemaker as ttcm
 import dunedaq.trigger.tpsetbuffercreator as buf
 import dunedaq.trigger.tpsetreceiver as tpsrcv
 import dunedaq.dfmodules.datafloworchestrator as dfo
-import dunedaq.dfmodules.requestreceiver as rrcv
 
 from appfwk.app import App, ModuleGraph
 from appfwk.daqmodule import DAQModule
