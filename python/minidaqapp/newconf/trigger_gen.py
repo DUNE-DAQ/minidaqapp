@@ -88,29 +88,6 @@ class TriggerApp(App):
         modules = []
     
         if SOFTWARE_TPG_ENABLED:
-            connections_request_receiver = {}
-            connections_tpset_receiver = {}
-            for ru in range(len(RU_CONFIG)):
-                for idy in range(RU_CONFIG[ru]["channel_count"]):
-                    connections_request_receiver[f'output_{ru}_{idy}'] = Connection(f'buf{ru}_{idy}.data_request_q{ru}_{idy}')
-                    connections_tpset_receiver  [f'output_{ru}_{idy}'] = Connection(f'buf{ru}_{idy}.tpset_q_for_buf{ru}_{idy}')
-
-            config_request_receiver = rrcv.ConfParams(map = [rrcv.geoidinst(region=RU_CONFIG[ru]["region_id"],
-                                                                            element=idy+RU_CONFIG[ru]["start_channel"],
-                                                                            system="DataSelection",
-                                                                            queueinstance=f"data_request_q{ru}_{idy}")
-                                                             for ru in range(len(RU_CONFIG)) for idy in range(RU_CONFIG[ru]["channel_count"])],
-                                                      general_queue_timeout = 100,
-                                                      connection_name = f"{PARTITION}.ds_tp_datareq_0")
-            
-            config_tpset_receiver = tpsrcv.ConfParams(map = [tpsrcv.geoidinst(region=RU_CONFIG[ru]["region_id"],
-                                                                              element=idy+RU_CONFIG[ru]["start_channel"],
-                                                                              system=SYSTEM_TYPE,
-                                                                              queueinstance=f"tpset_q_for_buf{ru}_{idy}")
-                                                             for ru in range(len(RU_CONFIG)) for idy in range(RU_CONFIG[ru]["channel_count"])],
-                                                      general_queue_timeout = 100,
-                                                      topic = f"TPSets")
-    
             config_tcm =  tcm.Conf(candidate_maker=CANDIDATE_PLUGIN,
                                    candidate_maker_config=temptypes.CandidateConf(**CANDIDATE_CONFIG))
             
