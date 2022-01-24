@@ -19,7 +19,6 @@ moo.otypes.load_types('readoutlibs/sourceemulatorconfig.jsonnet')
 moo.otypes.load_types('readoutlibs/readoutconfig.jsonnet')
 moo.otypes.load_types('lbrulibs/pacmancardreader.jsonnet')
 moo.otypes.load_types('dfmodules/fakedataprod.jsonnet')
-moo.otypes.load_types('dfmodules/requestreceiver.jsonnet')
 moo.otypes.load_types('networkmanager/nwmgr.jsonnet')
 
 # Import new types
@@ -37,7 +36,6 @@ import dunedaq.readoutlibs.readoutconfig as rconf
 import dunedaq.lbrulibs.pacmancardreader as pcr
 # import dunedaq.dfmodules.triggerrecordbuilder as trb
 import dunedaq.dfmodules.fakedataprod as fdp
-import dunedaq.dfmodules.requestreceiver as rrcv
 import dunedaq.networkmanager.nwmgr as nwmgr
 
 from appfwk.utils import acmd, mcmd, mrccmd, mspec
@@ -96,32 +94,14 @@ class ReadoutApp(App):
         if SOFTWARE_TPG_ENABLED:
             connections = {}
 
-            request_receiver_geoid_map = []
             for idx in range(MIN_LINK, MAX_LINK):
                 queue_inst = f"data_requests_{idx}"
-                request_receiver_geoid_map.append(rrcv.geoidinst(region = RU_CONFIG[RUIDX]["region_id"],
-                                                                 element = idx,
-                                                                 system = SYSTEM_TYPE,
-                                                                 queueinstance = queue_inst))
                 connections[f'output_{idx}'] = Connection(f"datahandler_{idx}.data_requests_0",
                                                           queue_name = queue_inst)
                 
-                if SOFTWARE_TPG_ENABLED:
-                    queue_inst = f"tp_requests_{idx}"
-                    request_receiver_geoid_map.append(rrcv.geoidinst(region = RU_CONFIG[RUIDX]["region_id"],
-                                                                     element = idx+total_link_count, system=SYSTEM_TYPE,
-                                                                     queueinstance = queue_inst))
-                    connections[f'tp_output_{idx}'] = Connection(f"tp_datahandler_{idx}.data_requests_0",
+                queue_inst = f"tp_requests_{idx}"
+                connections[f'tp_output_{idx}'] = Connection(f"tp_datahandler_{idx}.data_requests_0",
                                                                  queue_name = queue_inst)
-
-            # modules += [
-            #     DAQModule(name = "request_receiver",
-            #                    plugin = "RequestReceiver",
-            #                    connections = connections,
-            #                    conf = rrcv.ConfParams(map = request_receiver_geoid_map,
-            #                                           general_queue_timeout = QUEUE_POP_WAIT_MS,
-            #                                           connection_name = f"{PARTITION}.datareq_{RUIDX}"))]
-            for idx in range(MIN_LINK,MAX_LINK):
                 modules += [DAQModule(name = f"tp_datahandler_{idx}",
                                    plugin = "DataLinkHandler",
                                    connections =  {}, #{'fragment_queue': Connection('fragment_sender.input_queue')},
