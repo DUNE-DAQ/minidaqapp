@@ -13,7 +13,6 @@ moo.otypes.load_types('trigger/moduleleveltrigger.jsonnet')
 moo.otypes.load_types('trigger/fakedataflow.jsonnet')
 moo.otypes.load_types('trigger/timingtriggercandidatemaker.jsonnet')
 moo.otypes.load_types('trigger/tpsetbuffercreator.jsonnet')
-moo.otypes.load_types('trigger/tpsetreceiver.jsonnet')
 moo.otypes.load_types('dfmodules/datafloworchestrator.jsonnet')
 
 # Import new types
@@ -24,7 +23,6 @@ import dunedaq.trigger.moduleleveltrigger as mlt
 import dunedaq.trigger.fakedataflow as fdf
 import dunedaq.trigger.timingtriggercandidatemaker as ttcm
 import dunedaq.trigger.tpsetbuffercreator as buf
-import dunedaq.trigger.tpsetreceiver as tpsrcv
 import dunedaq.dfmodules.datafloworchestrator as dfo
 
 from appfwk.app import App, ModuleGraph
