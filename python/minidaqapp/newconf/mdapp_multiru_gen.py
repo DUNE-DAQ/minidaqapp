@@ -356,7 +356,7 @@ def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowd
                 RUN_NUMBER = run_number,
                 DATA_FILE = data_file,
                 CLOCK_SPEED_HZ = CLOCK_SPEED_HZ,
-                RUIDX = hostidx,
+                RUIDX = i,
                 SYSTEM_TYPE = system_type,
                 DQM_ENABLED=enable_dqm,
                 DQM_KAFKA_ADDRESS=dqm_kafka_address,
