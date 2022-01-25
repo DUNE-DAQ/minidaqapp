@@ -373,18 +373,19 @@ def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowd
     # endpoint per link in the ru apps (maybe there should just be one
     # per app?), and all the TPSets from one RU go to the same TA
     # input in the trigger app
-    for apa_idx,ru_app_name in enumerate(ru_app_names):
-        ru_config=ru_configs[apa_idx]
-        min_link=ru_config["start_channel"]
-        max_link=min_link+ru_config["channel_count"]
-        for link in range(min_link, max_link):
-            the_system.app_connections.update(
-                { f"{ru_app_name}.tpsets_{link}": AppConnection(nwmgr_connection=f"{partition_name}.tpsets_apa{apa_idx}_link{link}",
-                                                                msg_type="dunedaq::trigger::TPSet",
-                                                                msg_module_name="TPSetNQ",
-                                                                topics=["TPSets"],
-                                                                receivers=[f"trigger.tpsets_into_buffer_apa{apa_idx}_link{link}",
-                                                                           f"trigger.tpsets_into_chain_apa{apa_idx}"])})
+    if enable_software_tpg:
+        for apa_idx,ru_app_name in enumerate(ru_app_names):
+            ru_config=ru_configs[apa_idx]
+            min_link=ru_config["start_channel"]
+            max_link=min_link+ru_config["channel_count"]
+            for link in range(min_link, max_link):
+                the_system.app_connections.update(
+                    { f"{ru_app_name}.tpsets_{link}": AppConnection(nwmgr_connection=f"{partition_name}.tpsets_apa{apa_idx}_link{link}",
+                                                                    msg_type="dunedaq::trigger::TPSet",
+                                                                    msg_module_name="TPSetNQ",
+                                                                    topics=["TPSets"],
+                                                                    receivers=[f"trigger.tpsets_into_buffer_apa{apa_idx}_link{link}",
+                                                                            f"trigger.tpsets_into_chain_apa{apa_idx}"])})
     
 
 
