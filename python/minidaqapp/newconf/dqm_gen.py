@@ -32,7 +32,7 @@ QUEUE_POP_WAIT_MS = 100
 # local clock speed Hz
 # CLOCK_SPEED_HZ = 50000000;
 
-class DQM(App):
+class DQMApp(App):
     def __init__(self,
                  NW_SPECS,
                  RU_CONFIG=[],

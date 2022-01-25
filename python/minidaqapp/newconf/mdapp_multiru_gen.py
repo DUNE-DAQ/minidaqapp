@@ -114,7 +114,7 @@ def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowd
     from .dataflow_gen import DataFlowApp
     if enable_dqm:
         console.log("Loading dqm config generator")
-        from . import dqm_gen
+        from .dqm_gen import DQMApp
     console.log("Loading readout config generator")
     from .readout_gen import ReadoutApp
     console.log("Loading trigger config generator")
@@ -207,6 +207,7 @@ def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowd
     regionidx = 0
 
     ru_app_names=[f"ruflx{idx}" if use_felix else f"ruemu{idx}" for idx in range(len(host_ru))]
+    dqm_app_names = [f"dqm_{idx}" for idx in range(len(host_ru))]
     
     for hostidx,ru_host in enumerate(ru_app_names):
         if enable_dqm:
@@ -346,6 +347,27 @@ def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowd
                                               USE_FAKE_DATA_PRODUCERS = use_fake_data_producers,
                                               HOST=host)
         console.log(f"{ru_name} app: {the_system.apps[ru_name]}")
+
+        if enable_dqm:
+            dqm_name = dqm_app_names[i]
+            the_system.apps[dqm_name] = DQMApp(
+                RU_CONFIG = ru_configs,
+                EMULATOR_MODE = emulator_mode,
+                RUN_NUMBER = run_number,
+                DATA_FILE = data_file,
+                CLOCK_SPEED_HZ = CLOCK_SPEED_HZ,
+                RUIDX = hostidx,
+                SYSTEM_TYPE = system_type,
+                DQM_ENABLED=enable_dqm,
+                DQM_KAFKA_ADDRESS=dqm_kafka_address,
+                DQM_CMAP=dqm_cmap,
+                DQM_RAWDISPLAY_PARAMS=dqm_rawdisplay_params,
+                DQM_MEANRMS_PARAMS=dqm_meanrms_params,
+                DQM_FOURIER_PARAMS=dqm_fourier_params,
+                DQM_FOURIERSUM_PARAMS=dqm_fouriersum_params,
+                PARTITION=partition_name,
+                HOST=host)
+            console.log(f"{dqm_name} app: {the_system.apps[dqm_name]}")
 
     df_app_names = []
     for i,host in enumerate(host_df):
