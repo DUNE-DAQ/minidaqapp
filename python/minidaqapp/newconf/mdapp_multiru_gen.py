@@ -207,7 +207,7 @@ def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowd
     regionidx = 0
 
     ru_app_names=[f"ruflx{idx}" if use_felix else f"ruemu{idx}" for idx in range(len(host_ru))]
-    dqm_app_names = [f"dqm_{idx}" for idx in range(len(host_ru))]
+    dqm_app_names = [f"dqm{idx}" for idx in range(len(host_ru))]
     
     for hostidx,ru_host in enumerate(ru_app_names):
         if enable_dqm:
