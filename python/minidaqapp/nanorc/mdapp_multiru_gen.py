@@ -402,7 +402,7 @@ def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowd
 
     console.log(f"Generating top-level command json files")
 
-    start_order = app_df + [app_trigger] + app_ru + [app_hsi] + app_dqm
+    start_order = app_df + [app_trigger] + app_ru + [app_hsi] + (app_dqm if enable_dqm else [])
     if not control_timing_hw and use_hsi_hw:
         resume_order = [app_trigger]
     else:
