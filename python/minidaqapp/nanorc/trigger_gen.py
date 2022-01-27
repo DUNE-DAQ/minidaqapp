@@ -23,7 +23,6 @@ moo.otypes.load_types('nwqueueadapters/queuetonetwork.jsonnet')
 moo.otypes.load_types('nwqueueadapters/networktoqueue.jsonnet')
 moo.otypes.load_types('nwqueueadapters/networkobjectreceiver.jsonnet')
 moo.otypes.load_types('nwqueueadapters/networkobjectsender.jsonnet')
-moo.otypes.load_types('dfmodules/datafloworchestrator.jsonnet')
 moo.otypes.load_types('dfmodules/requestreceiver.jsonnet')
 moo.otypes.load_types('networkmanager/nwmgr.jsonnet')
 
@@ -47,7 +46,6 @@ import dunedaq.nwqueueadapters.queuetonetwork as qton
 import dunedaq.nwqueueadapters.networkobjectreceiver as nor
 import dunedaq.nwqueueadapters.networkobjectsender as nos
 import dunedaq.dfmodules.requestreceiver as rrcv
-import dunedaq.dfmodules.datafloworchestrator as dfo
 import dunedaq.networkmanager.nwmgr as nwmgr
 
 from appfwk.utils import acmd, mcmd, mrccmd, mspec
@@ -89,8 +87,6 @@ def generate(
         CANDIDATE_PLUGIN: str = 'TriggerCandidateMakerPrescalePlugin',
         CANDIDATE_CONFIG: int = dict(prescale=10),
 
-        TOKEN_COUNT: int = 10,
-        DF_COUNT: int = 1,
         SYSTEM_TYPE = 'wib',
         TTCM_S1: int = 1,
         TTCM_S2: int = 2,
@@ -109,8 +105,7 @@ def generate(
 
     # Define modules and queues
     queue_bare_specs = [
-        app.QueueSpec(inst='trigger_candidate_q', kind='FollyMPMCQueue', capacity=1000),
-        app.QueueSpec(inst='trigger_decision_q', kind='FollySPSCQueue', capacity=2)
+        app.QueueSpec(inst='trigger_candidate_q', kind='FollyMPMCQueue', capacity=1000)
     ]
 
     if SOFTWARE_TPG_ENABLED:
@@ -185,12 +180,6 @@ def generate(
         mspec("mlt", "ModuleLevelTrigger", [
             app.QueueInfo(name="trigger_candidate_source", inst="trigger_candidate_q", dir="input"),
             app.QueueInfo(name="trigger_decision_sink", inst="trigger_decision_q", dir="output"), 
-        ]),
-
-        ### DFO
-
-        mspec("dfo", "DataFlowOrchestrator", [
-            app.QueueInfo(name="trigger_decision_queue", inst="trigger_decision_q", dir="input"), 
         ]),
 
     ])
@@ -288,10 +277,6 @@ def generate(
             ] if SOFTWARE_TPG_ENABLED else []),
         )),
 
-        ("dfo", dfo.ConfParams(
-            token_connection=PARTITION+".triginh",
-            dataflow_applications=[dfo.app_config(decision_connection=f"{PARTITION}.trigdec_{dfidx}", capacity=TOKEN_COUNT) for dfidx in range(DF_COUNT)]
-        )),
     ])
 
     # We start modules in "downstream-to-upstream" order, so that each
@@ -301,7 +286,6 @@ def generate(
     # processed
     start_order = [
         "buf.*",
-        "dfo",
         "mlt",
         "ttcm",
         "ntoq_token"
@@ -334,7 +318,7 @@ def generate(
     ])
 
     cmd_data['scrap'] = acmd([
-        ("dfo", None)
+        ("", None)
     ])
 
     cmd_data['record'] = acmd([
