@@ -24,10 +24,6 @@ moo.otypes.load_types('appfwk/cmd.jsonnet')
 moo.otypes.load_types('appfwk/app.jsonnet')
 
 moo.otypes.load_types('timinglibs/fakehsieventgenerator.jsonnet')
-moo.otypes.load_types('nwqueueadapters/queuetonetwork.jsonnet')
-moo.otypes.load_types('nwqueueadapters/networktoqueue.jsonnet')
-moo.otypes.load_types('nwqueueadapters/networkobjectreceiver.jsonnet')
-moo.otypes.load_types('nwqueueadapters/networkobjectsender.jsonnet')
 
 # Import new types
 import dunedaq.cmdlib.cmd as basecmd # AddressedCmd,
@@ -35,10 +31,6 @@ import dunedaq.rcif.cmd as rccmd # AddressedCmd,
 import dunedaq.appfwk.cmd as cmd # AddressedCmd,
 import dunedaq.appfwk.app as app # AddressedCmd,
 import dunedaq.timinglibs.fakehsieventgenerator as fhsig
-import dunedaq.nwqueueadapters.networktoqueue as ntoq
-import dunedaq.nwqueueadapters.queuetonetwork as qton
-import dunedaq.nwqueueadapters.networkobjectreceiver as nor
-import dunedaq.nwqueueadapters.networkobjectsender as nos
 
 from appfwk.utils import acmd, mcmd, mrccmd, mspec
     
@@ -71,16 +63,19 @@ class FakeHSIApp(App):
         if TRIGGER_RATE_HZ > 0:
             trigger_interval_ticks = math.floor((1 / TRIGGER_RATE_HZ) * CLOCK_SPEED_HZ / DATA_RATE_SLOWDOWN_FACTOR)
 
-        modules = [DAQModule(name = 'fhsig',
-                           plugin = "FakeHSIEventGenerator",
-                           conf =  fhsig.Conf(clock_frequency=CLOCK_SPEED_HZ/DATA_RATE_SLOWDOWN_FACTOR,
-                                              # timestamp_offset=???,
-                                              # hsi_device_id=???,
-                                              trigger_interval_ticks=trigger_interval_ticks,
-                                              mean_signal_multiplicity=MEAN_SIGNAL_MULTIPLICITY,
-                                              signal_emulation_mode=SIGNAL_EMULATION_MODE,
-                                              enabled_signals=ENABLED_SIGNALS,
-                                              hsievent_connection_name=PARTITION+".hsievents"))]
+        startpars = rccmd.StartParams(run=RUN_NUMBER, trigger_interval_ticks = trigger_interval_ticks)
+        resumepars = rccmd.ResumeParams(trigger_interval_ticks = trigger_interval_ticks)
+
+        modules = [DAQModule(name   = 'fhsig',
+                             plugin = "FakeHSIEventGenerator",
+                             conf   =  fhsig.Conf(clock_frequency=CLOCK_SPEED_HZ/DATA_RATE_SLOWDOWN_FACTOR,
+                                                  trigger_interval_ticks=trigger_interval_ticks,
+                                                  mean_signal_multiplicity=MEAN_SIGNAL_MULTIPLICITY,
+                                                  signal_emulation_mode=SIGNAL_EMULATION_MODE,
+                                                  enabled_signals=ENABLED_SIGNALS,
+                                                  hsievent_connection_name=PARTITION+".hsievents"),
+                             extra_commands = {"start": startpars,
+                                               "resume": resumepars})]
     
         mgraph = ModuleGraph(modules)
         mgraph.add_endpoint("time_sync", "fhsig.time_sync_source", Direction.IN)
