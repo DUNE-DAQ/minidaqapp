@@ -452,6 +452,7 @@ def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowd
                 if enable_dqm:
                     for dqmapp in app_dqm:
                         del cfg['apps'][dqmapp]
+                del cfg['apps'][app_dfo]
                 if c == 'resume':
                     cfg['order'] = resume_order
                 elif c == 'pause':
