@@ -122,6 +122,8 @@ def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowd
     from . import readout_gen
     console.log("Loading trigger config generator")
     from . import trigger_gen
+    console.log("Loading dfo config generator")
+    from . import dfo_gen
     console.log("Loading hsi config generator")
     from . import hsi_gen
     console.log("Loading fake hsi config generator")
@@ -304,8 +306,17 @@ def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowd
         TRIGGER_WINDOW_AFTER_TICKS = trigger_window_after_ticks,
         PARTITION=partition_name)
 
-
     console.log("trigger cmd data:", cmd_data_trigger)
+
+
+    cmd_data_dfo = dfo_gen.generate(nw_specs,
+        TOKEN_COUNT=trigemu_token_count,
+        DF_COUNT=len(host_df),
+        PARTITION=partition_name)
+
+    console.log("dfo cmd data:", cmd_data_dfo)
+
+
 
     cmd_data_dataflow = [ dataflow_gen.generate(nw_specs,
         RU_CONFIG = ru_configs,
@@ -389,7 +400,7 @@ def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowd
     apps = [app_hsi, app_trigger, app_dfo] + app_df + app_ru
     if enable_dqm:
         apps += app_dqm
-    cmds_data = [cmd_data_hsi, cmd_data_trigger] + cmd_data_dataflow + cmd_data_readout
+    cmds_data = [cmd_data_hsi, cmd_data_trigger, cmd_data_dfo] + cmd_data_dataflow + cmd_data_readout
     if enable_dqm:
         cmds_data += cmd_data_dqm
     if control_timing_hw:
@@ -405,7 +416,7 @@ def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowd
 
     console.log(f"Generating top-level command json files")
 
-    start_order = app_df + [app_dfo, app_trigger] + app_ru + [app_hsi] + app_dqm
+    start_order = app_df + [app_dfo, app_trigger] + app_ru + [app_hsi] + (app_dqm if enable_dqm else [])
     if not control_timing_hw and use_hsi_hw:
         resume_order = [app_trigger]
     else:

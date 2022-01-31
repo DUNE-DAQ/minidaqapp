@@ -84,8 +84,8 @@ def generate(
     cmd_data['init'] = app.Init(queues=queue_specs, modules=mod_specs, nwconnections=NW_SPECS)
 
     # Generate schema for the maker plugins on the fly in the temptypes module
-    make_moo_record(ACTIVITY_CONFIG,'ActivityConf','temptypes')
-    make_moo_record(CANDIDATE_CONFIG,'CandidateConf','temptypes')
+    #make_moo_record(ACTIVITY_CONFIG,'ActivityConf','temptypes')
+    #make_moo_record(CANDIDATE_CONFIG,'CandidateConf','temptypes')
     import temptypes
 
     cmd_data['conf'] = acmd([
@@ -95,7 +95,7 @@ def generate(
             busy_connection=PARTITION+".df_busy_signal",
             td_connection=PARTITION+".td_mlt_to_dfo",
             dataflow_applications=[dfo.app_config(decision_connection=f"{PARTITION}.trigdec_{dfidx}", 
-                                                  dfo.busy_thresholds( free=1, busy=TOKEN_COUNT)) for dfidx in range(DF_COUNT)]
+                                                  thresholds=dfo.busy_thresholds( free=1, busy=TOKEN_COUNT)) for dfidx in range(DF_COUNT)]
         )),
     ])
 
@@ -114,6 +114,12 @@ def generate(
     cmd_data['start'] = acmd([ (m, startpars) for m in start_order ])
     cmd_data['stop'] = acmd([ (m, None) for m in stop_order ])
 
+    cmd_data['pause'] = acmd([
+        ("", None)
+    ])
+    cmd_data['resume'] = acmd([
+        ("", None)
+    ])
     cmd_data['scrap'] = acmd([
         ("dfo", None)
     ])
