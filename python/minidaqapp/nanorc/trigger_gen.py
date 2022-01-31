@@ -179,7 +179,6 @@ def generate(
 
         mspec("mlt", "ModuleLevelTrigger", [
             app.QueueInfo(name="trigger_candidate_source", inst="trigger_candidate_q", dir="input"),
-            app.QueueInfo(name="trigger_decision_sink", inst="trigger_decision_q", dir="output"), 
         ]),
 
     ])
@@ -275,6 +274,8 @@ def generate(
                 mlt.GeoID(system=SYSTEM_TYPE, region=RU_CONFIG[ru]["region_id"], element=RU_CONFIG[ru]["start_channel"] + idx + total_link_count)
                     for ru in range(len(RU_CONFIG)) for idx in range(RU_CONFIG[ru]["channel_count"])
             ] if SOFTWARE_TPG_ENABLED else []),
+            dfo_connection=f"{PARTITION}.td_mlt_to_dfo",
+            dfo_busy_connection=f"{PARTITION}.df_busy_signal",
         )),
 
     ])

@@ -43,7 +43,7 @@ import click
 @click.option('-f', '--use-felix', is_flag=True, help="Use real felix cards instead of fake ones")
 @click.option('--use-ssp', is_flag=True, help="Use real SSPs instead of fake sources")
 @click.option('--host-df', multiple=True, default=['localhost'], help="This option is repeatable, with each repetition adding another dataflow app.")
-@click.option('--host-dfo', multiple=false, default='localhost', help="Sets the host for the DFO app")
+@click.option('--host-dfo', default='localhost', help="Sets the host for the DFO app")
 @click.option('--host-ru', multiple=True, default=['localhost'], help="This option is repeatable, with each repetition adding an additional ru process.")
 @click.option('--host-trigger', default='localhost', help='Host to run the trigger app on')
 @click.option('--host-hsi', default='localhost', help='Host to run the HSI app on')
@@ -196,7 +196,7 @@ def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowd
     nw_specs = [nwmgr.Connection(name=partition_name + ".hsievent",       topics=[], address="tcp://{host_trigger}:12344"),
                 nwmgr.Connection(name=partition_name + ".triginh",        topics=[], address="tcp://{host_dfo}:12345"),
                 nwmgr.Connection(name=partition_name + ".df_busy_signal", topics=[], address="tcp://{host_trigger}:12346"),
-                nwmgr.Connection(name=partition_name + ".trig_candidate", topics=[], address="tcp://{host_dfo}:12347")   ]
+                nwmgr.Connection(name=partition_name + ".td_mlt_to_dfo", topics=[], address="tcp://{host_dfo}:12347")   ]
 
     port = 12348
 
@@ -297,8 +297,6 @@ def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowd
         ACTIVITY_CONFIG = eval(trigger_activity_config),
         CANDIDATE_PLUGIN = trigger_candidate_plugin,
         CANDIDATE_CONFIG = eval(trigger_candidate_config),
-        TOKEN_COUNT = trigemu_token_count,
-        DF_COUNT = len(host_df),
         SYSTEM_TYPE = system_type,
         TTCM_S1=ttcm_s1,
         TTCM_S2=ttcm_s2,

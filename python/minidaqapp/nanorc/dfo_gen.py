@@ -93,7 +93,7 @@ def generate(
         ("dfo", dfo.ConfParams(
             token_connection=PARTITION+".triginh",
             busy_connection=PARTITION+".df_busy_signal",
-            td_connection=PARTITION+".trig_candidate",
+            td_connection=PARTITION+".td_mlt_to_dfo",
             dataflow_applications=[dfo.app_config(decision_connection=f"{PARTITION}.trigdec_{dfidx}", 
                                                   dfo.busy_thresholds( free=1, busy=TOKEN_COUNT)) for dfidx in range(DF_COUNT)]
         )),
