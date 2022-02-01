@@ -34,7 +34,7 @@ QUEUE_POP_WAIT_MS = 100
 
 class DQMApp(App):
     def __init__(self,
-                 NW_SPECS,
+                 # NW_SPECS,
                  RU_CONFIG=[],
                  EMULATOR_MODE=False,
                  RUN_NUMBER=333,
@@ -64,36 +64,35 @@ class DQMApp(App):
         modules = []
 
         connections = {}
+        connections['data_fragments_q'] = Connection('trb_dqm.data_fragments_q',
+                                           queue_name='data_fragments_q',
+                                          queue_kind="FollySPSCQueue",
+                                          queue_capacity=1000)
 
-        connections['output'] = Connection(f'{PARTITION}.fragx_dqm_{RUIDX}',
-                                     queue_name='',
-                                     queue_kind='FollySPSCQueue',
-                                     queue_capacity=1000)
-
-        modules += [DAQModule(name='fragment_receiver_dqm',
-                              plugin='FragmentReceiver',
-                              connections=connections,
-                              conf=frcv.ConfParams(general_queue_timeout=QUEUE_POP_WAIT_MS,
-                                                   connection_name=f"{PARTITION}.fragx_dqm_{RUIDX}")
-                              )
-                              ]
+        # modules += [DAQModule(name='fragment_receiver_dqm',
+        #                       plugin='FragmentReceiver',
+        #                       connections=connections,
+        #                       conf=frcv.ConfParams(general_queue_timeout=QUEUE_POP_WAIT_MS,
+        #                                            connection_name=f"{PARTITION}.fragx_dqm_{RUIDX}")
+        #                       )
+        #                       ]
 
         connections = {}
 
-        connections['input_0'] = Connection('data_fragments_q',
-                                                queue_name='data_fragment_input_queue',
-                                                queue_kind="FollyMPMCQueue",
-                                                queue_capacity=1000)
+        # connections['input_0'] = Connection('fragment_receiver_dqm.fragment_receiver_output_queue',
+        #                                      queue_name='fragment_receiver_output_queue',
+        #                                      queue_kind="FollySPSCQueue",
+        #                                      queue_capacity=1000)
 
-        connections['input_1'] = Connection('trigger_decision_q_dqm',
-                                                queue_name='trigger_decision_input_queue',
-                                                queue_kind="FollySPSCQueue",
-                                                queue_capacity=100)
+        # connections['input_1'] = Connection('dqmprocessor.trigger_decision_q_dqm',
+        #                                     queue_name='trigger_decision_input_queue',
+        #                                     queue_kind="FollySPSCQueue",
+        #                                     queue_capacity=100)
 
-        connections['output'] = Connection('trigger_record_q_dqm',
-                                                queue_name='trigger_record_output_queue',
-                                                queue_kind="FollySPSCQueue",
-                                                queue_capacity=100)
+        connections['trigger_record_output_queue'] = Connection('dqmprocessor.trigger_record_output_queue',
+                                           queue_name='trigger_record_q_dqm',
+                                           queue_kind="FollySPSCQueue",
+                                           queue_capacity=100)
 
         modules += [DAQModule(name='trb_dqm',
                               plugin='TriggerRecordBuilder',
@@ -109,15 +108,16 @@ class DQMApp(App):
                               ]
 
         connections = {}
-        connections['input'] = Connection(f'trigger_record_q_dqm',
-                                                queue_name='trigger_record_dqm_processor',
-                                                queue_kind="FollySPSCQueue",
-                                                queue_capacity=100)
+        # connections['input'] = Connection(f'dqmprocessor.trigger_record_q_dqm',
+        #                                         queue_name='trigger_record_dqm_processor',
+        #                                         )
 
-        connections['output'] = Connection(f'trigger_decision_dqm_processor',
+        connections['output'] = Connection(f'trb_dqm.trigger_decision_input_queue',
                                                 queue_name='trigger_decision_q_dqm',
                                                 queue_kind="FollySPSCQueue",
-                                                queue_capacity=100)
+                                                queue_capacity=100,
+                                                toposort=False,
+                                           )
 
         modules += [DAQModule(name='dqmprocessor',
                               plugin='DQMProcessor',
