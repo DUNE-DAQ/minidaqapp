@@ -397,19 +397,24 @@ def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowd
     # per app?), and all the TPSets from one RU go to the same TA
     # input in the trigger app
     if enable_software_tpg:
-        for apa_idx,ru_app_name in enumerate(ru_app_names):
-            ru_config=ru_configs[apa_idx]
-            min_link=ru_config["start_channel"]
-            max_link=min_link+ru_config["channel_count"]
-            for link in range(min_link, max_link):
+        for ruidx,ru_app_name in enumerate(ru_app_names):
+            ru_config = ru_configs[ruidx]
+            apa_idx = ru_config['region_id']
+            for link in range(ru_config["channel_count"]):
+                # PL 2022-02-02: global_link is needed here to have non-overlapping app connections if len(ru)>1 with the same region_id
+                # Adding the ru number here too, in case we have many region_ids
+                global_link = link+ru_config["start_channel"]
                 the_system.app_connections.update(
-                    { f"{ru_app_name}.tpsets_{link}": AppConnection(nwmgr_connection=f"{partition_name}.tpsets_apa{apa_idx}_link{link}",
-                                                                    msg_type="dunedaq::trigger::TPSet",
-                                                                    msg_module_name="TPSetNQ",
-                                                                    topics=["TPSets"],
-                                                                    receivers=[f"trigger.tpsets_into_buffer_apa{apa_idx}_link{link}",
-                                                                            f"trigger.tpsets_into_chain_apa{apa_idx}"])})
-    
+                    {
+                        f"{ru_app_name}.tpsets_ru{ruidx}_link{global_link}":
+                        AppConnection(nwmgr_connection=f"{partition_name}.tpsets_apa{region_id}_link{global_link}",
+                                      msg_type="dunedaq::trigger::TPSet",
+                                      msg_module_name="TPSetNQ",
+                                      topics=["TPSets"],
+                                      receivers=[f"trigger.tpsets_into_buffer_ru{ruidx}_link{link}",
+                                                 f"trigger.tpsets_into_chain_apa{apa_idx}"])
+                    })
+
 
 
     for i,df_app_name in enumerate(df_app_names):

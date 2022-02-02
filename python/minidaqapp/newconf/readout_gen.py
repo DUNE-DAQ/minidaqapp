@@ -89,7 +89,8 @@ class ReadoutApp(App):
 
         total_link_count = 0
         for ru in range(len(RU_CONFIG)):
-            total_link_count += RU_CONFIG[ru]["channel_count"]
+            if RU_CONFIG[ru]['region_id'] == RU_CONFIG[RUIDX]['region_id']:
+                total_link_count += RU_CONFIG[ru]["channel_count"]
 
         if SOFTWARE_TPG_ENABLED:
             connections = {}
@@ -294,7 +295,7 @@ class ReadoutApp(App):
             # TODO: Should we just have one timesync outgoing endpoint?
             mgraph.add_endpoint(f"timesync_{idx}", f"datahandler_{idx}.timesync",    Direction.OUT)
             if SOFTWARE_TPG_ENABLED:
-                mgraph.add_endpoint(f"tpsets_{idx}", f"datahandler_{idx}.tpset_out",    Direction.OUT)
+                mgraph.add_endpoint(f"tpsets_ru{RUIDX}_link{idx}", f"datahandler_{idx}.tpset_out",    Direction.OUT)
                 mgraph.add_endpoint(f"timesync_{idx+RU_CONFIG[RUIDX]['channel_count']}", f"tp_datahandler_{idx}.timesync",    Direction.OUT)
 
             # Add fragment producers for raw data
@@ -304,7 +305,7 @@ class ReadoutApp(App):
 
             # Add fragment producers for TPC TPs. Make sure the element index doesn't overlap with the ones for raw data
             if SOFTWARE_TPG_ENABLED:
-                mgraph.add_fragment_producer(region = RU_CONFIG[RUIDX]["region_id"], element = idx + RU_CONFIG[RUIDX]["channel_count"], system = SYSTEM_TYPE,
+                mgraph.add_fragment_producer(region = RU_CONFIG[RUIDX]["region_id"], element = idx + total_link_count, system = SYSTEM_TYPE,
                                              requests_in   = f"tp_datahandler_{idx}.data_requests_0",
                                              fragments_out = f"tp_datahandler_{idx}.fragment_queue")
 
