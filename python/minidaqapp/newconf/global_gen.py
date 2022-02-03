@@ -50,7 +50,7 @@ def cli(partition_name, disable_trace, host_thi, port_thi, timing_hw_connections
 
     console.log(f"Generating configs for global thi host {host_thi}")
 
-    the_system = System(partition_name, first_port=port)
+    the_system = System(partition_name, first_port=port_thi)
    
     if opmon_impl == 'cern':
         info_svc_uri = "influx://188.185.88.195:80/write?db=db1"
