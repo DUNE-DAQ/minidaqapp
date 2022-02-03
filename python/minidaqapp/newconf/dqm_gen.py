@@ -65,17 +65,17 @@ class DQMApp(App):
         connections = {}
 
         connections['output'] = Connection(f'trb_dqm.fragx_dqm_{RUIDX}',
-                                           queue_name='',
+                                           queue_name='trigger_record_q_dqm',
                                            queue_kind='FollySPSCQueue',
                                            queue_capacity=1000)
 
-        modules += [DAQModule(name='fragment_receiver_dqm',
-                              plugin='FragmentReceiver',
-                              connections=connections,
-                              conf=frcv.ConfParams(general_queue_timeout=QUEUE_POP_WAIT_MS,
-                                                   connection_name=f"{PARTITION}.fragx_dqm_{RUIDX}")
-                              )
-                              ]
+        # modules += [DAQModule(name='fragment_receiver_dqm',
+        #                       plugin='FragmentReceiver',
+        #                       connections=connections,
+        #                       conf=frcv.ConfParams(general_queue_timeout=QUEUE_POP_WAIT_MS,
+        #                                            connection_name=f"{PARTITION}.fragx_dqm_{RUIDX}")
+        #                       )
+        #                       ]
 
         connections = {}
 
@@ -97,13 +97,13 @@ class DQMApp(App):
         modules += [DAQModule(name='trb_dqm',
                               plugin='TriggerRecordBuilder',
                               connections=connections,
-                              conf= trb.ConfParams(
-                                  general_queue_timeout=QUEUE_POP_WAIT_MS,
-                                  reply_connection_name = f"{PARTITION}.fragx_dqm_{RUIDX}",
-                                  map=trb.mapgeoidconnections([
-                                      trb.geoidinst(region=RU_CONFIG[RUIDX]["region_id"], element=idx, system=SYSTEM_TYPE, connection_name=f"{PARTITION}.datareq_{RUIDX}") for idx in range(MIN_LINK, MAX_LINK)
-                                  ]),
-                              ))
+                              conf= trb.ConfParams())
+                                  # general_queue_timeout=QUEUE_POP_WAIT_MS,
+                                  # reply_connection_name = f"{PARTITION}.fragx_dqm_{RUIDX}",
+                                  # map=trb.mapgeoidconnections([
+                                  #     trb.geoidinst(region=RU_CONFIG[RUIDX]["region_id"], element=idx, system=SYSTEM_TYPE, connection_name=f"{PARTITION}.datareq_{RUIDX}") for idx in range(MIN_LINK, MAX_LINK)
+                                  # ]),
+                              # ))
                     ]
 
         connections = {}
