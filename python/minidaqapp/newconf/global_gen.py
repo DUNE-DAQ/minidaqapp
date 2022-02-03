@@ -31,8 +31,8 @@ import click
 @click.command(context_settings=CONTEXT_SETTINGS)
 @click.option('-p', '--partition-name', default="global", help="Name of the partition to use, for ERS and OPMON")
 @click.option('--disable-trace', is_flag=True, help="Do not enable TRACE (default TRACE_FILE is /tmp/trace_buffer_\${HOSTNAME}_\${USER})")
-@click.option('--host', default='localhost', help='Host to run the HSI app on')
-@click.option('--port', default=12345, help='Port to host running the (global) timing hardware interface app on')
+@click.option('--host-thi', default='localhost', help='Host to run the (global) timing hardware interface app on')
+@click.option('--port-thi', default=12345, help='Port to host running the (global) timing hardware interface app on')
 @click.option('--timing-hw-connections-file', default="${TIMING_SHARE}/config/etc/connections.xml", help='Path to timing hardware connections file')
 @click.option('--opmon-impl', type=click.Choice(['json','cern','pocket'], case_sensitive=False),default='json', help="Info collector service implementation to use")
 @click.option('--ers-impl', type=click.Choice(['local','cern','pocket'], case_sensitive=False), default='local', help="ERS destination (Kafka used for cern and pocket)")
@@ -40,7 +40,7 @@ import click
 @click.option('--hsi-device-name', default="BOREAS_TLU", help='Real HSI hardware only: device name of HSI hw')
 @click.argument('json_dir', type=click.Path())
 
-def cli(partition_name, disable_trace, host, port, timing_hw_connections_file, opmon_impl, ers_impl, pocket_url, hsi_device_name, json_dir):
+def cli(partition_name, disable_trace, host_thi, port_thi, timing_hw_connections_file, opmon_impl, ers_impl, pocket_url, hsi_device_name, json_dir):
 
     if exists(json_dir):
         raise RuntimeError(f"Directory {json_dir} already exists")
@@ -81,7 +81,7 @@ def cli(partition_name, disable_trace, host, port, timing_hw_connections_file, o
         ers_settings["FATAL"] =   "erstrace,lstdout"
 
     # timing commands coming in outside data-taking partitions
-    the_system.network_endpoints.append(nwmgr.Connection(name=partition_name + ".timing_cmds",  topics=[], address=f"tcp://137.222.58.102:{port}"))
+    the_system.network_endpoints.append(nwmgr.Connection(name=partition_name + ".timing_cmds",  topics=[], address=f"tcp://{{host_thi}}:{port_thi}"))
     
     # the timing hardware interface application
     the_system.apps["thi"] = THIApp(
