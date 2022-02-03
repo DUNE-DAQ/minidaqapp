@@ -48,7 +48,7 @@ def cli(partition_name, disable_trace, host_thi, port_thi, timing_hw_connections
     console.log("Loading timing hardware config generator")
     from .thi_gen import THIApp
 
-    console.log(f"Generating configs for global host {host}")
+    console.log(f"Generating configs for global thi host {host_thi}")
 
     the_system = System(partition_name, first_port=port)
    
@@ -88,7 +88,7 @@ def cli(partition_name, disable_trace, host_thi, port_thi, timing_hw_connections
         CONNECTIONS_FILE=timing_hw_connections_file,
         HSI_DEVICE_NAME=hsi_device_name,
         PARTITION=partition_name,
-        HOST=host)
+        HOST=host_thi)
         
     the_system.app_connections[f"from_outside.timing_cmds"] = AppConnection(nwmgr_connection=partition_name + ".timing_cmds",
                                                                             msg_type="dunedaq::timinglibs::timingcmd::TimingHwCmd",
