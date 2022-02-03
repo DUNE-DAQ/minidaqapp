@@ -90,20 +90,21 @@ class DQMApp(App):
         #                                         queue_capacity=100)
 
         connections['output'] = Connection('dqmprocessor.trigger_record_q_dqm',
-                                                queue_name='trigger_record_output_queue',
-                                                queue_kind="FollySPSCQueue",
-                                                queue_capacity=100)
+                                           queue_name='trigger_record_output_queue',
+                                           queue_kind="FollySPSCQueue",
+                                           queue_capacity=100,
+                                           toposort = False)
 
         modules += [DAQModule(name='trb_dqm',
                               plugin='TriggerRecordBuilder',
                               connections=connections,
-                              conf= trb.ConfParams())
-                                  # general_queue_timeout=QUEUE_POP_WAIT_MS,
-                                  # reply_connection_name = f"{PARTITION}.fragx_dqm_{RUIDX}",
-                                  # map=trb.mapgeoidconnections([
-                                  #     trb.geoidinst(region=RU_CONFIG[RUIDX]["region_id"], element=idx, system=SYSTEM_TYPE, connection_name=f"{PARTITION}.datareq_{RUIDX}") for idx in range(MIN_LINK, MAX_LINK)
-                                  # ]),
-                              # ))
+                              conf= trb.ConfParams(# This needs to be done in connect_fragment_producers
+                                   general_queue_timeout=QUEUE_POP_WAIT_MS,
+                                   reply_connection_name = f"{PARTITION}.fragx_dqm_{RUIDX}",
+                                   map=trb.mapgeoidconnections([
+                                       trb.geoidinst(region=RU_CONFIG[RUIDX]["region_id"], element=idx, system=SYSTEM_TYPE, connection_name=f"{PARTITION}.datareq_{RUIDX}") for idx in range(MIN_LINK, MAX_LINK)
+                                   ]),
+                              ))
                     ]
 
         connections = {}
