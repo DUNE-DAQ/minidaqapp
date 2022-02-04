@@ -44,6 +44,7 @@ import click
 @click.option('-f', '--use-felix', is_flag=True, help="Use real felix cards instead of fake ones")
 @click.option('--use-ssp', is_flag=True, help="Use real SSPs instead of fake sources")
 @click.option('--host-df', multiple=True, default=['localhost'], help="This option is repeatable, with each repetition adding another dataflow app.")
+@click.option('--host-dfo', default='localhost', help="Sets the host for the DFO app")
 @click.option('--host-ru', multiple=True, default=['localhost'], help="This option is repeatable, with each repetition adding an additional ru process.")
 @click.option('--host-trigger', default='localhost', help='Host to run the trigger app on')
 @click.option('--host-hsi', default='localhost', help='Host to run the HSI app on')
@@ -98,7 +99,7 @@ import click
 @click.argument('json_dir', type=click.Path())
 
 def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowdown_factor, run_number, trigger_rate_hz, trigger_window_before_ticks, trigger_window_after_ticks,
-        token_count, data_file, output_path, disable_trace, use_felix, use_ssp, host_df, host_ru, host_trigger, host_hsi, host_timing_hw, control_timing_hw, timing_hw_connections_file, region_id, latency_buffer_size,
+        token_count, data_file, output_path, disable_trace, use_felix, use_ssp, host_df, host_dfo, host_ru, host_trigger, host_hsi, host_timing_hw, control_timing_hw, timing_hw_connections_file, region_id, latency_buffer_size,
         hsi_device_name, hsi_readout_period, hsi_endpoint_address, hsi_endpoint_partition, hsi_re_mask, hsi_fe_mask, hsi_inv_mask, hsi_source,
         use_hsi_hw, hsi_device_id, mean_hsi_signal_multiplicity, hsi_signal_emulation_mode, enabled_hsi_signals,
         ttcm_s1, ttcm_s2, trigger_activity_plugin, trigger_activity_config, trigger_candidate_plugin, trigger_candidate_config,
@@ -119,6 +120,8 @@ def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowd
     from .readout_gen import ReadoutApp
     console.log("Loading trigger config generator")
     from .trigger_gen import TriggerApp
+    console.log("Loading DFO config generator")
+    from .dfo_gen import DFOApp
     console.log("Loading hsi config generator")
     from . import hsi_gen
     console.log("Loading fake hsi config generator")
@@ -126,7 +129,7 @@ def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowd
     console.log("Loading timing hardware config generator")
     from .thi_gen import THIApp
 
-    console.log(f"Generating configs for hosts trigger={host_trigger} dataflow={host_df} readout={host_ru} hsi={host_hsi} dqm={host_ru}")
+    console.log(f"Generating configs for hosts trigger={host_trigger} DFO={host_dfo} dataflow={host_df} readout={host_ru} hsi={host_hsi} dqm={host_ru}")
 
     the_system = System(partition_name)
    
@@ -293,6 +296,12 @@ def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowd
         TTCM_S2=ttcm_s2,
         TRIGGER_WINDOW_BEFORE_TICKS = trigger_window_before_ticks,
         TRIGGER_WINDOW_AFTER_TICKS = trigger_window_after_ticks,
+        PARTITION=partition_name,
+        HOST=host_trigger)
+
+    the_system.apps['dfo'] = DFOApp(
+        DF_COUNT = len(host_df),
+        TOKEN_COUNT = trigemu_token_count,
         PARTITION=partition_name,
         HOST=host_trigger)
 
