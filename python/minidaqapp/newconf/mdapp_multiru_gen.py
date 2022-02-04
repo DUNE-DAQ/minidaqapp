@@ -198,7 +198,7 @@ def cli(global_partition_name, host_global, port_global, partition_name, number_
     dqm_kafka_address = "dqmbroadcast:9092" if dqm_impl == 'cern' else pocket_url + ":30092" if dqm_impl == 'pocket' else ''
 
     if control_hsi_hw:
-        the_system.network_endpoints.append(nwmgr.Connection(name=f"{global_partition_name}.timing_cmds",  topics=[], address=f"tcp://{host_global}:{port_global}"))
+        the_system.network_endpoints.append(nwmgr.Connection(name=f"{global_partition_name}.timing_cmds",  topics=[], address=f"tcp://{{host_global}}:{port_global}"))
 
     host_id_dict = {}
     ru_configs = []
