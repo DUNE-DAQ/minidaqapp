@@ -64,7 +64,7 @@ class DQMApp(App):
 
         connections = {}
 
-        connections['output'] = Connection(f'trb_dqm.data_fragments_input_queue',
+        connections['output'] = Connection(f'trb_dqm.data_fragment_input_queue',
                                            queue_name='data_fragments_q',
                                            queue_kind='FollyMPMCQueue',
                                            queue_capacity=1000)
