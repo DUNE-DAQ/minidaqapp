@@ -64,9 +64,9 @@ class DQMApp(App):
 
         connections = {}
 
-        connections['output'] = Connection(f'trb_dqm.data_fragments_input_queue',
+        connections['data_fragments_q'] = Connection(f'trb_dqm.data_fragments_input_queue',
                                            queue_name='data_fragments_q',
-                                           queue_kind='FollySPSCQueue',
+                                           queue_kind='FollyMPMCQueue',
                                            queue_capacity=1000)
 
         modules += [DAQModule(name='fragment_receiver_dqm',
@@ -99,7 +99,7 @@ class DQMApp(App):
 
         connections = {}
 
-        connections['trigger_decision_input_queue'] = Connection(f'trb_dqm.trigger_decision_dqm_processor',
+        connections['trigger_decision_input_queue'] = Connection(f'trb_dqm.trigger_decision_input_queue',
                                                 queue_name='trigger_decision_q_dqm',
                                                 queue_kind="FollySPSCQueue",
                                                 queue_capacity=100)
