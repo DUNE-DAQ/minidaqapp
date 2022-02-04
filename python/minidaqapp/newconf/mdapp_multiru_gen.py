@@ -124,7 +124,8 @@ def cli(global_partition_name, host_global, port_global, partition_name, number_
     console.log("Loading hsi config generator")
     from .hsi_gen import HSIApp
     console.log("Loading fake hsi config generator")
-
+    from .fake_hsi_gen import FakeHSIApp
+    
     console.log(f"Generating configs for hosts trigger={host_trigger} dataflow={host_df} readout={host_ru} hsi={host_hsi} dqm={host_ru}")
 
     the_system = System(partition_name, first_port=port_global)

@@ -85,7 +85,7 @@ class HSIApp(App):
                                                 readout_period=READOUT_PERIOD_US,
                                                 hsi_device_name=HSI_DEVICE_NAME,
                                                 uhal_log_level=UHAL_LOG_LEVEL,
-                                                hsievent_connection_name = f"{PARTITION}.hsievent"))]
+                                                hsievent_connection_name = f"{PARTITION}.hsievents"))]
         
         trigger_interval_ticks=0
         if TRIGGER_RATE_HZ > 0:
