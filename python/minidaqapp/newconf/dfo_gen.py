@@ -49,14 +49,10 @@ class DFOApp(App):
         { item_description }
         """
         
-        # Generate schema for the maker plugins on the fly in the temptypes module
-        make_moo_record(ACTIVITY_CONFIG , 'ActivityConf' , 'temptypes')
-        make_moo_record(CANDIDATE_CONFIG, 'CandidateConf', 'temptypes')
-        import temptypes
-
         modules = []
     
-        df_app_configs = [dfo.app_config(decision_connection=f"{PARTITION}.trigdec_{dfidx}", capacity=TOKEN_COUNT) for dfidx in range(DF_COUNT)]
+        df_app_configs = [dfo.app_config(decision_connection=f"{PARTITION}.trigdec_{dfidx}", 
+                                         thresholds=dfo.busy_thresholds(free=1, busy=TOKEN_COUNT)) for dfidx in range(DF_COUNT)]
         modules += [DAQModule(name = "dfo",
                               plugin = "DataFlowOrchestrator",
                               conf = dfo.ConfParams(token_connection = PARTITION+".triginh",
@@ -65,6 +61,7 @@ class DFOApp(App):
                                                     dataflow_applications=df_app_configs))]
         
         mgraph = ModuleGraph(modules)
+        mgraph.add_endpoint("td_to_dfo", None, Direction.IN)
 
         mgraph.add_endpoint("busy_signal", None, Direction.OUT)
         for i in range(DF_COUNT):
@@ -72,7 +69,6 @@ class DFOApp(App):
             # TDs come directly from the DFO to a nwmgr connection, so the
             # queue we connect to is None
             mgraph.add_endpoint(f"trigger_decisions{i}", None, Direction.OUT)
-
             # mgraph.add_endpoint("tokens", "mlt.token_source", Direction.IN)
 
         super().__init__(modulegraph=mgraph, host=HOST, name='DFOApp')

@@ -425,7 +425,7 @@ def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowd
 
 
     for i,df_app_name in enumerate(df_app_names):
-        the_system.app_connections[f"trigger.trigger_decisions{i}"] = AppConnection(nwmgr_connection=f"{partition_name}.trigdec_{i}",
+        the_system.app_connections[f"dfo.trigger_decisions{i}"] = AppConnection(nwmgr_connection=f"{partition_name}.trigdec_{i}",
                                                                                     msg_type="dunedaq::dfmessages::TriggerDecision",
                                                                                     msg_module_name="TriggerDecisionNQ",
                                                                                     topics=[],
@@ -435,6 +435,12 @@ def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowd
                                                                 topics=[],
                                                                 use_nwqa=False,
                                                                 receivers=["trigger.hsievents"])
+
+    the_system.app_connections["dfo.td_to_dfo"] = AppConnection(nwmgr_connection=f"{partition_name}.td_mlt_to_dfo",
+                                                                topics=[],
+                                                                use_nwqa=False,
+                                                                receivers=["dfo.td_mlt_to_dfo"])
+
     # TODO: How to do this more automatically?
     the_system.network_endpoints.append(nwmgr.Connection(name=f"{the_system.partition_name}.triginh",
                                                          topics=[],

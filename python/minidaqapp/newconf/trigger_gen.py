@@ -154,14 +154,15 @@ class TriggerApp(App):
         # util.connect_fragment_producers
         modules += [DAQModule(name = 'mlt',
                               plugin = 'ModuleLevelTrigger',
-                              connections = { #"trigger_decision_sink": Connection("dfo.trigger_decision_queue")
-                                            },
+                              #connections = { #"trigger_decision_sink": Connection("dfo.trigger_decision_queue")
+                               #             },
                               conf=mlt.ConfParams(links=[],  # To be updated later - see comment above
                                                   dfo_connection=f"{PARTITION}.td_mlt_to_dfo",
                                                   dfo_busy_connection=f"{PARTITION}.df_busy_signal"))]
 
         mgraph = ModuleGraph(modules)
         mgraph.add_endpoint("hsievents",  "ttcm.input", Direction.IN)
+        mgraph.add_endpoint("td_to_dfo",  "mlt.input", Direction.OUT)
         if SOFTWARE_TPG_ENABLED:
             for ruidx, ru_config in enumerate(RU_CONFIG):
                 # 1 zipper input per region_id
