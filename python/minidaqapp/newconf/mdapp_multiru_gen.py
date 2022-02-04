@@ -285,12 +285,10 @@ def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowd
     the_system.apps['trigger'] = TriggerApp(
         SOFTWARE_TPG_ENABLED = enable_software_tpg,
         RU_CONFIG = ru_configs,
-        DF_COUNT = len(host_df),
         ACTIVITY_PLUGIN = trigger_activity_plugin,
         ACTIVITY_CONFIG = eval(trigger_activity_config),
         CANDIDATE_PLUGIN = trigger_candidate_plugin,
         CANDIDATE_CONFIG = eval(trigger_candidate_config),
-        TOKEN_COUNT = trigemu_token_count,
         SYSTEM_TYPE = system_type,
         TTCM_S1=ttcm_s1,
         TTCM_S2=ttcm_s2,
@@ -455,6 +453,7 @@ def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowd
     mlt_links=the_system.apps["trigger"].modulegraph.get_module("mlt").conf.links
     console.log(f"After set_mlt_links, mlt_links is {mlt_links}")
     add_network("trigger", the_system, verbose=True)
+    add_network("dfo", the_system, verbose=True)
     # # console.log("After adding network, trigger mgraph:", the_system.apps['trigger'].modulegraph)
     add_network("hsi", the_system, verbose=True)
     for ru_app_name in ru_app_names:
