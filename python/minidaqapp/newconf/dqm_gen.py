@@ -34,7 +34,6 @@ QUEUE_POP_WAIT_MS = 100
 
 class DQMApp(App):
     def __init__(self,
-                 # NW_SPECS,
                  RU_CONFIG=[],
                  EMULATOR_MODE=False,
                  RUN_NUMBER=333,
@@ -64,10 +63,11 @@ class DQMApp(App):
         modules = []
 
         connections = {}
-        connections['data_fragments_q'] = Connection('trb_dqm.data_fragments_q',
-                                           queue_name='data_fragments_q',
-                                          queue_kind="FollySPSCQueue",
-                                          queue_capacity=1000)
+
+        connections['output'] = Connection(f'trb_dqm.fragx_dqm_{RUIDX}',
+                                           queue_name='trigger_record_q_dqm',
+                                           queue_kind='FollySPSCQueue',
+                                           queue_capacity=1000)
 
         # modules += [DAQModule(name='fragment_receiver_dqm',
         #                       plugin='FragmentReceiver',
@@ -79,45 +79,44 @@ class DQMApp(App):
 
         connections = {}
 
-        # connections['input_0'] = Connection('fragment_receiver_dqm.fragment_receiver_output_queue',
-        #                                      queue_name='fragment_receiver_output_queue',
-        #                                      queue_kind="FollySPSCQueue",
-        #                                      queue_capacity=1000)
+        # connections['input_0'] = Connection('data_fragments_q',
+        #                                         queue_name='data_fragment_input_queue',
+        #                                         queue_kind="FollyMPMCQueue",
+        #                                         queue_capacity=1000)
 
-        # connections['input_1'] = Connection('dqmprocessor.trigger_decision_q_dqm',
-        #                                     queue_name='trigger_decision_input_queue',
-        #                                     queue_kind="FollySPSCQueue",
-        #                                     queue_capacity=100)
+        # connections['input_1'] = Connection('trigger_decision_q_dqm',
+        #                                         queue_name='trigger_decision_input_queue',
+        #                                         queue_kind="FollySPSCQueue",
+        #                                         queue_capacity=100)
 
-        connections['trigger_record_output_queue'] = Connection('dqmprocessor.trigger_record_output_queue',
-                                           queue_name='trigger_record_q_dqm',
+        connections['output'] = Connection('dqmprocessor.trigger_record_q_dqm',
+                                           queue_name='trigger_record_output_queue',
                                            queue_kind="FollySPSCQueue",
-                                           queue_capacity=100)
+                                           queue_capacity=100,
+                                           toposort = False)
 
         modules += [DAQModule(name='trb_dqm',
                               plugin='TriggerRecordBuilder',
                               connections=connections,
-                              conf= trb.ConfParams(
-                                                   general_queue_timeout=QUEUE_POP_WAIT_MS,
-                                                   reply_connection_name = f"{PARTITION}.fragx_dqm_{RUIDX}",
-                                                   map=trb.mapgeoidconnections([
-                                                           trb.geoidinst(region=RU_CONFIG[RUIDX]["region_id"], element=idx, system=SYSTEM_TYPE, connection_name=f"{PARTITION}.datareq_{RUIDX}") for idx in range(MIN_LINK, MAX_LINK)
-                                                       ]),
-                                  )
-                              )
-                              ]
+                              conf= trb.ConfParams(# This needs to be done in connect_fragment_producers
+                                   general_queue_timeout=QUEUE_POP_WAIT_MS,
+                                   reply_connection_name = f"{PARTITION}.fragx_dqm_{RUIDX}",
+                                   map=trb.mapgeoidconnections([
+                                       trb.geoidinst(region=RU_CONFIG[RUIDX]["region_id"], element=idx, system=SYSTEM_TYPE, connection_name=f"{PARTITION}.datareq_{RUIDX}") for idx in range(MIN_LINK, MAX_LINK)
+                                   ]),
+                              ))
+                    ]
 
         connections = {}
-        # connections['input'] = Connection(f'dqmprocessor.trigger_record_q_dqm',
+        # connections['input'] = Connection(f'trigger_record_q_dqm',
         #                                         queue_name='trigger_record_dqm_processor',
-        #                                         )
+        #                                         queue_kind="FollySPSCQueue",
+        #                                         queue_capacity=100)
 
-        connections['output'] = Connection(f'trb_dqm.trigger_decision_input_queue',
+        connections['output'] = Connection(f'trb_dqm.trigger_decision_dqm_processor',
                                                 queue_name='trigger_decision_q_dqm',
                                                 queue_kind="FollySPSCQueue",
-                                                queue_capacity=100,
-                                                toposort=False,
-                                           )
+                                                queue_capacity=100)
 
         modules += [DAQModule(name='dqmprocessor',
                               plugin='DQMProcessor',

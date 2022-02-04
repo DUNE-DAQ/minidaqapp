@@ -95,29 +95,43 @@ class TriggerApp(App):
                                    'output': Connection(f'mlt.trigger_candidate_source')},
                                conf = config_tcm)]
             
+            region_ids = set()
             for ru in range(len(RU_CONFIG)):
-                
-                modules += [DAQModule(name = f'zip_{ru}',
-                                   plugin = 'TPZipper',
-                                   connections = {# 'input' are App.network_endpoints, from RU
-                                       'output': Connection(f'tam_{ru}.input')},
-                                   conf = tzip.ConfParams(cardinality=RU_CONFIG[ru]['channel_count'],
-                                                          max_latency_ms=1000,
-                                                          region_id=0,
-                                                          element_id=0)),
+                ## 1 zipper/TAM per region id
+                region_id = RU_CONFIG[ru]["region_id"]
+                skip=False
+                if region_id in region_ids: skip=True
+
+                if not skip: # we only add Zipper/TAM is that region_id wasn't seen before (in a very clunky way)
+                    region_ids.add(region_id)
+                    cardinality = 0
+                    for RU in RU_CONFIG:
+                        if RU['region_id'] == region_id:
+                            cardinality += RU['channel_count']
+                    modules += [DAQModule(name = f'zip_{region_id}',
+                                          plugin = 'TPZipper',
+                                          connections = {# 'input' are App.network_endpoints, from RU
+                                              'output': Connection(f'tam_{region_id}.input')},
+                                          conf = tzip.ConfParams(cardinality=cardinality,
+                                                                 max_latency_ms=1000,
+                                                                 region_id=region_id,
+                                                                 # 2022-02-02 PL: Not sure what element_id should be,
+                                                                 # since zipper is merging the stream for the whole region_id
+                                                                 element_id=0)),
                             
-                            DAQModule(name = f'tam_{ru}',
-                                   plugin = 'TriggerActivityMaker',
-                                   connections = {'output': Connection('tcm.input')},
-                                   conf = tam.Conf(activity_maker=ACTIVITY_PLUGIN,
-                                                   geoid_region=0,  # Fake placeholder
-                                                   geoid_element=0,  # Fake placeholder
-                                                   window_time=10000,  # should match whatever makes TPSets, in principle
-                                                   buffer_time=625000,  # 10ms in 62.5 MHz ticks
-                                                   activity_maker_config=temptypes.ActivityConf(**ACTIVITY_CONFIG)))]
+                                DAQModule(name = f'tam_{region_id}',
+                                          plugin = 'TriggerActivityMaker',
+                                          connections = {'output': Connection('tcm.input')},
+                                          conf = tam.Conf(activity_maker=ACTIVITY_PLUGIN,
+                                                          geoid_region=region_id,
+                                                          geoid_element=0,  # 2022-02-02 PL: Same comment as above
+                                                          window_time=10000,  # should match whatever makes TPSets, in principle
+                                                          buffer_time=625000,  # 10ms in 62.5 MHz ticks
+                                                          activity_maker_config=temptypes.ActivityConf(**ACTIVITY_CONFIG)))]
 
                 for idy in range(RU_CONFIG[ru]["channel_count"]):
-                    modules += [DAQModule(name = f'buf_apa{ru}_link{idy}',
+                    # 1 buffer per TPG channel
+                    modules += [DAQModule(name = f'buf_ru{ru}_link{idy}',
                                        plugin = 'TPSetBufferCreator',
                                        connections = {},#'tpset_source': Connection(f"tpset_q_for_buf{ru}_{idy}"),#already in request_receiver
                                                       #'data_request_source': Connection(f"data_request_q{ru}_{idy}"), #ditto
@@ -157,13 +171,17 @@ class TriggerApp(App):
         mgraph = ModuleGraph(modules)
         mgraph.add_endpoint("hsievents",  "ttcm.input", Direction.IN)
         if SOFTWARE_TPG_ENABLED:
-            for apa_idx,ru_config in enumerate(RU_CONFIG):
-                mgraph.add_endpoint(f"tpsets_into_chain_apa{apa_idx}", f"zip_{apa_idx}.input", Direction.IN)
+            for ruidx, ru_config in enumerate(RU_CONFIG):
+                # 1 zipper input per region_id
+                # PL 2022-02-02: Maybe need to check that we don't create twice the same endpoint?
+                mgraph.add_endpoint(f"tpsets_into_chain_apa{ru_config['region_id']}", f"zip_{ru_config['region_id']}.input", Direction.IN)
 
                 for link_idx in range(ru_config["channel_count"]):
-                    buf_name=f'buf_apa{apa_idx}_link{link_idx}'
-                    mgraph.add_endpoint(f"tpsets_into_buffer_apa{apa_idx}_link{link_idx}", f"{buf_name}.tpset_source", Direction.IN)
-                    mgraph.add_fragment_producer(region=apa_idx, element=link_idx, system="DataSelection",
+                    # 1 buffer per link
+                    buf_name=f'buf_ru{ruidx}_link{link_idx}'
+                    global_link = link_idx+ru_config['start_channel'] # for the benefit of correct fragment geoid
+                    mgraph.add_endpoint(f"tpsets_into_buffer_ru{ruidx}_link{link_idx}", f"{buf_name}.tpset_source", Direction.IN)
+                    mgraph.add_fragment_producer(region=ru_config['region_id'], element=global_link, system="DataSelection",
                                                  requests_in=f"{buf_name}.data_request_source",
                                                  fragments_out=f"{buf_name}.fragment_sink")
 
@@ -177,4 +195,3 @@ class TriggerApp(App):
 
         super().__init__(modulegraph=mgraph, host=HOST, name='TriggerApp')
         self.export("trigger_app.dot")
-
