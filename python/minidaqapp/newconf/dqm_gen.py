@@ -35,6 +35,7 @@ QUEUE_POP_WAIT_MS = 100
 class DQMApp(App):
     def __init__(self,
                  RU_CONFIG=[],
+                 RU_NAME='',
                  EMULATOR_MODE=False,
                  RUN_NUMBER=333,
                  DATA_FILE="./frames.bin",
@@ -90,7 +91,7 @@ class DQMApp(App):
                                    general_queue_timeout=QUEUE_POP_WAIT_MS,
                                    reply_connection_name = f"{PARTITION}.fragx_dqm_{RUIDX}",
                                    map=trb.mapgeoidconnections([
-                                       trb.geoidinst(region=RU_CONFIG[RUIDX]["region_id"], element=idx, system=SYSTEM_TYPE, connection_name=f"{PARTITION}.datareq_{RUIDX}") for idx in range(MIN_LINK, MAX_LINK)
+                                       trb.geoidinst(region=RU_CONFIG[RUIDX]["region_id"], element=idx, system=SYSTEM_TYPE, connection_name=f"{PARTITION}.data_requests_for_{RU_NAME}") for idx in range(MIN_LINK, MAX_LINK)
                                    ]),
                               ))
                     ]

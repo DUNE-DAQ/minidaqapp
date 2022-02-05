@@ -353,6 +353,7 @@ def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowd
             dqm_name = dqm_app_names[i]
             the_system.apps[dqm_name] = DQMApp(
                 RU_CONFIG = ru_configs,
+                RU_NAME=ru_name,
                 EMULATOR_MODE = emulator_mode,
                 RUN_NUMBER = run_number,
                 DATA_FILE = data_file,
