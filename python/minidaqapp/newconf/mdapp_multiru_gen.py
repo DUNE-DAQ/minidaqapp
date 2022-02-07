@@ -345,7 +345,8 @@ def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowd
                                               SYSTEM_TYPE = system_type,
                                               SOFTWARE_TPG_ENABLED = enable_software_tpg,
                                               USE_FAKE_DATA_PRODUCERS = use_fake_data_producers,
-                                              HOST=host)
+                                              HOST=host,
+                                              LATENCY_BUFFER_SIZE=latency_buffer_size)
         console.log(f"{ru_name} app: {the_system.apps[ru_name]}")
 
         if enable_dqm:
