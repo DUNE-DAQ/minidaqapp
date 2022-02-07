@@ -50,13 +50,9 @@ QUEUE_POP_WAIT_MS = 100
 
 class DataFlowApp(App):
     def __init__(self,
-                 # NW_SPECS,
                  RU_CONFIG=[],
                  HOSTIDX=0,
-                 RUN_NUMBER=333,
                  OUTPUT_PATH=".",
-                 SYSTEM_TYPE="TPC",
-                 SOFTWARE_TPG_ENABLED=False,
                  TPSET_WRITING_ENABLED=False,
                  PARTITION="UNKNOWN",
                  OPERATIONAL_ENVIRONMENT="swtest",

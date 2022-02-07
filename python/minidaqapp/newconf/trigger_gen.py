@@ -64,7 +64,6 @@ class TriggerApp(App):
                  CANDIDATE_CONFIG: int = dict(prescale=10),
 
                  TOKEN_COUNT: int = 10,
-                 SYSTEM_TYPE = 'wib',
                  TTCM_S1: int = 1,
                  TTCM_S2: int = 2,
                  TRIGGER_WINDOW_BEFORE_TICKS: int = 1000,
