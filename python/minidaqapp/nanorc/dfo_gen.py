@@ -75,9 +75,7 @@ def generate(
     mod_specs += ([
 
         ### DFO
-        mspec("dfo", "DataFlowOrchestrator", [
-            app.QueueInfo(name="trigger_decision_queue", inst="trigger_decision_q", dir="input"), 
-        ]),
+        mspec("dfo", "DataFlowOrchestrator", []),
 
     ])
 
