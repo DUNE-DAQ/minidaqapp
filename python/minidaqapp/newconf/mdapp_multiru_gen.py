@@ -436,15 +436,21 @@ def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowd
                                                                 use_nwqa=False,
                                                                 receivers=["trigger.hsievents"])
 
-    the_system.app_connections["dfo.td_to_dfo"] = AppConnection(nwmgr_connection=f"{partition_name}.td_mlt_to_dfo",
+    the_system.app_connections["trigger.td_to_dfo"] = AppConnection(nwmgr_connection=f"{partition_name}.td_mlt_to_dfo",
                                                                 topics=[],
                                                                 use_nwqa=False,
                                                                 receivers=["dfo.td_mlt_to_dfo"])
 
+    the_system.app_connections["dfo.busy_signal"] = AppConnection(nwmgr_connection=f"{partition_name}.df_busy_signal",
+                                                                  topics=[],
+                                                                  use_nwqa=False,
+                                                                  receivers=["trigger.df_busy_signal"])
+
+
     # TODO: How to do this more automatically?
     the_system.network_endpoints.append(nwmgr.Connection(name=f"{the_system.partition_name}.triginh",
                                                          topics=[],
-                                                         address=f"tcp://{{host_trigger}}:{the_system.next_unassigned_port()}"))
+                                                         address=f"tcp://{{host_dfo}}:{the_system.next_unassigned_port()}"))
                                                                             
     
     #     console.log(f"MDAapp config generated in {json_dir}")
