@@ -228,9 +228,6 @@ def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowd
         ru_channel_counts[region_id[regionidx]] += number_of_data_producers
         if len(region_id) != 1: regionidx = regionidx + 1
 
-    for nw in the_system.network_endpoints:
-        print(f'{nwmgr.Name} {nwmgr.Topic} {nwmgr.Address}')
-        
     if control_timing_hw:
         pass
         # PL: TODO
@@ -276,7 +273,6 @@ def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowd
             PARTITION=partition_name,
             HOST=host_hsi)
 
-        # the_system.apps["hsi"] = util.App(modulegraph=mgraph_hsi, host=host_hsi)
     console.log("hsi cmd data:", the_system.apps["hsi"])
 
     the_system.apps['trigger'] = TriggerApp(
@@ -288,15 +284,12 @@ def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowd
         CANDIDATE_PLUGIN = trigger_candidate_plugin,
         CANDIDATE_CONFIG = eval(trigger_candidate_config),
         TOKEN_COUNT = trigemu_token_count,
-        SYSTEM_TYPE = system_type,
         TTCM_S1=ttcm_s1,
         TTCM_S2=ttcm_s2,
         TRIGGER_WINDOW_BEFORE_TICKS = trigger_window_before_ticks,
         TRIGGER_WINDOW_AFTER_TICKS = trigger_window_after_ticks,
         PARTITION=partition_name,
         HOST=host_trigger)
-
-    # console.log("trigger cmd data:", cmd_data_trigger)
 
     #-------------------------------------------------------------------
     # Readout apps
@@ -323,11 +316,8 @@ def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowd
             for link in range(min_link, max_link):
                 the_system.network_endpoints.append(nwmgr.Connection(name=f"{partition_name}.tpsets_apa{apa_idx}_link{link}", topics=["TPSets"], address = f"tcp://{{host_{ru_app_name}}}:{the_system.next_unassigned_port()}"))
 
-    for nw in the_system.network_endpoints:
-        print(f'{nwmgr.Name} {nwmgr.Topic} {nwmgr.Address}')
         
 
-    mgraphs_readout = []
     for i,host in enumerate(host_ru):
         ru_name = ru_app_names[i]
         the_system.apps[ru_name] = ReadoutApp(PARTITION=partition_name,
@@ -337,7 +327,6 @@ def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowd
                                               DATA_FILE = data_file,
                                               FLX_INPUT = use_felix,
                                               SSP_INPUT = use_ssp,
-                                              CLOCK_SPEED_HZ = CLOCK_SPEED_HZ,
                                               RUIDX = i,
                                               RAW_RECORDING_ENABLED = enable_raw_recording,
                                               RAW_RECORDING_OUTPUT_DIR = raw_recording_output_dir,
@@ -354,7 +343,6 @@ def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowd
             the_system.apps[dqm_name] = DQMApp(
                 RU_CONFIG = ru_configs,
                 EMULATOR_MODE = emulator_mode,
-                RUN_NUMBER = run_number,
                 DATA_FILE = data_file,
                 CLOCK_SPEED_HZ = CLOCK_SPEED_HZ,
                 RUIDX = i,
@@ -377,10 +365,7 @@ def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowd
         the_system.apps[app_name] = DataFlowApp(
             RU_CONFIG = ru_configs,
             HOSTIDX = i,
-            RUN_NUMBER = run_number,
             OUTPUT_PATH = output_path,
-            SYSTEM_TYPE = system_type,
-            SOFTWARE_TPG_ENABLED = enable_software_tpg,
             TPSET_WRITING_ENABLED = enable_tpset_writing,
             PARTITION=partition_name,
             OPERATIONAL_ENVIRONMENT = op_env,

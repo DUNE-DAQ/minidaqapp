@@ -52,15 +52,12 @@ QUEUE_POP_WAIT_MS = 100
 
 class ReadoutApp(App):
     def __init__(self,
-                 # NW_SPECS,
                  RU_CONFIG=[],
                  EMULATOR_MODE=False,
                  DATA_RATE_SLOWDOWN_FACTOR=1,
-                 RUN_NUMBER=333, 
                  DATA_FILE="./frames.bin",
                  FLX_INPUT=False,
                  SSP_INPUT=True,
-                 CLOCK_SPEED_HZ=50000000,
                  RUIDX=0,
                  RAW_RECORDING_ENABLED=False,
                  RAW_RECORDING_OUTPUT_DIR=".",
@@ -72,15 +69,7 @@ class ReadoutApp(App):
                  LATENCY_BUFFER_SIZE=499968,
                  HOST="localhost"):
         """Generate the json configuration for the readout and DF process"""
-        NUMBER_OF_DATA_PRODUCERS = len(RU_CONFIG)
-        cmd_data = {}
-    
-        required_eps = {f'{PARTITION}.timesync_{RUIDX}'}
-        # if not required_eps.issubset([nw.name for nw in NW_SPECS]):
-        #     raise RuntimeError(f"ERROR: not all the required endpoints ({', '.join(required_eps)}) found in list of endpoints {' '.join([nw.name for nw in NW_SPECS])}")
-    
-        RATE_KHZ = CLOCK_SPEED_HZ / (25 * 12 * DATA_RATE_SLOWDOWN_FACTOR * 1000)
-    
+        
         MIN_LINK = RU_CONFIG[RUIDX]["start_channel"]
         MAX_LINK = MIN_LINK + RU_CONFIG[RUIDX]["channel_count"]
         
