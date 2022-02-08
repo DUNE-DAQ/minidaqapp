@@ -411,7 +411,7 @@ def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowd
                 the_system.app_connections.update(
                     {
                         f"{ru_app_name}.tpsets_ru{ruidx}_link{global_link}":
-                        AppConnection(nwmgr_connection=f"{partition_name}.tpsets_apa{region_id}_link{global_link}",
+                        AppConnection(nwmgr_connection=f"{partition_name}.tpsets_apa{apa_idx}_link{global_link}",
                                       msg_type="dunedaq::trigger::TPSet",
                                       msg_module_name="TPSetNQ",
                                       topics=["TPSets"],
