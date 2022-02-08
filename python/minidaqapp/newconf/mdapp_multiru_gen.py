@@ -6,8 +6,8 @@ import glob
 import rich.traceback
 from rich.console import Console
 from os.path import exists, join
-from appfwk.system import System
-from appfwk.conf_utils import AppConnection
+from dunedaq.appfwk.conf_utils import AppConnection
+from dunedaq.appfwk.system import System
 
 CLOCK_SPEED_HZ = 50000000
 
