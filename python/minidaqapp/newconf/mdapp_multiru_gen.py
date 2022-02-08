@@ -403,7 +403,6 @@ def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowd
         for ruidx,ru_app_name in enumerate(ru_app_names):
             ru_config = ru_configs[ruidx]
             apa_idx = ru_config['region_id']
-            print(apa_idx)
             for link in range(ru_config["channel_count"]):
                 # PL 2022-02-02: global_link is needed here to have non-overlapping app connections if len(ru)>1 with the same region_id
                 # Adding the ru number here too, in case we have many region_ids

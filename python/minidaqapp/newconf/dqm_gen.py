@@ -49,7 +49,8 @@ class DQMApp(App):
                  DQM_FOURIER_PARAMS=[600, 60, 100],
                  DQM_FOURIERSUM_PARAMS=[10, 1, 8192],
                  PARTITION="UNKNOWN",
-                 HOST="localhost"):
+                 HOST="localhost",
+                 DEBUG=False):
 
         cmd_data = {}
 
