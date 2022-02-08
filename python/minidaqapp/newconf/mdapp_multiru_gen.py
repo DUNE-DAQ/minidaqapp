@@ -218,7 +218,6 @@ def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowd
         # "tcp://{host_ru0}:12347"'
         the_system.network_endpoints.append(nwmgr.Connection(name=f"{partition_name}.timesync_{hostidx}", topics=["Timesync"], address=f"tcp://{{host_{ru_host}}}:{the_system.next_unassigned_port()}"))
         
-
         cardid = 0
         if host_ru[hostidx] in host_id_dict:
             host_id_dict[host_ru[hostidx]] = host_id_dict[host_ru[hostidx]] + 1
@@ -353,6 +352,7 @@ def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowd
             dqm_name = dqm_app_names[i]
             the_system.apps[dqm_name] = DQMApp(
                 RU_CONFIG = ru_configs,
+                RU_NAME=ru_name,
                 EMULATOR_MODE = emulator_mode,
                 RUN_NUMBER = run_number,
                 DATA_FILE = data_file,

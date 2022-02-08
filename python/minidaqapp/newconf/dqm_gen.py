@@ -35,6 +35,7 @@ QUEUE_POP_WAIT_MS = 100
 class DQMApp(App):
     def __init__(self,
                  RU_CONFIG=[],
+                 RU_NAME='',
                  EMULATOR_MODE=False,
                  RUN_NUMBER=333,
                  DATA_FILE="./frames.bin",
@@ -55,8 +56,6 @@ class DQMApp(App):
         cmd_data = {}
 
         required_eps = {f'{PARTITION}.timesync_{RUIDX}'}
-        # if not required_eps.issubset([nw.name for nw in NW_SPECS]):
-        #     raise RuntimeError(f"ERROR: not all the required endpoints ({', '.join(required_eps)}) found in list of endpoints {' '.join([nw.name for nw in NW_SPECS])}")
 
         MIN_LINK = RU_CONFIG[RUIDX]["start_channel"]
         MAX_LINK = MIN_LINK + RU_CONFIG[RUIDX]["channel_count"]
@@ -65,36 +64,26 @@ class DQMApp(App):
 
         connections = {}
 
-        connections['output'] = Connection(f'trb_dqm.fragx_dqm_{RUIDX}',
-                                           queue_name='trigger_record_q_dqm',
-                                           queue_kind='FollySPSCQueue',
+        connections['output'] = Connection(f'trb_dqm.data_fragment_input_queue',
+                                           queue_name='data_fragments_q',
+                                           queue_kind='FollyMPMCQueue',
                                            queue_capacity=1000)
 
-        # modules += [DAQModule(name='fragment_receiver_dqm',
-        #                       plugin='FragmentReceiver',
-        #                       connections=connections,
-        #                       conf=frcv.ConfParams(general_queue_timeout=QUEUE_POP_WAIT_MS,
-        #                                            connection_name=f"{PARTITION}.fragx_dqm_{RUIDX}")
-        #                       )
-        #                       ]
+        modules += [DAQModule(name='fragment_receiver_dqm',
+                              plugin='FragmentReceiver',
+                              connections=connections,
+                              conf=frcv.ConfParams(general_queue_timeout=QUEUE_POP_WAIT_MS,
+                                                   connection_name=f"{PARTITION}.fragx_dqm_{RUIDX}")
+                              )
+                              ]
 
         connections = {}
 
-        # connections['input_0'] = Connection('data_fragments_q',
-        #                                         queue_name='data_fragment_input_queue',
-        #                                         queue_kind="FollyMPMCQueue",
-        #                                         queue_capacity=1000)
-
-        # connections['input_1'] = Connection('trigger_decision_q_dqm',
-        #                                         queue_name='trigger_decision_input_queue',
-        #                                         queue_kind="FollySPSCQueue",
-        #                                         queue_capacity=100)
-
-        connections['output'] = Connection('dqmprocessor.trigger_record_q_dqm',
-                                           queue_name='trigger_record_output_queue',
+        connections['trigger_record_output_queue'] = Connection('dqmprocessor.trigger_record_dqm_processor',
+                                           queue_name='trigger_record_q_dqm',
                                            queue_kind="FollySPSCQueue",
                                            queue_capacity=100,
-                                           toposort = False)
+                                           toposort=False)
 
         modules += [DAQModule(name='trb_dqm',
                               plugin='TriggerRecordBuilder',
@@ -103,18 +92,14 @@ class DQMApp(App):
                                    general_queue_timeout=QUEUE_POP_WAIT_MS,
                                    reply_connection_name = f"{PARTITION}.fragx_dqm_{RUIDX}",
                                    map=trb.mapgeoidconnections([
-                                       trb.geoidinst(region=RU_CONFIG[RUIDX]["region_id"], element=idx, system=SYSTEM_TYPE, connection_name=f"{PARTITION}.datareq_{RUIDX}") for idx in range(MIN_LINK, MAX_LINK)
+                                       trb.geoidinst(region=RU_CONFIG[RUIDX]["region_id"], element=idx, system=SYSTEM_TYPE, connection_name=f"{PARTITION}.data_requests_for_{RU_NAME}") for idx in range(MIN_LINK, MAX_LINK)
                                    ]),
                               ))
                     ]
 
         connections = {}
-        # connections['input'] = Connection(f'trigger_record_q_dqm',
-        #                                         queue_name='trigger_record_dqm_processor',
-        #                                         queue_kind="FollySPSCQueue",
-        #                                         queue_capacity=100)
 
-        connections['output'] = Connection(f'trb_dqm.trigger_decision_dqm_processor',
+        connections['trigger_decision_input_queue'] = Connection(f'trb_dqm.trigger_decision_input_queue',
                                                 queue_name='trigger_decision_q_dqm',
                                                 queue_kind="FollySPSCQueue",
                                                 queue_capacity=100)
@@ -141,83 +126,3 @@ class DQMApp(App):
 
         super().__init__(mgraph, host=HOST)
         self.export("dqm_app.dot")
-
-
-#     # Define modules and queues
-#     queue_bare_specs =  [
-#         app.QueueSpec(inst="data_fragments_q", kind='FollyMPMCQueue', capacity=1000),
-#         app.QueueSpec(inst="trigger_decision_q_dqm", kind='FollySPSCQueue', capacity=20),
-#         app.QueueSpec(inst="trigger_record_q_dqm", kind='FollySPSCQueue', capacity=20)
-#     ]
-
-#     # Only needed to reproduce the same order as when using jsonnet
-#     queue_specs = app.QueueSpecs(sorted(queue_bare_specs, key=lambda x: x.inst))
-
-#     mod_specs = [mspec("trb_dqm", "TriggerRecordBuilder", [
-#                     app.QueueInfo(name="trigger_decision_input_queue", inst="trigger_decision_q_dqm", dir="input"),
-#                     app.QueueInfo(name="trigger_record_output_queue", inst="trigger_record_q_dqm", dir="output"),
-#                     app.QueueInfo(name="data_fragment_input_queue", inst="data_fragments_q", dir="input")
-#                 ]),
-#     ]
-#     mod_specs += [mspec("dqmprocessor", "DQMProcessor", [
-#                     app.QueueInfo(name="trigger_record_dqm_processor", inst="trigger_record_q_dqm", dir="input"),
-#                     app.QueueInfo(name="trigger_decision_dqm_processor", inst="trigger_decision_q_dqm", dir="output"),
-#                 ]),
-#     ]
-
-#     mod_specs += [
-#         mspec(f"fragment_receiver_dqm", "FragmentReceiver",
-#               [app.QueueInfo(name="output", inst="data_fragments_q", dir="output")
-#                ])]
-
-#     cmd_data['init'] = app.Init(queues=queue_specs, modules=mod_specs, nwconnections=NW_SPECS)
-
-#     conf_list = [("fragment_receiver_dqm", frcv.ConfParams(
-#                     general_queue_timeout=QUEUE_POP_WAIT_MS,
-#                     connection_name=f"{PARTITION}.fragx_dqm_{RUIDX}"))
-#             ] + [
-#                 ("trb_dqm", trb.ConfParams(
-#                         general_queue_timeout=QUEUE_POP_WAIT_MS,
-#                         reply_connection_name = f"{PARTITION}.fragx_dqm_{RUIDX}",
-#                         map=trb.mapgeoidconnections([
-#                                 trb.geoidinst(region=RU_CONFIG[RUIDX]["region_id"], element=idx, system=SYSTEM_TYPE, connection_name=f"{PARTITION}.datareq_{RUIDX}") for idx in range(MIN_LINK, MAX_LINK)
-#                             ]),
-#                         ))
-#             ] + [
-#                 ('dqmprocessor', dqmprocessor.Conf(
-#                         region=RU_CONFIG[RUIDX]["region_id"],
-#                         channel_map=DQM_CMAP, # 'HD' for horizontal drift or 'VD' for vertical drift
-#                         sdqm_hist=dqmprocessor.StandardDQM(**{'how_often' : DQM_RAWDISPLAY_PARAMS[0], 'unavailable_time' : DQM_RAWDISPLAY_PARAMS[1], 'num_frames' : DQM_RAWDISPLAY_PARAMS[2]}),
-#                         sdqm_mean_rms=dqmprocessor.StandardDQM(**{'how_often' : DQM_MEANRMS_PARAMS[0], 'unavailable_time' : DQM_MEANRMS_PARAMS[1], 'num_frames' : DQM_MEANRMS_PARAMS[2]}),
-#                         sdqm_fourier=dqmprocessor.StandardDQM(**{'how_often' : DQM_FOURIER_PARAMS[0], 'unavailable_time' : DQM_FOURIER_PARAMS[1], 'num_frames' : DQM_FOURIER_PARAMS[2]}),
-#                         kafka_address=DQM_KAFKA_ADDRESS,
-#                         link_idx=list(range(MIN_LINK, MAX_LINK)),
-#                         clock_frequency=CLOCK_SPEED_HZ,
-#                         timesync_connection_name = f"{PARTITION}.timesync_{RUIDX}",
-#                         ))
-#             ]
-
-#     cmd_data['conf'] = acmd(conf_list)
-
-#     startpars = rccmd.StartParams(run=RUN_NUMBER)
-#     cmd_data['start'] = acmd([
-#             ("fragment_receiver_dqm", startpars),
-#             ("dqmprocessor", startpars),
-#             ("trb_dqm", startpars),
-#             ])
-
-#     cmd_data['stop'] = acmd([
-#             ("trb_dqm", None), 
-#             ("dqmprocessor", None),
-#             ("fragment_receiver_dqm", None),
-#             ])
-
-#     cmd_data['pause'] = acmd([("", None)])
-
-#     cmd_data['resume'] = acmd([("", None)])
-
-#     cmd_data['scrap'] = acmd([("", None)])
-
-#     cmd_data['record'] = acmd([("", None)])
-
-#     return cmd_data
