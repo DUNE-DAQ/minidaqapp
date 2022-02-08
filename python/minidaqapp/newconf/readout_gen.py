@@ -70,7 +70,9 @@ class ReadoutApp(App):
                  USE_FAKE_DATA_PRODUCERS=False,
                  PARTITION="UNKNOWN",
                  LATENCY_BUFFER_SIZE=499968,
-                 HOST="localhost"):
+                 HOST="localhost",
+                 DEBUG=False,
+                 ):
         """Generate the json configuration for the readout and DF process"""
         NUMBER_OF_DATA_PRODUCERS = len(RU_CONFIG)
         cmd_data = {}
@@ -84,7 +86,7 @@ class ReadoutApp(App):
         MIN_LINK = RU_CONFIG[RUIDX]["start_channel"]
         MAX_LINK = MIN_LINK + RU_CONFIG[RUIDX]["channel_count"]
         
-        print(f"ReadoutApp.__init__ with RUIDX={RUIDX}, MIN_LINK={MIN_LINK}, MAX_LINK={MAX_LINK}")
+        if DEBUG: print(f"ReadoutApp.__init__ with RUIDX={RUIDX}, MIN_LINK={MIN_LINK}, MAX_LINK={MAX_LINK}")
         modules = []
 
         total_link_count = 0
@@ -310,4 +312,4 @@ class ReadoutApp(App):
                                              fragments_out = f"tp_datahandler_{idx}.fragment_queue")
 
         super().__init__(mgraph, host=HOST)
-        self.export("readout_app.dot")
+        if DEBUG: self.export("readout_app.dot")
