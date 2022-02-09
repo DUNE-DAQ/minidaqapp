@@ -69,6 +69,7 @@ class TriggerApp(App):
                  PARTITION="UNKNOWN",
 
                  HOST="localhost"
+                 DEBUG=False
                  ):
         """
         { item_description }
@@ -180,4 +181,4 @@ class TriggerApp(App):
 
 
         super().__init__(modulegraph=mgraph, host=HOST, name='TriggerApp')
-        self.export("trigger_app.dot")
+        if DEBUG: self.export("trigger_app.dot")
