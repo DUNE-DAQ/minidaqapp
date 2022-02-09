@@ -68,7 +68,7 @@ class TriggerApp(App):
                  TRIGGER_WINDOW_AFTER_TICKS: int = 1000,
                  PARTITION="UNKNOWN",
 
-                 HOST="localhost"
+                 HOST="localhost",
                  DEBUG=False
                  ):
         """
