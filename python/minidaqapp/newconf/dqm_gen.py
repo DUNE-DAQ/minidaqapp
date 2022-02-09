@@ -125,4 +125,5 @@ class DQMApp(App):
         mgraph = ModuleGraph(modules)
 
         super().__init__(mgraph, host=HOST)
-        self.export("dqm_app.dot")
+        if DEBUG:
+            self.export("dqm_app.dot")
