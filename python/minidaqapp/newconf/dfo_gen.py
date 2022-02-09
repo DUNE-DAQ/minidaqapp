@@ -52,7 +52,8 @@ class DFOApp(App):
         modules = []
     
         df_app_configs = [dfo.app_config(decision_connection=f"{PARTITION}.trigdec_{dfidx}", 
-                                         thresholds=dfo.busy_thresholds(free=1, busy=TOKEN_COUNT)) for dfidx in range(DF_COUNT)]
+                                         thresholds=dfo.busy_thresholds(free=min(1, int(TOKEN_COUNT/2),
+                                                                                 busy=TOKEN_COUNT)) for dfidx in range(DF_COUNT)]
         modules += [DAQModule(name = "dfo",
                               plugin = "DataFlowOrchestrator",
                               conf = dfo.ConfParams(token_connection = PARTITION+".triginh",
