@@ -50,6 +50,7 @@ import click
 @click.option('--host-ru', multiple=True, default=['localhost'], help="This option is repeatable, with each repetition adding an additional ru process.")
 @click.option('--host-trigger', default='localhost', help='Host to run the trigger app on')
 @click.option('--host-hsi', default='localhost', help='Host to run the HSI app on')
+@click.option('--host-tprtc', default='localhost', help='Host to run the timing partition controller app on')
 @click.option('--region-id', multiple=True, default=[0], help="Define the Region IDs for the RUs. If only specified once, will apply to all RUs.")
 @click.option('--latency-buffer-size', default=499968, help="Size of the latency buffers (in number of elements)")
 # hsi readout options
@@ -77,6 +78,13 @@ import click
 @click.option('--trigger-activity-config', default='dict(prescale=100)', help="Trigger activity algorithm config (string containing python dictionary)")
 @click.option('--trigger-candidate-plugin', default='TriggerCandidateMakerPrescalePlugin', help="Trigger candidate algorithm plugin")
 @click.option('--trigger-candidate-config', default='dict(prescale=100)', help="Trigger candidate algorithm config (string containing python dictionary)")
+# timing hw partition options
+@click.option('--control-timing-partition', is_flag=True, default=False, help='Flag to control whether we are controlling timing partition in master hardware')
+@click.option('--timing-partition-master-device-name', default="", help='Timing partition master hardware device name')
+@click.option('--timing-partition-id', default=0, help='Timing partition id')
+@click.option('--timing-partition-trigger-mask', default=0xff, help='Timing partition trigger mask')
+@click.option('--timing-partition-rate-control-enabled', default=False, help='Timing partition rate control enabled')
+@click.option('--timing-partition-spill-gate-enabled', default=False, help='Timing partition spill gate enabled')
 
 @click.option('--enable-raw-recording', is_flag=True, help="Add queues and modules necessary for the record command")
 @click.option('--raw-recording-output-dir', type=click.Path(), default='.', help="Output directory where recorded data is written to. Data for each link is written to a separate file")
@@ -100,10 +108,11 @@ import click
 @click.argument('json_dir', type=click.Path())
 
 def cli(global_partition_name, host_global, port_global, partition_name, number_of_data_producers, emulator_mode, data_rate_slowdown_factor, run_number, trigger_rate_hz, trigger_window_before_ticks, trigger_window_after_ticks,
-        token_count, data_file, output_path, disable_trace, use_felix, use_ssp, host_df, host_ru, host_trigger, host_hsi, region_id, latency_buffer_size,
+        token_count, data_file, output_path, disable_trace, use_felix, use_ssp, host_df, host_ru, host_trigger, host_hsi, host_tprtc, region_id, latency_buffer_size,
         hsi_hw_connections_file, hsi_device_name, hsi_readout_period, control_hsi_hw, hsi_endpoint_address, hsi_endpoint_partition, hsi_re_mask, hsi_fe_mask, hsi_inv_mask, hsi_source,
         use_hsi_hw, hsi_device_id, mean_hsi_signal_multiplicity, hsi_signal_emulation_mode, enabled_hsi_signals,
         ttcm_s1, ttcm_s2, trigger_activity_plugin, trigger_activity_config, trigger_candidate_plugin, trigger_candidate_config,
+        control_timing_partition, timing_partition_master_device_name, timing_partition_id, timing_partition_trigger_mask, timing_partition_rate_control_enabled, timing_partition_spill_gate_enabled,
         enable_raw_recording, raw_recording_output_dir, frontend_type, opmon_impl, enable_dqm, ers_impl, dqm_impl, pocket_url, enable_software_tpg, enable_tpset_writing, use_fake_data_producers, dqm_cmap,
         dqm_rawdisplay_params, dqm_meanrms_params, dqm_fourier_params, dqm_fouriersum_params,
         op_env, tpc_region_name_prefix, max_file_size, json_dir):
@@ -125,7 +134,9 @@ def cli(global_partition_name, host_global, port_global, partition_name, number_
     from .hsi_gen import HSIApp
     console.log("Loading fake hsi config generator")
     from .fake_hsi_gen import FakeHSIApp
-    
+    console.log("Loading timing partition controller config generator")
+    from .tprtc_gen import TPRTCApp
+
     console.log(f"Generating configs for hosts trigger={host_trigger} dataflow={host_df} readout={host_ru} hsi={host_hsi} dqm={host_ru}")
 
     the_system = System(partition_name, first_port=port_global)
@@ -197,8 +208,8 @@ def cli(global_partition_name, host_global, port_global, partition_name, number_
 
     dqm_kafka_address = "dqmbroadcast:9092" if dqm_impl == 'cern' else pocket_url + ":30092" if dqm_impl == 'pocket' else ''
 
-    if control_hsi_hw:
-        the_system.network_endpoints.append(nwmgr.Connection(name=f"{global_partition_name}.timing_cmds",  topics=[], address=f"tcp://{{host_global}}:{port_global}"))
+    if control_hsi_hw or control_timing_partition:
+        the_system.network_endpoints.append(nwmgr.Connection(name=f"{global_partition_name}.timing_cmds",  topics=[], address="tcp://{"+host_global+"}:"+f"{port_global}"))
 
     host_id_dict = {}
     ru_configs = []
@@ -272,6 +283,22 @@ def cli(global_partition_name, host_global, port_global, partition_name, number_
                                                                             receivers=[])
         # the_system.apps["hsi"] = util.App(modulegraph=mgraph_hsi, host=host_hsi)
     console.log("hsi cmd data:", the_system.apps["hsi"])
+
+    if control_timing_partition:
+        the_system.apps["tprtc"] = TPRTCApp(
+            MASTER_DEVICE_NAME=timing_partition_master_device_name,
+            TIMING_PARTITION=timing_partition_id,
+            TRIGGER_MASK=timing_partition_trigger_mask,
+            RATE_CONTROL_ENABLED=timing_partition_rate_control_enabled,
+            SPILL_GATE_ENABLED=timing_partition_spill_gate_enabled,
+            PARTITION=partition_name,
+            GLOBAL_PARTITION=global_partition_name,
+            HOST=host_tprtc)
+        the_system.app_connections[f"tprtc.timing_cmds"] = AppConnection(nwmgr_connection=f"{global_partition_name}.timing_cmds",
+                                                                            msg_type="dunedaq::timinglibs::timingcmd::TimingHwCmd",
+                                                                            msg_module_name="TimingHwCmdNQ",
+                                                                            topics=[],
+                                                                            receivers=[])
 
     the_system.apps['trigger'] = TriggerApp(
         SOFTWARE_TPG_ENABLED = enable_software_tpg,
@@ -442,6 +469,8 @@ def cli(global_partition_name, host_global, port_global, partition_name, number_
     add_network("trigger", the_system, verbose=True)
     # # console.log("After adding network, trigger mgraph:", the_system.apps['trigger'].modulegraph)
     add_network("hsi", the_system, verbose=True)
+    if control_timing_partition:
+        add_network("tprtc", the_system, verbose=True)
     for ru_app_name in ru_app_names:
         add_network(ru_app_name, the_system, verbose=True)
 
