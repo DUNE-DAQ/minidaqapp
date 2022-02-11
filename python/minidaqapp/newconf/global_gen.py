@@ -7,7 +7,7 @@ import rich.traceback
 from rich.console import Console
 from os.path import exists, join
 from appfwk.system import System
-from appfwk.conf_utils import AppConnection
+from appfwk.conf_utils import AppConnection, add_network, make_app_command_data
 
 CLOCK_SPEED_HZ = 50000000
 
@@ -33,20 +33,25 @@ import click
 @click.option('--disable-trace', is_flag=True, help="Do not enable TRACE (default TRACE_FILE is /tmp/trace_buffer_\${HOSTNAME}_\${USER})")
 @click.option('--host-thi', default='localhost', help='Host to run the (global) timing hardware interface app on')
 @click.option('--port-thi', default=12345, help='Port to host running the (global) timing hardware interface app on')
+@click.option('--host-tmc', default='localhost', help='Host to run the (global) timing master controller app on')
 @click.option('--timing-hw-connections-file', default="${TIMING_SHARE}/config/etc/connections.xml", help='Path to timing hardware connections file')
 @click.option('--opmon-impl', type=click.Choice(['json','cern','pocket'], case_sensitive=False),default='json', help="Info collector service implementation to use")
 @click.option('--ers-impl', type=click.Choice(['local','cern','pocket'], case_sensitive=False), default='local', help="ERS destination (Kafka used for cern and pocket)")
 @click.option('--pocket-url', default='127.0.0.1', help="URL for connecting to Pocket services")
 @click.option('--hsi-device-name', default="BOREAS_TLU", help='Real HSI hardware only: device name of HSI hw')
+@click.option('--master-device-name', default="BOREAS_TLU", help='Device name of timing master hw')
 @click.argument('json_dir', type=click.Path())
 
-def cli(partition_name, disable_trace, host_thi, port_thi, timing_hw_connections_file, opmon_impl, ers_impl, pocket_url, hsi_device_name, json_dir):
+def cli(partition_name, disable_trace, host_thi, port_thi, host_tmc, timing_hw_connections_file, opmon_impl, ers_impl, pocket_url, hsi_device_name, master_device_name, json_dir):
 
     if exists(json_dir):
         raise RuntimeError(f"Directory {json_dir} already exists")
 
     console.log("Loading timing hardware config generator")
     from .thi_gen import THIApp
+
+    console.log("Loading timing master controller generator")
+    from .tmc_gen import TMCApp
 
     console.log(f"Generating configs for global thi host {host_thi}")
 
@@ -95,9 +100,21 @@ def cli(partition_name, disable_trace, host_thi, port_thi, timing_hw_connections
                                                                             msg_module_name="TimingHwCmdNQ",
                                                                             topics=[],
                                                                             receivers=["thi.timing_cmds"])
-    from appfwk.conf_utils import add_network, make_app_command_data
     add_network("thi", the_system, verbose=True)
 
+    # the timing master controller application
+    the_system.app_connections[f"tmc.timing_cmds"] = AppConnection(nwmgr_connection=partition_name + ".timing_cmds",
+                                                                            msg_type="dunedaq::timinglibs::timingcmd::TimingHwCmd",
+                                                                            msg_module_name="TimingHwCmdNQ",
+                                                                            topics=[],
+                                                                            receivers=["thi.timing_cmds"])
+    the_system.apps["tmc"] = TMCApp(
+        MASTER_DEVICE_NAME=master_device_name,
+        PARTITION=partition_name,
+        HOST=host_tmc)
+    add_network("tmc", the_system, verbose=True)
+
+    
     the_system.export("global_system.dot")
 
     ####################################################################
