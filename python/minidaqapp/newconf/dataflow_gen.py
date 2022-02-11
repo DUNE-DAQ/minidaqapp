@@ -52,6 +52,7 @@ class DataFlowApp(App):
     def __init__(self,
                  RU_CONFIG=[],
                  HOSTIDX=0,
+                 DF_APP_COUNT=1,
                  RUN_NUMBER=333,
                  OUTPUT_PATH=".",
                  SYSTEM_TYPE="TPC",
@@ -67,9 +68,6 @@ class DataFlowApp(App):
         """Generate the json configuration for the readout and DF process"""
 
         modules = []
-        total_link_count = 0
-        for ru in range(len(RU_CONFIG)):
-            total_link_count += RU_CONFIG[ru]["channel_count"]
         
         modules += [DAQModule(name = 'trb',
                               plugin = 'TriggerRecordBuilder',
@@ -112,25 +110,25 @@ class DataFlowApp(App):
                                                               detector_group_name="TPC",
                                                               region_name_prefix="TP_APA",
                                                               element_name_prefix="Link")])))))]
-            
-        if TPSET_WRITING_ENABLED:
-            for idx in range(len(RU_CONFIG)):
-                modules += [DAQModule(name = f'tpset_subscriber_{idx}',
-                                   plugin = "NetworkToQueue",
-                                   connections = {'output':Connection(f"tpswriter.tpsets_from_netq")},
-                                   conf = nor.Conf(name=f'{PARTITION}.tpsets_{idx}',
-                                                   subscriptions=["TPSets"]))]
 
-            modules += [DAQModule(name = 'tpswriter',
-                               plugin = "TPSetWriter",
-                               connections = {'tpset_source': Connection("tpsets_from_netq")},
-                               conf = tpsw.ConfParams(max_file_size_bytes=1000000000))]
+        if TPSET_WRITING_ENABLED and (HOSTIDX+1) <= len(RU_CONFIG):
+            for ruidx in range(len(RU_CONFIG)):
+                dest_dfapp_idx = ruidx % DF_APP_COUNT
+                if HOSTIDX == dest_dfapp_idx:
+                    modules += [DAQModule(name = f'tpswriter_ru{ruidx}',
+                                          plugin = "TPSetWriter",
+                                          connections = {}, #'tpset_source': Connection("tpsets_from_netq")},
+                                          conf = tpsw.ConfParams(max_file_size_bytes=1000000000))]
 
         mgraph=ModuleGraph(modules)
 
         mgraph.add_endpoint("trigger_decisions", "trb.trigger_decision_input_queue", Direction.IN)
-        
+        if TPSET_WRITING_ENABLED and (HOSTIDX+1) <= len(RU_CONFIG):
+            for ruidx in range(len(RU_CONFIG)):
+                dest_dfapp_idx = ruidx % DF_APP_COUNT
+                if HOSTIDX == dest_dfapp_idx:
+                    mgraph.add_endpoint(f"tpsets_into_writer_ru{ruidx}", f"tpswriter_ru{ruidx}.tpset_source", Direction.IN)
+
         super().__init__(modulegraph=mgraph, host=HOST)
         if DEBUG:
             self.export("dataflow_app.dot")
-

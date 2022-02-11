@@ -1,4 +1,4 @@
-import json
+mport json
 import os
 import math
 import sys
@@ -378,6 +378,7 @@ def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowd
         the_system.apps[app_name] = DataFlowApp(
             RU_CONFIG = ru_configs,
             HOSTIDX = i,
+            DF_APP_COUNT = len(host_df),
             RUN_NUMBER = run_number,
             OUTPUT_PATH = output_path,
             SYSTEM_TYPE = system_type,
@@ -403,6 +404,7 @@ def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowd
         for ruidx,ru_app_name in enumerate(ru_app_names):
             ru_config = ru_configs[ruidx]
             apa_idx = ru_config['region_id']
+            dfapp_idx_for_tpsets = (ruidx % len(df_app_names))
             for link in range(ru_config["channel_count"]):
                 # PL 2022-02-02: global_link is needed here to have non-overlapping app connections if len(ru)>1 with the same region_id
                 # Adding the ru number here too, in case we have many region_ids
@@ -414,11 +416,10 @@ def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowd
                                       msg_type="dunedaq::trigger::TPSet",
                                       msg_module_name="TPSetNQ",
                                       topics=["TPSets"],
-                                      receivers=[f"trigger.tpsets_into_buffer_ru{ruidx}_link{link}",
-                                                 f"trigger.tpsets_into_chain_apa{apa_idx}"])
+                                      receivers=([f"trigger.tpsets_into_buffer_ru{ruidx}_link{link}",
+                                                  f"trigger.tpsets_into_chain_apa{apa_idx}"] +
+                                                 ([f"dataflow{dfapp_idx_for_tpsets}.tpsets_into_writer_ru{ruidx}"] if enable_tpset_writing else [])))
                     })
-
-
 
     for i,df_app_name in enumerate(df_app_names):
         the_system.app_connections[f"trigger.trigger_decisions{i}"] = AppConnection(nwmgr_connection=f"{partition_name}.trigdec_{i}",
