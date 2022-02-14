@@ -118,6 +118,8 @@ class DQMApp(App):
                                   link_idx=list(range(MIN_LINK, MAX_LINK)),
                                   clock_frequency=CLOCK_SPEED_HZ,
                                   timesync_connection_name = f"{PARTITION}.timesync_{RUIDX}",
+                                  df2dqm_connection_name=f"{PARTITION}.tr_df2dqm_{RUIDX}",
+                                  dqm2df_connection_name=f"{PARTITION}.trmon_dqm2df_{RUIDX}",
                                    )
                               )
                               ]

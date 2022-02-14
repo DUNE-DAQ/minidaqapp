@@ -76,6 +76,7 @@ class DataFlowApp(App):
                               connections = {'trigger_record_output_queue': Connection('datawriter.trigger_record_input_queue')},
                               conf = trb.ConfParams(general_queue_timeout=QUEUE_POP_WAIT_MS,
                                                     reply_connection_name = "",
+                                                    mon_connection_name=f"{PARTITION}.trmon_dqm2df_{HOSTIDX}",
                                                     map=trb.mapgeoidconnections([]))), # We patch this up in connect_fragment_producers
                     DAQModule(name = 'datawriter',
                            plugin = 'DataWriter',

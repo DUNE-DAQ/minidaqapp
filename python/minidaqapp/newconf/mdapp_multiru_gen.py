@@ -213,6 +213,7 @@ def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowd
     for hostidx,ru_host in enumerate(ru_app_names):
         if enable_dqm:
             the_system.network_endpoints.append(nwmgr.Connection(name=f"{partition_name}.fragx_dqm_{hostidx}", topics=[], address=f"tcp://{{host_{ru_host}}}:{the_system.next_unassigned_port()}"))
+            the_system.network_endpoints.append(nwmgr.Connection(name=f"{partition_name}.tr_df2dqm_{hostidx}", topics=[], address=f"tcp://{{host_{ru_host}}}:{the_system.next_unassigned_port()}"))
 
         # Should end up something like 'network_endpoints[timesync_0]:
         # "tcp://{host_ru0}:12347"'
@@ -426,6 +427,9 @@ def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowd
                                                                                     msg_module_name="TriggerDecisionNQ",
                                                                                     topics=[],
                                                                                     receivers=[f"{df_app_name}.trigger_decisions"])
+
+        # Always enabled or it won't work at conf time because the endpoint is not there
+        the_system.network_endpoints.append(nwmgr.Connection(name=f"{partition_name}.trmon_dqm2df_{i}", topics=[], address=f"tcp://{{host_{df_app_name}}}:{the_system.next_unassigned_port()}"))
     
     the_system.app_connections["hsi.hsievents"] = AppConnection(nwmgr_connection=f"{partition_name}.hsievents",
                                                                 topics=[],
