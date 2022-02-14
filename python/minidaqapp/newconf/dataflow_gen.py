@@ -52,7 +52,6 @@ class DataFlowApp(App):
     def __init__(self,
                  RU_CONFIG=[],
                  HOSTIDX=0,
-                 DF_APP_COUNT=1,
                  RUN_NUMBER=333,
                  OUTPUT_PATH=".",
                  SYSTEM_TYPE="TPC",
@@ -111,23 +110,17 @@ class DataFlowApp(App):
                                                               region_name_prefix="TP_APA",
                                                               element_name_prefix="Link")])))))]
 
-        if TPSET_WRITING_ENABLED and (HOSTIDX+1) <= len(RU_CONFIG):
-            for ruidx in range(len(RU_CONFIG)):
-                dest_dfapp_idx = ruidx % DF_APP_COUNT
-                if HOSTIDX == dest_dfapp_idx:
-                    modules += [DAQModule(name = f'tpswriter_ru{ruidx}',
-                                          plugin = "TPSetWriter",
-                                          connections = {}, #'tpset_source': Connection("tpsets_from_netq")},
-                                          conf = tpsw.ConfParams(max_file_size_bytes=1000000000))]
+        if TPSET_WRITING_ENABLED and HOSTIDX == 0:
+            modules += [DAQModule(name = 'tpswriter',
+                                  plugin = "TPSetWriter",
+                                  connections = {}, #'tpset_source': Connection("tpsets_from_netq")},
+                                  conf = tpsw.ConfParams(max_file_size_bytes=1000000000))]
 
         mgraph=ModuleGraph(modules)
 
         mgraph.add_endpoint("trigger_decisions", "trb.trigger_decision_input_queue", Direction.IN)
-        if TPSET_WRITING_ENABLED and (HOSTIDX+1) <= len(RU_CONFIG):
-            for ruidx in range(len(RU_CONFIG)):
-                dest_dfapp_idx = ruidx % DF_APP_COUNT
-                if HOSTIDX == dest_dfapp_idx:
-                    mgraph.add_endpoint(f"tpsets_into_writer_ru{ruidx}", f"tpswriter_ru{ruidx}.tpset_source", Direction.IN)
+        if TPSET_WRITING_ENABLED and HOSTIDX == 0:
+            mgraph.add_endpoint(f"tpsets_into_writer", f"tpswriter.tpset_source", Direction.IN)
 
         super().__init__(modulegraph=mgraph, host=HOST)
         if DEBUG:
