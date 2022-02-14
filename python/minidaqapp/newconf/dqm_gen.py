@@ -92,6 +92,7 @@ class DQMApp(App):
                               conf= trb.ConfParams(# This needs to be done in connect_fragment_producers
                                    general_queue_timeout=QUEUE_POP_WAIT_MS,
                                    reply_connection_name = f"{PARTITION}.fragx_dqm_{RUIDX}",
+                                   mon_connection_name=f"", # let all trb in DQM listen to the same endpoint
                                    map=trb.mapgeoidconnections([
                                        trb.geoidinst(region=RU_CONFIG[RUIDX]["region_id"], element=idx, system=SYSTEM_TYPE, connection_name=f"{PARTITION}.data_requests_for_{RU_NAME}") for idx in range(MIN_LINK, MAX_LINK)
                                    ]),
