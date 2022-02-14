@@ -213,7 +213,9 @@ def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowd
     for hostidx,ru_host in enumerate(ru_app_names):
         if enable_dqm:
             the_system.network_endpoints.append(nwmgr.Connection(name=f"{partition_name}.fragx_dqm_{hostidx}", topics=[], address=f"tcp://{{host_{ru_host}}}:{the_system.next_unassigned_port()}"))
-            the_system.network_endpoints.append(nwmgr.Connection(name=f"{partition_name}.tr_df2dqm_{hostidx}", topics=[], address=f"tcp://{{host_{ru_host}}}:{the_system.next_unassigned_port()}"))
+            # Create at most {number of df apps} endpoints
+            if hostidx < len(host_df):
+                the_system.network_endpoints.append(nwmgr.Connection(name=f"{partition_name}.tr_df2dqm_{hostidx}", topics=[], address=f"tcp://{{host_{ru_host}}}:{the_system.next_unassigned_port()}"))
 
         # Should end up something like 'network_endpoints[timesync_0]:
         # "tcp://{host_ru0}:12347"'
