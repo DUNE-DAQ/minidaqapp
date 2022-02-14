@@ -371,6 +371,7 @@ def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowd
                 DQM_FOURIERSUM_PARAMS=dqm_fouriersum_params,
                 PARTITION=partition_name,
                 HOST=host,
+                NUM_DF_APPS=len(host_df),
                 DEBUG=debug)
             if debug: console.log(f"{dqm_name} app: {the_system.apps[dqm_name]}")
 

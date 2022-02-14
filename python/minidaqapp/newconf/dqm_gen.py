@@ -51,6 +51,7 @@ class DQMApp(App):
                  DQM_FOURIERSUM_PARAMS=[10, 1, 8192],
                  PARTITION="UNKNOWN",
                  HOST="localhost",
+                 NUM_DF_APPS=1,
                  DEBUG=False):
 
         cmd_data = {}
@@ -118,8 +119,8 @@ class DQMApp(App):
                                   link_idx=list(range(MIN_LINK, MAX_LINK)),
                                   clock_frequency=CLOCK_SPEED_HZ,
                                   timesync_connection_name = f"{PARTITION}.timesync_{RUIDX}",
-                                  df2dqm_connection_name=f"{PARTITION}.tr_df2dqm_{RUIDX}",
-                                  dqm2df_connection_name=f"{PARTITION}.trmon_dqm2df_{RUIDX}",
+                                  df2dqm_connection_name=f"{PARTITION}.tr_df2dqm_{RUIDX}" if RUIDX < NUM_DF_APPS else '',
+                                  dqm2df_connection_name=f"{PARTITION}.trmon_dqm2df_{RUIDX}" if RUIDX < NUM_DF_APPS else '',
                                    )
                               )
                               ]
