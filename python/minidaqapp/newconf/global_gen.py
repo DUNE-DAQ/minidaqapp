@@ -38,8 +38,8 @@ import click
 @click.option('--opmon-impl', type=click.Choice(['json','cern','pocket'], case_sensitive=False),default='json', help="Info collector service implementation to use")
 @click.option('--ers-impl', type=click.Choice(['local','cern','pocket'], case_sensitive=False), default='local', help="ERS destination (Kafka used for cern and pocket)")
 @click.option('--pocket-url', default='127.0.0.1', help="URL for connecting to Pocket services")
-@click.option('--hsi-device-name', default="BOREAS_TLU", help='Real HSI hardware only: device name of HSI hw')
-@click.option('--master-device-name', default="BOREAS_TLU", help='Device name of timing master hw')
+@click.option('--hsi-device-name', default="", help='Real HSI hardware only: device name of HSI hw')
+@click.option('--master-device-name', default="", help='Device name of timing master hw')
 @click.argument('json_dir', type=click.Path())
 
 def cli(partition_name, disable_trace, host_thi, port_thi, host_tmc, timing_hw_connections_file, opmon_impl, ers_impl, pocket_url, hsi_device_name, master_device_name, json_dir):
@@ -91,8 +91,8 @@ def cli(partition_name, disable_trace, host_thi, port_thi, host_tmc, timing_hw_c
     # the timing hardware interface application
     the_system.apps["thi"] = THIApp(
         CONNECTIONS_FILE=timing_hw_connections_file,
+        MASTER_DEVICE_NAME=master_device_name,
         HSI_DEVICE_NAME=hsi_device_name,
-        PARTITION=partition_name,
         HOST=host_thi)
         
     the_system.app_connections[f"from_outside.timing_cmds"] = AppConnection(nwmgr_connection=partition_name + ".timing_cmds",
@@ -110,7 +110,6 @@ def cli(partition_name, disable_trace, host_thi, port_thi, host_tmc, timing_hw_c
                                                                             receivers=["thi.timing_cmds"])
     the_system.apps["tmc"] = TMCApp(
         MASTER_DEVICE_NAME=master_device_name,
-        PARTITION=partition_name,
         HOST=host_tmc)
     add_network("tmc", the_system, verbose=True)
 

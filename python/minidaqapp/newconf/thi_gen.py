@@ -52,10 +52,10 @@ class THIApp(App):
     def __init__(self,
                  GATHER_INTERVAL=1e6,
                  GATHER_INTERVAL_DEBUG=10e6,
+                 MASTER_DEVICE_NAME="",
                  HSI_DEVICE_NAME="",
                  CONNECTIONS_FILE="${TIMING_SHARE}/config/etc/connections.xml",
                  UHAL_LOG_LEVEL="notice",
-                 PARTITION="UNKNOWN",
                  HOST="localhost"):
         """
         { item_description }
@@ -67,7 +67,7 @@ class THIApp(App):
                                     conf= thi.ConfParams(connections_file=CONNECTIONS_FILE,
                                                            gather_interval=GATHER_INTERVAL,
                                                            gather_interval_debug=GATHER_INTERVAL_DEBUG,
-                                                           monitored_device_name_master="",
+                                                           monitored_device_name_master=MASTER_DEVICE_NAME,
                                                            monitored_device_names_fanout=[],
                                                            monitored_device_name_endpoint="",
                                                            monitored_device_name_hsi=HSI_DEVICE_NAME,

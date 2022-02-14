@@ -56,8 +56,6 @@ class TMCApp(App):
                  MASTER_DEVICE_NAME="",
                  MASTER_CLOCK_FILE="",
                  MASTER_CLOCK_MODE=-1,
-                 PARTITION="UNKNOWN",
-                 GLOBAL_PARTITION="UNKNOWN",
                  HOST="localhost"## CHANGE ME TO WHAT IT SHOULD BE
                  ):
         """
