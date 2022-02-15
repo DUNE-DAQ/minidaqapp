@@ -170,7 +170,7 @@ class TriggerApp(App):
                                                     dataflow_applications=df_app_configs))]
         
         mgraph = ModuleGraph(modules)
-        mgraph.add_endpoint("hsievents",  "ttcm.input", Direction.IN)
+        mgraph.add_endpoint("hsievents", None, Direction.IN)
         if SOFTWARE_TPG_ENABLED:
             for ruidx, ru_config in enumerate(RU_CONFIG):
                 # 1 zipper input per region_id

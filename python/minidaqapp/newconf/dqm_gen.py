@@ -37,6 +37,7 @@ class DQMApp(App):
                  RU_CONFIG=[],
                  RU_NAME='',
                  EMULATOR_MODE=False,
+                 DATA_RATE_SLOWDOWN_FACTOR=1,
                  RUN_NUMBER=333,
                  DATA_FILE="./frames.bin",
                  CLOCK_SPEED_HZ=50000000,
@@ -54,8 +55,6 @@ class DQMApp(App):
                  DEBUG=False):
 
         cmd_data = {}
-
-        required_eps = {f'{PARTITION}.timesync_{RUIDX}'}
 
         MIN_LINK = RU_CONFIG[RUIDX]["start_channel"]
         MAX_LINK = MIN_LINK + RU_CONFIG[RUIDX]["channel_count"]
@@ -88,11 +87,14 @@ class DQMApp(App):
         modules += [DAQModule(name='trb_dqm',
                               plugin='TriggerRecordBuilder',
                               connections=connections,
-                              conf= trb.ConfParams(# This needs to be done in connect_fragment_producers
+                              conf=trb.ConfParams(# This needs to be done in connect_fragment_producers
                                    general_queue_timeout=QUEUE_POP_WAIT_MS,
-                                   reply_connection_name = f"{PARTITION}.fragx_dqm_{RUIDX}",
+                                   reply_connection_name=f"{PARTITION}.fragx_dqm_{RUIDX}",
                                    map=trb.mapgeoidconnections([
-                                       trb.geoidinst(region=RU_CONFIG[RUIDX]["region_id"], element=idx, system=SYSTEM_TYPE, connection_name=f"{PARTITION}.data_requests_for_{RU_NAME}") for idx in range(MIN_LINK, MAX_LINK)
+                                       trb.geoidinst(region=RU_CONFIG[RUIDX]["region_id"],
+                                                     element=idx,
+                                                     system=SYSTEM_TYPE,
+                                                     connection_name=f"{PARTITION}.data_requests_for_{RU_NAME}") for idx in range(MIN_LINK, MAX_LINK)
                                    ]),
                               ))
                     ]
@@ -107,7 +109,7 @@ class DQMApp(App):
         modules += [DAQModule(name='dqmprocessor',
                               plugin='DQMProcessor',
                               connections=connections,
-                              conf= dqmprocessor.Conf(
+                              conf=dqmprocessor.Conf(
                                   region=RU_CONFIG[RUIDX]["region_id"],
                                   channel_map=DQM_CMAP, # 'HD' for horizontal drift or 'VD' for vertical drift
                                   sdqm_hist=dqmprocessor.StandardDQM(**{'how_often' : DQM_RAWDISPLAY_PARAMS[0], 'unavailable_time' : DQM_RAWDISPLAY_PARAMS[1], 'num_frames' : DQM_RAWDISPLAY_PARAMS[2]}),
@@ -117,7 +119,8 @@ class DQMApp(App):
                                   kafka_address=DQM_KAFKA_ADDRESS,
                                   link_idx=list(range(MIN_LINK, MAX_LINK)),
                                   clock_frequency=CLOCK_SPEED_HZ,
-                                  timesync_connection_name = f"{PARTITION}.timesync_{RUIDX}",
+                                  timesync_connection_name=f"{PARTITION}.timesync_{RUIDX}",
+                                  readout_window_offset=10**7 / DATA_RATE_SLOWDOWN_FACTOR, # 10^7 works fine for WIBs with no slowdown
                                    )
                               )
                               ]
