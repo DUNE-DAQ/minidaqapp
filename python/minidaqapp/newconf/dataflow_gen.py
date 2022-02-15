@@ -103,10 +103,11 @@ class DataFlowApp(App):
                                                               region_name_prefix="TP_APA",
                                                               element_name_prefix="Link")])))))]
 
+        
         mgraph=ModuleGraph(modules)
 
         mgraph.add_endpoint("trigger_decisions", "trb.trigger_decision_input_queue", Direction.IN)
-        
+
         super().__init__(modulegraph=mgraph, host=HOST)
         if DEBUG:
             self.export("dataflow_app.dot")
