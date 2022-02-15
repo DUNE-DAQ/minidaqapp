@@ -52,7 +52,8 @@ class FakeHSIApp(App):
                  SIGNAL_EMULATION_MODE: int=0,
                  ENABLED_SIGNALS: int=0b00000001,
                  PARTITION="UNKNOWN",
-                 HOST="localhost"):
+                 HOST="localhost",
+                 DEBUG=False):
         
         trigger_interval_ticks = 0
         if TRIGGER_RATE_HZ > 0:
@@ -76,6 +77,7 @@ class FakeHSIApp(App):
         mgraph.add_endpoint("time_sync", "fhsig.time_sync_source", Direction.IN)
         mgraph.add_endpoint("hsievents", "fhsig.hsievent_sink",    Direction.OUT)
         super().__init__(modulegraph=mgraph, host=HOST, name="FakeHSIApp")
-        self.export("fake_hsi_app.dot")
+        if DEBUG:
+            self.export("fake_hsi_app.dot")
         
 

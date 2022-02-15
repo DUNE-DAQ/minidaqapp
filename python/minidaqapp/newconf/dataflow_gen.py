@@ -50,7 +50,6 @@ QUEUE_POP_WAIT_MS = 100
 
 class DataFlowApp(App):
     def __init__(self,
-                 # NW_SPECS,
                  RU_CONFIG=[],
                  HOSTIDX=0,
                  RUN_NUMBER=333,
@@ -62,7 +61,8 @@ class DataFlowApp(App):
                  OPERATIONAL_ENVIRONMENT="swtest",
                  TPC_REGION_NAME_PREFIX="APA",
                  HOST="localhost",
-                 MAX_FILE_SIZE=4*1024*1024*1024):
+                 MAX_FILE_SIZE=4*1024*1024*1024,
+                 DEBUG=False):
         
         """Generate the json configuration for the readout and DF process"""
 
@@ -131,5 +131,6 @@ class DataFlowApp(App):
         mgraph.add_endpoint("trigger_decisions", "trb.trigger_decision_input_queue", Direction.IN)
         
         super().__init__(modulegraph=mgraph, host=HOST)
-        self.export("dataflow_app.dot")
+        if DEBUG:
+            self.export("dataflow_app.dot")
 

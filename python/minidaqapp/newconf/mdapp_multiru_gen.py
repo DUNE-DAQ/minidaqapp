@@ -105,6 +105,7 @@ import click
 @click.option('--op-env', default='swtest', help="Operational environment - used for raw data filename prefix and HDF5 Attribute inside the files")
 @click.option('--tpc-region-name-prefix', default='APA', help="Prefix to be used for the 'Region' Group name inside the HDF5 file")
 @click.option('--max-file-size', default=4*1024*1024*1024, help="The size threshold when raw data files are closed (in bytes)")
+@click.option('--debug', default=False, is_flag=True, help="Switch to get a lot of printout and dot files")
 @click.argument('json_dir', type=click.Path())
 
 def cli(global_partition_name, host_global, port_global, partition_name, number_of_data_producers, emulator_mode, data_rate_slowdown_factor, run_number, trigger_rate_hz, trigger_window_before_ticks, trigger_window_after_ticks,
@@ -115,7 +116,7 @@ def cli(global_partition_name, host_global, port_global, partition_name, number_
         control_timing_partition, timing_partition_master_device_name, timing_partition_id, timing_partition_trigger_mask, timing_partition_rate_control_enabled, timing_partition_spill_gate_enabled,
         enable_raw_recording, raw_recording_output_dir, frontend_type, opmon_impl, enable_dqm, ers_impl, dqm_impl, pocket_url, enable_software_tpg, enable_tpset_writing, use_fake_data_producers, dqm_cmap,
         dqm_rawdisplay_params, dqm_meanrms_params, dqm_fourier_params, dqm_fouriersum_params,
-        op_env, tpc_region_name_prefix, max_file_size, json_dir):
+        op_env, tpc_region_name_prefix, max_file_size, debug, json_dir):
 
 
     if exists(json_dir):
@@ -230,7 +231,6 @@ def cli(global_partition_name, host_global, port_global, partition_name, number_
         # "tcp://{host_ru0}:12347"'
         the_system.network_endpoints.append(nwmgr.Connection(name=f"{partition_name}.timesync_{hostidx}", topics=["Timesync"], address=f"tcp://{{host_{ru_host}}}:{the_system.next_unassigned_port()}"))
         
-
         cardid = 0
         if host_ru[hostidx] in host_id_dict:
             host_id_dict[host_ru[hostidx]] = host_id_dict[host_ru[hostidx]] + 1
@@ -241,9 +241,6 @@ def cli(global_partition_name, host_global, port_global, partition_name, number_
         ru_channel_counts[region_id[regionidx]] += number_of_data_producers
         if len(region_id) != 1: regionidx = regionidx + 1
 
-    for nw in the_system.network_endpoints:
-        print(f'{nwmgr.Name} {nwmgr.Topic} {nwmgr.Address}')
-    
     if use_hsi_hw:
         the_system.apps["hsi"] = HSIApp(
             RUN_NUMBER = run_number,
@@ -273,7 +270,8 @@ def cli(global_partition_name, host_global, port_global, partition_name, number_
             SIGNAL_EMULATION_MODE = hsi_signal_emulation_mode,
             ENABLED_SIGNALS =  enabled_hsi_signals,
             PARTITION=partition_name,
-            HOST=host_hsi)
+            HOST=host_hsi,
+            DEBUG=debug)
     
     if control_hsi_hw and use_hsi_hw:
         the_system.app_connections[f"hsi.timing_cmds"] = AppConnection(nwmgr_connection=f"{global_partition_name}.timing_cmds",
@@ -281,8 +279,9 @@ def cli(global_partition_name, host_global, port_global, partition_name, number_
                                                                             msg_module_name="TimingHwCmdNQ",
                                                                             topics=[],
                                                                             receivers=[])
+
         # the_system.apps["hsi"] = util.App(modulegraph=mgraph_hsi, host=host_hsi)
-    console.log("hsi cmd data:", the_system.apps["hsi"])
+    if debug: console.log("hsi cmd data:", the_system.apps["hsi"])
 
     if control_timing_partition:
         the_system.apps["tprtc"] = TPRTCApp(
@@ -315,7 +314,8 @@ def cli(global_partition_name, host_global, port_global, partition_name, number_
         TRIGGER_WINDOW_BEFORE_TICKS = trigger_window_before_ticks,
         TRIGGER_WINDOW_AFTER_TICKS = trigger_window_after_ticks,
         PARTITION=partition_name,
-        HOST=host_trigger)
+        HOST=host_trigger,
+        DEBUG=debug)
 
     # console.log("trigger cmd data:", cmd_data_trigger)
 
@@ -344,9 +344,7 @@ def cli(global_partition_name, host_global, port_global, partition_name, number_
             for link in range(min_link, max_link):
                 the_system.network_endpoints.append(nwmgr.Connection(name=f"{partition_name}.tpsets_apa{apa_idx}_link{link}", topics=["TPSets"], address = f"tcp://{{host_{ru_app_name}}}:{the_system.next_unassigned_port()}"))
 
-    for nw in the_system.network_endpoints:
-        print(f'{nwmgr.Name} {nwmgr.Topic} {nwmgr.Address}')
-        
+
 
     mgraphs_readout = []
     for i,host in enumerate(host_ru):
@@ -366,13 +364,16 @@ def cli(global_partition_name, host_global, port_global, partition_name, number_
                                               SYSTEM_TYPE = system_type,
                                               SOFTWARE_TPG_ENABLED = enable_software_tpg,
                                               USE_FAKE_DATA_PRODUCERS = use_fake_data_producers,
-                                              HOST=host)
-        console.log(f"{ru_name} app: {the_system.apps[ru_name]}")
+                                              HOST=host,
+                                              LATENCY_BUFFER_SIZE=latency_buffer_size,
+                                              DEBUG=debug)
+        if debug: console.log(f"{ru_name} app: {the_system.apps[ru_name]}")
 
         if enable_dqm:
             dqm_name = dqm_app_names[i]
             the_system.apps[dqm_name] = DQMApp(
                 RU_CONFIG = ru_configs,
+                RU_NAME=ru_name,
                 EMULATOR_MODE = emulator_mode,
                 RUN_NUMBER = run_number,
                 DATA_FILE = data_file,
@@ -387,8 +388,9 @@ def cli(global_partition_name, host_global, port_global, partition_name, number_
                 DQM_FOURIER_PARAMS=dqm_fourier_params,
                 DQM_FOURIERSUM_PARAMS=dqm_fouriersum_params,
                 PARTITION=partition_name,
-                HOST=host)
-            console.log(f"{dqm_name} app: {the_system.apps[dqm_name]}")
+                HOST=host,
+                DEBUG=debug)
+            if debug: console.log(f"{dqm_name} app: {the_system.apps[dqm_name]}")
 
     df_app_names = []
     for i,host in enumerate(host_df):
@@ -406,7 +408,8 @@ def cli(global_partition_name, host_global, port_global, partition_name, number_
             OPERATIONAL_ENVIRONMENT = op_env,
             TPC_REGION_NAME_PREFIX = tpc_region_name_prefix,
             MAX_FILE_SIZE = max_file_size,
-            HOST=host
+            HOST=host,
+            DEBUG=debug
         )
 
     for name,app in the_system.apps.items():
@@ -428,7 +431,7 @@ def cli(global_partition_name, host_global, port_global, partition_name, number_
                 the_system.app_connections.update(
                     {
                         f"{ru_app_name}.tpsets_ru{ruidx}_link{global_link}":
-                        AppConnection(nwmgr_connection=f"{partition_name}.tpsets_apa{region_id}_link{global_link}",
+                        AppConnection(nwmgr_connection=f"{partition_name}.tpsets_apa{apa_idx}_link{global_link}",
                                       msg_type="dunedaq::trigger::TPSet",
                                       msg_module_name="TPSetNQ",
                                       topics=["TPSets"],
@@ -457,26 +460,29 @@ def cli(global_partition_name, host_global, port_global, partition_name, number_
     
     #     console.log(f"MDAapp config generated in {json_dir}")
     from appfwk.conf_utils import connect_all_fragment_producers, add_network, make_app_command_data, set_mlt_links
-    the_system.export("system_no_frag_prod_connection.dot")
-    connect_all_fragment_producers(the_system, verbose=True)
+    if debug:
+        the_system.export("system_no_frag_prod_connection.dot")
+    connect_all_fragment_producers(the_system, verbose=debug)
     
     # console.log("After connecting fragment producers, trigger mgraph:", the_system.apps['trigger'].modulegraph)
     # console.log("After connecting fragment producers, the_system.app_connections:", the_system.app_connections)
 
-    set_mlt_links(the_system, "trigger", verbose=True)
+    set_mlt_links(the_system, "trigger", verbose=debug)
     mlt_links=the_system.apps["trigger"].modulegraph.get_module("mlt").conf.links
-    console.log(f"After set_mlt_links, mlt_links is {mlt_links}")
-    add_network("trigger", the_system, verbose=True)
+    if debug:
+        console.log(f"After set_mlt_links, mlt_links is {mlt_links}")
+    add_network("trigger", the_system, verbose=debug)
     # # console.log("After adding network, trigger mgraph:", the_system.apps['trigger'].modulegraph)
-    add_network("hsi", the_system, verbose=True)
+    add_network("hsi", the_system, verbose=debug)
     if control_timing_partition:
-        add_network("tprtc", the_system, verbose=True)
+        add_network("tprtc", the_system, verbose=debug)
     for ru_app_name in ru_app_names:
-        add_network(ru_app_name, the_system, verbose=True)
+        add_network(ru_app_name, the_system, verbose=debug)
 
     for df_app_name in df_app_names:
-        add_network(df_app_name, the_system, verbose=True)
-    the_system.export("system.dot")
+        add_network(df_app_name, the_system, verbose=debug)
+    if debug:
+        the_system.export("system.dot")
 
     ####################################################################
     # Application command data generation
@@ -484,7 +490,7 @@ def cli(global_partition_name, host_global, port_global, partition_name, number_
     
     # Arrange per-app command data into the format used by util.write_json_files()
     app_command_datas = {
-        name : make_app_command_data(the_system, app, verbose=True)
+        name : make_app_command_data(the_system, app, verbose=debug)
         for name,app in the_system.apps.items()
     }
 
