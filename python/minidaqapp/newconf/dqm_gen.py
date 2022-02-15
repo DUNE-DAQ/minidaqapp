@@ -37,6 +37,7 @@ class DQMApp(App):
                  RU_CONFIG=[],
                  RU_NAME='',
                  EMULATOR_MODE=False,
+                 DATA_RATE_SLOWDOWN_FACTOR=1,
                  RUN_NUMBER=333,
                  DATA_FILE="./frames.bin",
                  CLOCK_SPEED_HZ=50000000,
@@ -116,6 +117,7 @@ class DQMApp(App):
                                   link_idx=list(range(MIN_LINK, MAX_LINK)),
                                   clock_frequency=CLOCK_SPEED_HZ,
                                   timesync_connection_name = f"{PARTITION}.timesync_{RUIDX}",
+                                  readout_window_offset=10**7 / DATA_SLOWDOWN_RATE, # 10^7 works fine for WIBs with no slowdown
                                    )
                               )
                               ]

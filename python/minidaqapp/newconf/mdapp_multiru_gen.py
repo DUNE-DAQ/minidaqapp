@@ -354,6 +354,7 @@ def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowd
                 RU_CONFIG = ru_configs,
                 RU_NAME=ru_name,
                 EMULATOR_MODE = emulator_mode,
+                DATA_RATE_SLOWDOWN_FACTOR = data_rate_slowdown_factor,
                 RUN_NUMBER = run_number,
                 DATA_FILE = data_file,
                 CLOCK_SPEED_HZ = CLOCK_SPEED_HZ,
