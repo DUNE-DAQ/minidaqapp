@@ -48,6 +48,7 @@ import click
 @click.option('--host-trigger', default='localhost', help='Host to run the trigger app on')
 @click.option('--host-hsi', default='localhost', help='Host to run the HSI app on')
 @click.option('--host-timing-hw', default='np04-srv-012.cern.ch', help='Host to run the timing hardware interface app on')
+@click.option('--host-tpw', default='localhost', help='Host to run the TPSetWriter app on')
 @click.option('--control-timing-hw', is_flag=True, default=False, help='Flag to control whether we are controlling timing hardware')
 @click.option('--timing-hw-connections-file', default="${TIMING_SHARE}/config/etc/connections.xml", help='Real timing hardware only: path to hardware connections file')
 @click.option('--region-id', multiple=True, default=[0], help="Define the Region IDs for the RUs. If only specified once, will apply to all RUs.")
@@ -99,7 +100,7 @@ import click
 @click.argument('json_dir', type=click.Path())
 
 def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowdown_factor, run_number, trigger_rate_hz, trigger_window_before_ticks, trigger_window_after_ticks,
-        token_count, data_file, output_path, disable_trace, use_felix, use_ssp, host_df, host_ru, host_trigger, host_hsi, host_timing_hw, control_timing_hw, timing_hw_connections_file, region_id, latency_buffer_size,
+        token_count, data_file, output_path, disable_trace, use_felix, use_ssp, host_df, host_ru, host_trigger, host_hsi, host_timing_hw, host_tpw, control_timing_hw, timing_hw_connections_file, region_id, latency_buffer_size,
         hsi_device_name, hsi_readout_period, hsi_endpoint_address, hsi_endpoint_partition, hsi_re_mask, hsi_fe_mask, hsi_inv_mask, hsi_source,
         use_hsi_hw, hsi_device_id, mean_hsi_signal_multiplicity, hsi_signal_emulation_mode, enabled_hsi_signals,
         ttcm_s1, ttcm_s2, trigger_activity_plugin, trigger_activity_config, trigger_candidate_plugin, trigger_candidate_config,
@@ -126,6 +127,9 @@ def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowd
     from .fake_hsi_gen import FakeHSIApp
     console.log("Loading timing hardware config generator")
     from .thi_gen import THIApp
+    if enable_tpset_writing:
+        console.log("Loading TPSetWriter config generator")
+        from .tpsetwriter_gen import TPSetWriterApp
 
     console.log(f"Generating configs for hosts trigger={host_trigger} dataflow={host_df} readout={host_ru} hsi={host_hsi} dqm={host_ru}")
 
@@ -371,19 +375,22 @@ def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowd
                 DEBUG=debug)
             if debug: console.log(f"{dqm_name} app: {the_system.apps[dqm_name]}")
 
+    if enable_tpset_writing:
+        tpw_name=f'tpsetwriter'
+        the_system.apps[tpw_name] = TPSetWriterApp(
+            RU_CONFIG = ru_configs, 
+            TPSET_WRITING_ENABLED=enable_tpset_writing, 
+            HOST=host_tpw, 
+            DEBUG=debug)
+        if debug: console.log(f"{tpw_name} app: {the_system.apps[tpw_name]}")
+
     df_app_names = []
     for i,host in enumerate(host_df):
         app_name = f'dataflow{i}'
         df_app_names.append(app_name)
         the_system.apps[app_name] = DataFlowApp(
-            RU_CONFIG = ru_configs,
             HOSTIDX = i,
-            DF_APP_COUNT = len(host_df),
-            RUN_NUMBER = run_number,
             OUTPUT_PATH = output_path,
-            SYSTEM_TYPE = system_type,
-            SOFTWARE_TPG_ENABLED = enable_software_tpg,
-            TPSET_WRITING_ENABLED = enable_tpset_writing,
             PARTITION=partition_name,
             OPERATIONAL_ENVIRONMENT = op_env,
             TPC_REGION_NAME_PREFIX = tpc_region_name_prefix,
@@ -404,7 +411,6 @@ def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowd
         for ruidx,ru_app_name in enumerate(ru_app_names):
             ru_config = ru_configs[ruidx]
             apa_idx = ru_config['region_id']
-            dfapp_idx_for_tpsets = (ruidx % len(df_app_names))
             for link in range(ru_config["channel_count"]):
                 # PL 2022-02-02: global_link is needed here to have non-overlapping app connections if len(ru)>1 with the same region_id
                 # Adding the ru number here too, in case we have many region_ids
@@ -418,7 +424,7 @@ def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowd
                                       topics=["TPSets"],
                                       receivers=([f"trigger.tpsets_into_buffer_ru{ruidx}_link{link}",
                                                   f"trigger.tpsets_into_chain_apa{apa_idx}"] +
-                                                 ([f"dataflow{dfapp_idx_for_tpsets}.tpsets_into_writer_ru{ruidx}"] if enable_tpset_writing else [])))
+                                                 ([f"tpsetwriter.tpsets_into_writer_ru{ruidx}"] if enable_tpset_writing else [])))
                     })
 
     for i,df_app_name in enumerate(df_app_names):
@@ -454,6 +460,8 @@ def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowd
     add_network("trigger", the_system, verbose=debug)
     # # console.log("After adding network, trigger mgraph:", the_system.apps['trigger'].modulegraph)
     add_network("hsi", the_system, verbose=debug)
+    if enable_tpset_writing:
+        add_network("tpsetwriter", the_system, verbose=debug)
     for ru_app_name in ru_app_names:
         add_network(ru_app_name, the_system, verbose=debug)
 
