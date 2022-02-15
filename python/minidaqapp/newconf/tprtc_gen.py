@@ -60,8 +60,8 @@ class TPRTCApp(App):
                  SPILL_GATE_ENABLED=False,
                  PARTITION="UNKNOWN",
                  GLOBAL_PARTITION="UNKNOWN",
-                 HOST="localhost"## CHANGE ME TO WHAT IT SHOULD BE
-                 ):
+                 HOST="localhost",
+                 DEBUG=False):
         """
         { item_description }
         """            
@@ -82,4 +82,5 @@ class TPRTCApp(App):
         mgraph.add_endpoint("timing_cmds", "tprtc.hardware_commands_out", Direction.OUT)
         
         super().__init__(modulegraph=mgraph, host=HOST, name="TPRTCApp")
-        self.export("tprtc_app.dot")
+        if DEBUG:
+            self.export("tprtc_app.dot")

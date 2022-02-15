@@ -71,8 +71,8 @@ class HSIApp(App):
                  UHAL_LOG_LEVEL="notice",
                  PARTITION="UNKNOWN",
                  GLOBAL_PARTITION="UNKNOWN",
-                 HOST="localhost"## CHANGE ME TO WHAT IT SHOULD BE
-                 ):
+                 HOST="localhost",
+                 DEBUG=False):
         """
         { item_description }
         """            
@@ -118,4 +118,5 @@ class HSIApp(App):
         
         mgraph.add_endpoint("hsievents", "hsir.hsievent_sink",     Direction.OUT)
         super().__init__(modulegraph=mgraph, host=HOST, name="HSIApp")
-        self.export("hsi_app.dot")
+        if DEBUG:
+            self.export("hsi_app.dot")

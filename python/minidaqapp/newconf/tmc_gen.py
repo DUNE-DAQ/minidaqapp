@@ -56,8 +56,8 @@ class TMCApp(App):
                  MASTER_DEVICE_NAME="",
                  MASTER_CLOCK_FILE="",
                  MASTER_CLOCK_MODE=-1,
-                 HOST="localhost"## CHANGE ME TO WHAT IT SHOULD BE
-                 ):
+                 HOST="localhost",
+                 DEBUG=False):
         """
         { item_description }
         """            
@@ -77,4 +77,5 @@ class TMCApp(App):
         mgraph.add_endpoint("timing_cmds", "tmc.hardware_commands_out", Direction.OUT)
         
         super().__init__(modulegraph=mgraph, host=HOST, name="TMCApp")
-        self.export("tmc_app.dot")
+        if DEBUG:
+            self.export("tmc_app.dot")

@@ -56,7 +56,8 @@ class THIApp(App):
                  HSI_DEVICE_NAME="",
                  CONNECTIONS_FILE="${TIMING_SHARE}/config/etc/connections.xml",
                  UHAL_LOG_LEVEL="notice",
-                 HOST="localhost"):
+                 HOST="localhost",
+                 DEBUG=False):
         """
         { item_description }
         """
@@ -78,4 +79,5 @@ class THIApp(App):
         mgraph = ModuleGraph(modules)
         mgraph.add_endpoint("timing_cmds", "thi.timing_cmds_queue", Direction.IN)
         super().__init__(modulegraph=mgraph, host=HOST, name="THIApp")
-        self.export("thi_app.dot")
+        if DEBUG:
+            self.export("thi_app.dot")

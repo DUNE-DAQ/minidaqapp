@@ -258,7 +258,8 @@ def cli(global_partition_name, host_global, port_global, partition_name, number_
             HSI_SOURCE=hsi_source,
             PARTITION=partition_name,
             GLOBAL_PARTITION=global_partition_name,
-            HOST=host_hsi)
+            HOST=host_hsi,
+            DEBUG=debug)
     else:
         the_system.apps["hsi"] = FakeHSIApp(
             RUN_NUMBER = run_number,
@@ -292,7 +293,8 @@ def cli(global_partition_name, host_global, port_global, partition_name, number_
             SPILL_GATE_ENABLED=timing_partition_spill_gate_enabled,
             PARTITION=partition_name,
             GLOBAL_PARTITION=global_partition_name,
-            HOST=host_tprtc)
+            HOST=host_tprtc,
+            DEBUG=debug)
         the_system.app_connections[f"tprtc.timing_cmds"] = AppConnection(nwmgr_connection=f"{global_partition_name}.timing_cmds",
                                                                             msg_type="dunedaq::timinglibs::timingcmd::TimingHwCmd",
                                                                             msg_module_name="TimingHwCmdNQ",
