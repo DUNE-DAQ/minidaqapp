@@ -120,7 +120,7 @@ class DQMApp(App):
                                   link_idx=list(range(MIN_LINK, MAX_LINK)),
                                   clock_frequency=CLOCK_SPEED_HZ,
                                   timesync_connection_name=f"{PARTITION}.timesync_{RUIDX}",
-                                  readout_window_offset=10**7 / DATA_SLOWDOWN_RATE, # 10^7 works fine for WIBs with no slowdown
+                                  readout_window_offset=10**7 / DATA_RATE_SLOWDOWN_FACTOR, # 10^7 works fine for WIBs with no slowdown
                                    )
                               )
                               ]
