@@ -168,7 +168,7 @@ class ReadoutApp(App):
                                           readoutmodelconf= rconf.ReadoutModelConf(
                                               source_queue_timeout_ms= QUEUE_POP_WAIT_MS,
                                               # fake_trigger_flag=0, # default
-                            region_id = RU_CONFIG[RUIDX]["region_id"],
+                                              region_id = RU_CONFIG[RUIDX]["region_id"],
                                               element_id = idx,
                                               timesync_connection_name = f"{PARTITION}.timesync_{RUIDX}",
                                               timesync_topic_name = "Timesync",
@@ -294,8 +294,13 @@ class ReadoutApp(App):
         mgraph = ModuleGraph(modules)
 
         for idx in range(MIN_LINK, MAX_LINK):
-            # TODO: Should we just have one timesync outgoing endpoint?
-            mgraph.add_endpoint(f"timesync_{idx}", f"datahandler_{idx}.timesync",    Direction.OUT)
+            # P. Rodrigues 2022-02-15 We don't make endpoints for the
+            # timesync connection because they are handled by some
+            # special-case magic in NetworkManager, which holds a map
+            # of topics to connections, and looks up all the
+            # connections for a given topic.
+            #
+            # mgraph.add_endpoint(f"timesync_{idx}", f"datahandler_{idx}.timesync",    Direction.OUT)
             if SOFTWARE_TPG_ENABLED:
                 mgraph.add_endpoint(f"tpsets_ru{RUIDX}_link{idx}", f"datahandler_{idx}.tpset_out",    Direction.OUT)
                 mgraph.add_endpoint(f"timesync_{idx+RU_CONFIG[RUIDX]['channel_count']}", f"tp_datahandler_{idx}.timesync",    Direction.OUT)
