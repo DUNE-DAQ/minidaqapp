@@ -55,8 +55,6 @@ class DQMApp(App):
 
         cmd_data = {}
 
-        required_eps = {f'{PARTITION}.timesync_{RUIDX}'}
-
         MIN_LINK = RU_CONFIG[RUIDX]["start_channel"]
         MAX_LINK = MIN_LINK + RU_CONFIG[RUIDX]["channel_count"]
 
