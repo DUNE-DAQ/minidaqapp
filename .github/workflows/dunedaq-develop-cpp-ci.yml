@@ -53,7 +53,7 @@ jobs:
     - name: setup dev area
       run: |
           source /cvmfs/dunedaq.opensciencegrid.org/tools/dbt/latest/env.sh
-          dbt-create.sh -c -n ${{ matrix.link }} dev-${{ matrix.os_name }}
+          dbt-create.sh -n ${{ matrix.link }} dev-${{ matrix.os_name }}
           
     - name: checkout package for CI
       uses: actions/checkout@v2
