@@ -11,6 +11,7 @@
 # in this directory, no modules from the readout package are used: the
 # fragments are provided by the FakeDataProd module from dfmodules
 
+import math
 from rich.console import Console
 console = Console()
 
@@ -49,12 +50,11 @@ import dunedaq.networkmanager.nwmgr as nwmgr
 from appfwk.utils import acmd, mcmd, mrccmd, mspec
 from appfwk.app import App, ModuleGraph
 from appfwk.daqmodule import DAQModule
-from appfwk.conf_utils import Direction
+from appfwk.conf_utils import Direction, Connection
 
 #===============================================================================
 class HSIApp(App):
     def __init__(self,
-                 NW_SPECS: list,
                  RUN_NUMBER = 333,
                  CLOCK_SPEED_HZ: int = 50000000,
                  TRIGGER_RATE_HZ: int = 1,
@@ -70,42 +70,53 @@ class HSIApp(App):
                  HSI_DEVICE_NAME="BOREAS_TLU",
                  UHAL_LOG_LEVEL="notice",
                  PARTITION="UNKNOWN",
-                 HOST="localhost"## CHANGE ME TO WHAT IT SHOULD BE
-                 ):
+                 GLOBAL_PARTITION="UNKNOWN",
+                 HOST="localhost",
+                 DEBUG=False):
         """
         { item_description }
-        """
-    
-        required_eps = {PARTITION+'.hsievent'}
-        if CONTROL_HSI_HARDWARE:
-            required_eps.add('hsicmds')
-    
-        if not required_eps.issubset([nw.name for nw in NW_SPECS]):
-            raise RuntimeError(f"ERROR: not all the required endpoints ({', '.join(required_eps)}) found in list of endpoints {' '.join([nw.name for nw in NW_SPECS])}")
-    
-        
-        hsi_controller_init_data = hsic.InitParams(qinfos=app.QueueInfos([app.QueueInfo(name="hardware_commands_out", inst="hw_cmds_q_to_net", dir="output")]),
-                                                   device=HSI_DEVICE_NAME,
-                                                   )
+        """            
         modules = {}
 
         ## TODO all the connections...
-        modules["hsir"] = Module(plugin = "HSIReadout",
-                                 conf = hsi.ConfParams(connections_file=CONNECTIONS_FILE,
-                                                       readout_period=READOUT_PERIOD_US,
-                                                       hsi_device_name=HSI_DEVICE_NAME,
-                                                       uhal_log_level=UHAL_LOG_LEVEL,
-                                                       hsievent_connection_name = f"{PARTITION}.hsievent"))
+        modules = [DAQModule(name = "hsir",
+                            plugin = "HSIReadout",
+                            conf = hsi.ConfParams(connections_file=CONNECTIONS_FILE,
+                                                readout_period=READOUT_PERIOD_US,
+                                                hsi_device_name=HSI_DEVICE_NAME,
+                                                uhal_log_level=UHAL_LOG_LEVEL,
+                                                hsievent_connection_name = f"{PARTITION}.hsievents"))]
         
+        trigger_interval_ticks=0
+        if TRIGGER_RATE_HZ > 0:
+            trigger_interval_ticks=math.floor((1/TRIGGER_RATE_HZ) * CLOCK_SPEED_HZ)
+        elif CONTROL_HSI_HARDWARE:
+            console.log('WARNING! Emulated trigger rate of 0 will not disable signal emulation in real HSI hardware! To disable emulated HSI triggers, use  option: "--hsi-source 0" or mask all signal bits', style="bold red")
+        
+        startpars = rccmd.StartParams(run=RUN_NUMBER, trigger_interval_ticks = trigger_interval_ticks)
+        resumepars = rccmd.ResumeParams(trigger_interval_ticks = trigger_interval_ticks)
+
         if CONTROL_HSI_HARDWARE:
-            modules["hsic"] = Module(plugin = "HSIController",
-                                     conf = hsic.ConfParams(clock_frequency=CLOCK_SPEED_HZ,
+            modules.extend( [
+                            DAQModule(name="hsic",
+                                    plugin = "HSIController",
+                                    conf = hsic.ConfParams( device=HSI_DEVICE_NAME,
+                                                            clock_frequency=CLOCK_SPEED_HZ,
                                                             trigger_interval_ticks=trigger_interval_ticks,
                                                             address=HSI_ENDPOINT_ADDRESS,
                                                             partition=HSI_ENDPOINT_PARTITION,
                                                             rising_edge_mask=HSI_RE_MASK,
                                                             falling_edge_mask=HSI_FE_MASK,
                                                             invert_edge_mask=HSI_INV_MASK,
-                                                            data_source=HSI_SOURCE))
+                                                            data_source=HSI_SOURCE)),
+                            ] )
+        
         mgraph = ModuleGraph(modules)
-        super().__init__(modulegraph=mgraph, host=HOST)
+        
+        if CONTROL_HSI_HARDWARE:
+            mgraph.add_endpoint("timing_cmds", "hsic.hardware_commands_out", Direction.OUT)
+        
+        mgraph.add_endpoint("hsievents", "hsir.hsievent_sink",     Direction.OUT)
+        super().__init__(modulegraph=mgraph, host=HOST, name="HSIApp")
+        if DEBUG:
+            self.export("hsi_app.dot")

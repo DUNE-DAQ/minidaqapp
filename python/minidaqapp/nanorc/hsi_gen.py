@@ -93,30 +93,20 @@ def generate(
     # Only needed to reproduce the same order as when using jsonnet
     queue_specs = app.QueueSpecs(sorted(queue_bare_specs, key=lambda x: x.inst))
 
-    hsi_controller_init_data = hsic.InitParams(
-                                                  qinfos=app.QueueInfos([app.QueueInfo(name="hardware_commands_out", inst="hw_cmds_q_to_net", dir="output")]),
-                                                  device=HSI_DEVICE_NAME,
-                                                 )
     mod_specs = [
-        mspec("hsir", "HSIReadout", []),
-        ]
+                    mspec("hsir", "HSIReadout", []),
+                ]
     
     if CONTROL_HSI_HARDWARE:
-        hsi_controller_init_data = hsic.InitParams(
-                                                  qinfos=app.QueueInfos([app.QueueInfo(name="hardware_commands_out", inst="hw_cmds_q_to_net", dir="output")]),
-                                                  device=HSI_DEVICE_NAME,
-                                                 )
         mod_specs.extend ( [
-            mspec("qton_hw_cmds", "QueueToNetwork", [
-                        app.QueueInfo(name="input", inst="hw_cmds_q_to_net", dir="input")
-                    ]),
-            app.ModSpec(inst="hsic", plugin="HSIController", data=hsi_controller_init_data)
-        ])
+                                mspec("qton_hw_cmds", "QueueToNetwork", [ app.QueueInfo(name="input", inst="hw_cmds_q_to_net", dir="input") ]),
+                                mspec("hsic", "HSIController", [ app.QueueInfo(name="hardware_commands_out", inst="hw_cmds_q_to_net", dir="output") ])
+                            ])
 
     cmd_data['init'] = app.Init(queues=queue_specs, modules=mod_specs, nwconnections=NW_SPECS)
     
     conf_cmds = [
-                        ("hsir", hsi.ConfParams(
+                    ("hsir", hsi.ConfParams(
                         connections_file=CONNECTIONS_FILE,
                         readout_period=READOUT_PERIOD_US,
                         hsi_device_name=HSI_DEVICE_NAME,
@@ -139,6 +129,7 @@ def generate(
                                                                   stype="msgpack")
                                            )),
             ("hsic", hsic.ConfParams(
+                                device=HSI_DEVICE_NAME,
                                 clock_frequency=CLOCK_SPEED_HZ,
                                 trigger_interval_ticks=trigger_interval_ticks,
                                 address=HSI_ENDPOINT_ADDRESS,

@@ -29,6 +29,9 @@ import dunedaq.networkmanager.nwmgr as nwmgr
 import click
 
 @click.command(context_settings=CONTEXT_SETTINGS)
+@click.option('-g', '--global-partition-name', default="global", help="Name of the global partition to use, for ERS and OPMON and timing commands")
+@click.option('--host-global', default='np04-srv-012.cern.ch', help='Host to run the (global) timing hardware interface app on')
+@click.option('--port-global', default=12345, help='Port to host running the (global) timing hardware interface app on')
 @click.option('-p', '--partition-name', default="${USER}_test", help="Name of the partition to use, for ERS and OPMON")
 @click.option('-n', '--number-of-data-producers', default=2, help="Number of links to use for each readout application")
 @click.option('-e', '--emulator-mode', is_flag=True, help="If active, timestamps of data frames are overwritten when processed by the readout. This is necessary if the felix card does not set correct timestamps.")
@@ -48,18 +51,18 @@ import click
 @click.option('--host-ru', multiple=True, default=['localhost'], help="This option is repeatable, with each repetition adding an additional ru process.")
 @click.option('--host-trigger', default='localhost', help='Host to run the trigger app on')
 @click.option('--host-hsi', default='localhost', help='Host to run the HSI app on')
-@click.option('--host-timing-hw', default='np04-srv-012.cern.ch', help='Host to run the timing hardware interface app on')
-@click.option('--control-timing-hw', is_flag=True, default=False, help='Flag to control whether we are controlling timing hardware')
-@click.option('--timing-hw-connections-file', default="${TIMING_SHARE}/config/etc/connections.xml", help='Real timing hardware only: path to hardware connections file')
+@click.option('--host-tprtc', default='localhost', help='Host to run the timing partition controller app on')
 @click.option('--region-id', multiple=True, default=[0], help="Define the Region IDs for the RUs. If only specified once, will apply to all RUs.")
 @click.option('--latency-buffer-size', default=499968, help="Size of the latency buffers (in number of elements)")
 # hsi readout options
-@click.option('--hsi-device-name', default="BOREAS_TLU", help='Real HSI hardware only: device name of HSI hw')
+@click.option('--hsi-hw-connections-file', default="${TIMING_SHARE}/config/etc/connections.xml", help='Real timing hardware only: path to hardware connections file')
+@click.option('--hsi-device-name', default="", help='Real HSI hardware only: device name of HSI hw')
 @click.option('--hsi-readout-period', default=1e3, help='Real HSI hardware only: Period between HSI hardware polling [us]')
 # hw hsi options
+@click.option('--control-hsi-hw', is_flag=True, default=False, help='Flag to control whether we are controlling hsi hardware')
 @click.option('--hsi-endpoint-address', default=1, help='Timing address of HSI endpoint')
 @click.option('--hsi-endpoint-partition', default=0, help='Timing partition of HSI endpoint')
-@click.option('--hsi-re-mask', default=0x20000, help='Rising-edge trigger mask')
+@click.option('--hsi-re-mask', default=0x0, help='Rising-edge trigger mask')
 @click.option('--hsi-fe-mask', default=0x0, help='Falling-edge trigger mask')
 @click.option('--hsi-inv-mask', default=0x0, help='Invert-edge mask')
 @click.option('--hsi-source', default=0x1, help='HSI signal source; 0 - hardware, 1 - emulation (trigger timestamp bits)')
@@ -76,6 +79,13 @@ import click
 @click.option('--trigger-activity-config', default='dict(prescale=100)', help="Trigger activity algorithm config (string containing python dictionary)")
 @click.option('--trigger-candidate-plugin', default='TriggerCandidateMakerPrescalePlugin', help="Trigger candidate algorithm plugin")
 @click.option('--trigger-candidate-config', default='dict(prescale=100)', help="Trigger candidate algorithm config (string containing python dictionary)")
+# timing hw partition options
+@click.option('--control-timing-partition', is_flag=True, default=False, help='Flag to control whether we are controlling timing partition in master hardware')
+@click.option('--timing-partition-master-device-name', default="", help='Timing partition master hardware device name')
+@click.option('--timing-partition-id', default=0, help='Timing partition id')
+@click.option('--timing-partition-trigger-mask', default=0xff, help='Timing partition trigger mask')
+@click.option('--timing-partition-rate-control-enabled', default=False, help='Timing partition rate control enabled')
+@click.option('--timing-partition-spill-gate-enabled', default=False, help='Timing partition spill gate enabled')
 
 @click.option('--enable-raw-recording', is_flag=True, help="Add queues and modules necessary for the record command")
 @click.option('--raw-recording-output-dir', type=click.Path(), default='.', help="Output directory where recorded data is written to. Data for each link is written to a separate file")
@@ -99,11 +109,12 @@ import click
 @click.option('--debug', default=False, is_flag=True, help="Switch to get a lot of printout and dot files")
 @click.argument('json_dir', type=click.Path())
 
-def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowdown_factor, run_number, trigger_rate_hz, trigger_window_before_ticks, trigger_window_after_ticks,
-        token_count, data_file, output_path, disable_trace, use_felix, use_ssp, host_df, host_dfo, host_ru, host_trigger, host_hsi, host_timing_hw, control_timing_hw, timing_hw_connections_file, region_id, latency_buffer_size,
-        hsi_device_name, hsi_readout_period, hsi_endpoint_address, hsi_endpoint_partition, hsi_re_mask, hsi_fe_mask, hsi_inv_mask, hsi_source,
+def cli(global_partition_name, host_global, port_global, partition_name, number_of_data_producers, emulator_mode, data_rate_slowdown_factor, run_number, trigger_rate_hz, trigger_window_before_ticks, trigger_window_after_ticks,
+        token_count, data_file, output_path, disable_trace, use_felix, use_ssp, host_df, host_dfo, host_ru, host_trigger, host_hsi, host_tprtc,  host_timing_hw, control_timing_hw, timing_hw_connections_file, region_id, latency_buffer_size,
+        hsi_hw_connections_file, hsi_device_name, hsi_readout_period, control_hsi_hw, hsi_endpoint_address, hsi_endpoint_partition, hsi_re_mask, hsi_fe_mask, hsi_inv_mask, hsi_source,
         use_hsi_hw, hsi_device_id, mean_hsi_signal_multiplicity, hsi_signal_emulation_mode, enabled_hsi_signals,
         ttcm_s1, ttcm_s2, trigger_activity_plugin, trigger_activity_config, trigger_candidate_plugin, trigger_candidate_config,
+        control_timing_partition, timing_partition_master_device_name, timing_partition_id, timing_partition_trigger_mask, timing_partition_rate_control_enabled, timing_partition_spill_gate_enabled,
         enable_raw_recording, raw_recording_output_dir, frontend_type, opmon_impl, enable_dqm, ers_impl, dqm_impl, pocket_url, enable_software_tpg, enable_tpset_writing, use_fake_data_producers, dqm_cmap,
         dqm_rawdisplay_params, dqm_meanrms_params, dqm_fourier_params, dqm_fouriersum_params,
         op_env, tpc_region_name_prefix, max_file_size, debug, json_dir):
@@ -124,15 +135,15 @@ def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowd
     console.log("Loading DFO config generator")
     from .dfo_gen import DFOApp
     console.log("Loading hsi config generator")
-    from . import hsi_gen
+    from .hsi_gen import HSIApp
     console.log("Loading fake hsi config generator")
     from .fake_hsi_gen import FakeHSIApp
-    console.log("Loading timing hardware config generator")
-    from .thi_gen import THIApp
+    console.log("Loading timing partition controller config generator")
+    from .tprtc_gen import TPRTCApp
 
     console.log(f"Generating configs for hosts trigger={host_trigger} DFO={host_dfo} dataflow={host_df} readout={host_ru} hsi={host_hsi} dqm={host_ru}")
 
-    the_system = System(partition_name)
+    the_system = System(partition_name, first_port=port_global)
    
     total_number_of_data_producers = 0
 
@@ -201,8 +212,8 @@ def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowd
 
     dqm_kafka_address = "dqmbroadcast:9092" if dqm_impl == 'cern' else pocket_url + ":30092" if dqm_impl == 'pocket' else ''
 
-    if control_timing_hw:
-        the_system.network_endpoints.append(nwmgr.Connection(name=partition_name + ".hsicmds",  topics=[], address="tcp://{host_timing_hw}:" + f"{the_system.next_unassigned_port()}"))
+    if control_hsi_hw or control_timing_partition:
+        the_system.network_endpoints.append(nwmgr.Connection(name=f"{global_partition_name}.timing_cmds",  topics=[], address="tcp://{"+host_global+"}:"+f"{port_global}"))
 
     host_id_dict = {}
     ru_configs = []
@@ -216,6 +227,8 @@ def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowd
     for hostidx,ru_host in enumerate(ru_app_names):
         if enable_dqm:
             the_system.network_endpoints.append(nwmgr.Connection(name=f"{partition_name}.fragx_dqm_{hostidx}", topics=[], address=f"tcp://{{host_{ru_host}}}:{the_system.next_unassigned_port()}"))
+
+        the_system.network_endpoints.append(nwmgr.Connection(name=f"{partition_name}.datareq_{hostidx}", topics=[], address=f"tcp://{{host_{ru_host}}}:{the_system.next_unassigned_port()}"))
 
         # Should end up something like 'network_endpoints[timesync_0]:
         # "tcp://{host_ru0}:12347"'
@@ -231,39 +244,25 @@ def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowd
         ru_channel_counts[region_id[regionidx]] += number_of_data_producers
         if len(region_id) != 1: regionidx = regionidx + 1
 
-        
-    if control_timing_hw:
-        pass
-        # PL: TODO
-        # timing_cmd_network_endpoints = set()
-        # if use_hsi_hw:
-        #     timing_cmd_network_endpoints.add(partition_name + 'hsicmds')
-        # cmd_data_thi = thi_gen.generate(RUN_NUMBER = run_number,
-        #     NW_SPECS=nw_specs,
-        #     TIMING_CMD_NETWORK_ENDPOINTS=timing_cmd_network_endpoints,
-        #     CONNECTIONS_FILE=timing_hw_connections_file,
-        #     HSI_DEVICE_NAME=hsi_device_name,
-        # )
-        #if debug: console.log("thi cmd data:", cmd_data_thi)
-
     if use_hsi_hw:
-        pass
-        # PL: TODO
-        # cmd_data_hsi = hsi_gen.generate(nw_specs,
-        #     RUN_NUMBER = run_number,
-        #     CLOCK_SPEED_HZ = CLOCK_SPEED_HZ,
-        #     TRIGGER_RATE_HZ = trigger_rate_hz,
-        #     CONTROL_HSI_HARDWARE=control_timing_hw,
-        #     CONNECTIONS_FILE=timing_hw_connections_file,
-        #     READOUT_PERIOD_US = hsi_readout_period,
-        #     HSI_DEVICE_NAME = hsi_device_name,
-        #     HSI_ENDPOINT_ADDRESS = hsi_endpoint_address,
-        #     HSI_ENDPOINT_PARTITION = hsi_endpoint_partition,
-        #     HSI_RE_MASK=hsi_re_mask,
-        #     HSI_FE_MASK=hsi_fe_mask,
-        #     HSI_INV_MASK=hsi_inv_mask,
-        #     HSI_SOURCE=hsi_source,
-        #     PARTITION=partition_name)
+        the_system.apps["hsi"] = HSIApp(
+            RUN_NUMBER = run_number,
+            CLOCK_SPEED_HZ = CLOCK_SPEED_HZ,
+            TRIGGER_RATE_HZ = trigger_rate_hz,
+            CONTROL_HSI_HARDWARE=control_hsi_hw,
+            CONNECTIONS_FILE=hsi_hw_connections_file,
+            READOUT_PERIOD_US = hsi_readout_period,
+            HSI_DEVICE_NAME = hsi_device_name,
+            HSI_ENDPOINT_ADDRESS = hsi_endpoint_address,
+            HSI_ENDPOINT_PARTITION = hsi_endpoint_partition,
+            HSI_RE_MASK=hsi_re_mask,
+            HSI_FE_MASK=hsi_fe_mask,
+            HSI_INV_MASK=hsi_inv_mask,
+            HSI_SOURCE=hsi_source,
+            PARTITION=partition_name,
+            GLOBAL_PARTITION=global_partition_name,
+            HOST=host_hsi,
+            DEBUG=debug)
     else:
         the_system.apps["hsi"] = FakeHSIApp(
             RUN_NUMBER = run_number,
@@ -277,9 +276,33 @@ def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowd
             PARTITION=partition_name,
             HOST=host_hsi,
             DEBUG=debug)
+    
+    if control_hsi_hw and use_hsi_hw:
+        the_system.app_connections[f"hsi.timing_cmds"] = AppConnection(nwmgr_connection=f"{global_partition_name}.timing_cmds",
+                                                                            msg_type="dunedaq::timinglibs::timingcmd::TimingHwCmd",
+                                                                            msg_module_name="TimingHwCmdNQ",
+                                                                            topics=[],
+                                                                            receivers=[])
 
         # the_system.apps["hsi"] = util.App(modulegraph=mgraph_hsi, host=host_hsi)
     if debug: console.log("hsi cmd data:", the_system.apps["hsi"])
+
+    if control_timing_partition:
+        the_system.apps["tprtc"] = TPRTCApp(
+            MASTER_DEVICE_NAME=timing_partition_master_device_name,
+            TIMING_PARTITION=timing_partition_id,
+            TRIGGER_MASK=timing_partition_trigger_mask,
+            RATE_CONTROL_ENABLED=timing_partition_rate_control_enabled,
+            SPILL_GATE_ENABLED=timing_partition_spill_gate_enabled,
+            PARTITION=partition_name,
+            GLOBAL_PARTITION=global_partition_name,
+            HOST=host_tprtc,
+            DEBUG=debug)
+        the_system.app_connections[f"tprtc.timing_cmds"] = AppConnection(nwmgr_connection=f"{global_partition_name}.timing_cmds",
+                                                                            msg_type="dunedaq::timinglibs::timingcmd::TimingHwCmd",
+                                                                            msg_module_name="TimingHwCmdNQ",
+                                                                            topics=[],
+                                                                            receivers=[])
 
     the_system.apps['trigger'] = TriggerApp(
         SOFTWARE_TPG_ENABLED = enable_software_tpg,
@@ -361,6 +384,7 @@ def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowd
                 RU_CONFIG = ru_configs,
                 RU_NAME=ru_name,
                 EMULATOR_MODE = emulator_mode,
+                DATA_RATE_SLOWDOWN_FACTOR = data_rate_slowdown_factor,
                 RUN_NUMBER = run_number,
                 DATA_FILE = data_file,
                 CLOCK_SPEED_HZ = CLOCK_SPEED_HZ,
@@ -447,9 +471,7 @@ def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowd
     the_system.app_connections["dfo.busy_signal"] = AppConnection(nwmgr_connection=f"{partition_name}.df_busy_signal",
                                                                   topics=[],
                                                                   use_nwqa=False,
-                                                                  receivers=["trigger.df_busy_signal"])
-
-
+ 
     # TODO: How to do this more automatically?
     the_system.network_endpoints.append(nwmgr.Connection(name=f"{the_system.partition_name}.triginh",
                                                          topics=[],
@@ -474,6 +496,8 @@ def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowd
 
     # # console.log("After adding network, trigger mgraph:", the_system.apps['trigger'].modulegraph)
     add_network("hsi", the_system, verbose=debug)
+    if control_timing_partition:
+        add_network("tprtc", the_system, verbose=debug)
     for ru_app_name in ru_app_names:
         add_network(ru_app_name, the_system, verbose=debug)
 
@@ -485,27 +509,12 @@ def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowd
     ####################################################################
     # Application command data generation
     ####################################################################
-
-    # if control_timing_hw:
-    #     timing_cmd_network_endpoints=set()
-    #     if use_hsi_hw:
-    #         timing_cmd_network_endpoints.add('hsicmds')
-    #     cmd_data_thi = thi_gen.generate(
-    #         RUN_NUMBER = run_number,
-    #         NETWORK_ENDPOINTS=network_endpoints,
-    #         TIMING_CMD_NETWORK_ENDPOINTS=timing_cmd_network_endpoints,
-    #         HSI_DEVICE_NAME=hsi_device_name,
-    #     )
-    #     console.log("thi cmd data:", cmd_data_thi)
     
     # Arrange per-app command data into the format used by util.write_json_files()
     app_command_datas = {
         name : make_app_command_data(the_system, app, verbose=debug)
         for name,app in the_system.apps.items()
     }
-
-    if control_timing_hw:
-        app_command_datas["thi"] = cmd_data_thi
 
     ##################################################################################
 
@@ -518,7 +527,7 @@ def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowd
 
     system_command_datas['boot'] = boot
 
-    write_json_files(app_command_datas, system_command_datas, json_dir)
+    write_json_files(app_command_datas, system_command_datas, json_dir, verbose=debug)
 
     console.log(f"MDAapp config generated in {json_dir}")
 

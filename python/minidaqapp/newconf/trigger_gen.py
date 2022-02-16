@@ -162,7 +162,7 @@ class TriggerApp(App):
                                                   dfo_busy_connection=f"{PARTITION}.df_busy_signal"))]
 
         mgraph = ModuleGraph(modules)
-        mgraph.add_endpoint("hsievents",  "ttcm.input", Direction.IN)
+        mgraph.add_endpoint("hsievents", None, Direction.IN)
         mgraph.add_endpoint("td_to_dfo",  "mlt.input", Direction.OUT)
         if SOFTWARE_TPG_ENABLED:
             for ruidx, ru_config in enumerate(RU_CONFIG):

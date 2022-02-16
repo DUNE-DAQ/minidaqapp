@@ -43,7 +43,6 @@ import math
 #===============================================================================
 class FakeHSIApp(App):
     def __init__(self,
-                 # NW_SPECS: list,
                  RUN_NUMBER=333,
                  CLOCK_SPEED_HZ: int=50000000,
                  DATA_RATE_SLOWDOWN_FACTOR: int=1,
@@ -57,10 +56,6 @@ class FakeHSIApp(App):
                  DEBUG=False):
         
         trigger_interval_ticks = 0
-        required_eps = {PARTITION + '.hsievent'}
-        # if not required_eps.issubset([nw.name for nw in NW_SPECS]):
-        #     raise RuntimeError(f"ERROR: not all the required endpoints ({', '.join(required_eps)}) found in list of endpoints {' '.join([nw.name for nw in NW_SPECS])}")
-
         if TRIGGER_RATE_HZ > 0:
             trigger_interval_ticks = math.floor((1 / TRIGGER_RATE_HZ) * CLOCK_SPEED_HZ / DATA_RATE_SLOWDOWN_FACTOR)
 
@@ -74,13 +69,20 @@ class FakeHSIApp(App):
                                                   mean_signal_multiplicity=MEAN_SIGNAL_MULTIPLICITY,
                                                   signal_emulation_mode=SIGNAL_EMULATION_MODE,
                                                   enabled_signals=ENABLED_SIGNALS,
-                                                  hsievent_connection_name=PARTITION+".hsievents"),
+                                                  hsievent_connection_name=PARTITION+".hsievents",
+                                                  timesync_topic="Timesync"),
                              extra_commands = {"start": startpars,
                                                "resume": resumepars})]
     
         mgraph = ModuleGraph(modules)
-        mgraph.add_endpoint("time_sync", "fhsig.time_sync_source", Direction.IN)
-        mgraph.add_endpoint("hsievents", "fhsig.hsievent_sink",    Direction.OUT)
+        # P. Rodrigues 2022-02-15 We don't make endpoints for the
+        # timesync connection because they are handled by some
+        # special-case magic in NetworkManager, which holds a map
+        # of topics to connections, and looks up all the
+        # connections for a given topic.
+        #
+        # mgraph.add_endpoint("time_sync", None, Direction.IN)
+        mgraph.add_endpoint("hsievents", None, Direction.OUT)
         super().__init__(modulegraph=mgraph, host=HOST, name="FakeHSIApp")
         if DEBUG:
             self.export("fake_hsi_app.dot")

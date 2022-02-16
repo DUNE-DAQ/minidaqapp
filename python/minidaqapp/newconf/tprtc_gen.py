@@ -2,15 +2,18 @@
 
 # This python configuration produces *two* json configuration files
 # that together form a MiniDAQApp with the same functionality as
-# MiniDAQApp v1, but in two processes.  One process contains the
+# MiniDAQApp v1, but in two processes. One process contains the
 # TriggerDecisionEmulator, while the other process contains everything
-# else.  The network communication is done with the QueueToNetwork and
+# else. The network communication is done with the QueueToNetwork and
 # NetworkToQueue modules from the nwqueueadapters package.
 #
 # As with testapp_noreadout_confgen.py
 # in this directory, no modules from the readout package are used: the
 # fragments are provided by the FakeDataProd module from dfmodules
 
+import math
+from rich.console import Console
+console = Console()
 
 # Set moo schema search path
 from dunedaq.env import get_moo_model_path
@@ -23,7 +26,7 @@ moo.otypes.load_types('rcif/cmd.jsonnet')
 moo.otypes.load_types('appfwk/cmd.jsonnet')
 moo.otypes.load_types('appfwk/app.jsonnet')
 
-moo.otypes.load_types('timinglibs/timinghardwaremanagerpdi.jsonnet')
+moo.otypes.load_types('timinglibs/timingpartitioncontroller.jsonnet')
 moo.otypes.load_types('nwqueueadapters/queuetonetwork.jsonnet')
 moo.otypes.load_types('nwqueueadapters/networktoqueue.jsonnet')
 moo.otypes.load_types('nwqueueadapters/networkobjectreceiver.jsonnet')
@@ -31,11 +34,11 @@ moo.otypes.load_types('nwqueueadapters/networkobjectsender.jsonnet')
 moo.otypes.load_types('networkmanager/nwmgr.jsonnet')
 
 # Import new types
-import dunedaq.cmdlib.cmd as basecmd # AddressedCmd,
-import dunedaq.rcif.cmd as rccmd # AddressedCmd,
-import dunedaq.appfwk.cmd as cmd # AddressedCmd,
+import dunedaq.cmdlib.cmd as basecmd # AddressedCmd, 
+import dunedaq.rcif.cmd as rccmd # AddressedCmd, 
+import dunedaq.appfwk.cmd as cmd # AddressedCmd, 
 import dunedaq.appfwk.app as app # AddressedCmd,
-import dunedaq.timinglibs.timinghardwaremanagerpdi as thi
+import dunedaq.timinglibs.timingpartitioncontroller as tprtc
 import dunedaq.nwqueueadapters.networktoqueue as ntoq
 import dunedaq.nwqueueadapters.queuetonetwork as qton
 import dunedaq.nwqueueadapters.networkobjectreceiver as nor
@@ -48,36 +51,36 @@ from appfwk.daqmodule import DAQModule
 from appfwk.conf_utils import Direction, Connection
 
 #===============================================================================
-class THIApp(App):
+class TPRTCApp(App):
     def __init__(self,
-                 GATHER_INTERVAL=1e6,
-                 GATHER_INTERVAL_DEBUG=10e6,
                  MASTER_DEVICE_NAME="",
-                 HSI_DEVICE_NAME="",
-                 CONNECTIONS_FILE="${TIMING_SHARE}/config/etc/connections.xml",
-                 UHAL_LOG_LEVEL="notice",
+                 TIMING_PARTITION=0,
+                 TRIGGER_MASK=0xff,
+                 RATE_CONTROL_ENABLED=True,
+                 SPILL_GATE_ENABLED=False,
+                 PARTITION="UNKNOWN",
+                 GLOBAL_PARTITION="UNKNOWN",
                  HOST="localhost",
                  DEBUG=False):
         """
         { item_description }
-        """
+        """            
         modules = {}
-        modules = [ 
-                    DAQModule( name="thi",
-                                    plugin="TimingHardwareManagerPDI",
-                                    conf= thi.ConfParams(connections_file=CONNECTIONS_FILE,
-                                                           gather_interval=GATHER_INTERVAL,
-                                                           gather_interval_debug=GATHER_INTERVAL_DEBUG,
-                                                           monitored_device_name_master=MASTER_DEVICE_NAME,
-                                                           monitored_device_names_fanout=[],
-                                                           monitored_device_name_endpoint="",
-                                                           monitored_device_name_hsi=HSI_DEVICE_NAME,
-                                                           uhal_log_level=UHAL_LOG_LEVEL)),
-                    ]                
-            
+
+        modules = [DAQModule(name = "tprtc",
+                            plugin = "TimingPartitionController",
+                            conf = tprtc.PartitionConfParams(
+                                                device=MASTER_DEVICE_NAME,
+                                                partition_id=TIMING_PARTITION,
+                                                trigger_mask=TRIGGER_MASK,
+                                                spill_gate_enabled=SPILL_GATE_ENABLED,
+                                                rate_control_enabled=RATE_CONTROL_ENABLED,
+                                                ))]
 
         mgraph = ModuleGraph(modules)
-        mgraph.add_endpoint("timing_cmds", "thi.timing_cmds_queue", Direction.IN)
-        super().__init__(modulegraph=mgraph, host=HOST, name="THIApp")
+        
+        mgraph.add_endpoint("timing_cmds", "tprtc.hardware_commands_out", Direction.OUT)
+        
+        super().__init__(modulegraph=mgraph, host=HOST, name="TPRTCApp")
         if DEBUG:
-            self.export("thi_app.dot")
+            self.export("tprtc_app.dot")
