@@ -110,7 +110,7 @@ import click
 @click.argument('json_dir', type=click.Path())
 
 def cli(global_partition_name, host_global, port_global, partition_name, number_of_data_producers, emulator_mode, data_rate_slowdown_factor, run_number, trigger_rate_hz, trigger_window_before_ticks, trigger_window_after_ticks,
-        token_count, data_file, output_path, disable_trace, use_felix, use_ssp, host_df, host_dfo, host_ru, host_trigger, host_hsi, host_tprtc,  host_timing_hw, control_timing_hw, timing_hw_connections_file, region_id, latency_buffer_size,
+        token_count, data_file, output_path, disable_trace, use_felix, use_ssp, host_df, host_dfo, host_ru, host_trigger, host_hsi, host_tprtc, region_id, latency_buffer_size,
         hsi_hw_connections_file, hsi_device_name, hsi_readout_period, control_hsi_hw, hsi_endpoint_address, hsi_endpoint_partition, hsi_re_mask, hsi_fe_mask, hsi_inv_mask, hsi_source,
         use_hsi_hw, hsi_device_id, mean_hsi_signal_multiplicity, hsi_signal_emulation_mode, enabled_hsi_signals,
         ttcm_s1, ttcm_s2, trigger_activity_plugin, trigger_activity_config, trigger_candidate_plugin, trigger_candidate_config,
@@ -471,6 +471,7 @@ def cli(global_partition_name, host_global, port_global, partition_name, number_
     the_system.app_connections["dfo.busy_signal"] = AppConnection(nwmgr_connection=f"{partition_name}.df_busy_signal",
                                                                   topics=[],
                                                                   use_nwqa=False,
+                                                                  receivers=["trigger.df_busy_signal"])
  
     # TODO: How to do this more automatically?
     the_system.network_endpoints.append(nwmgr.Connection(name=f"{the_system.partition_name}.triginh",
