@@ -48,7 +48,7 @@ import click
 @click.option('--host-trigger', default='localhost', help='Host to run the trigger app on')
 @click.option('--host-hsi', default='localhost', help='Host to run the HSI app on')
 @click.option('--host-timing-hw', default='np04-srv-012.cern.ch', help='Host to run the timing hardware interface app on')
-@click.option('--host-tpw', default='localhost', help='Host to run the TPSetWriter app on')
+@click.option('--host-tpw', default='localhost', help='Host to run the TPWriter app on')
 @click.option('--control-timing-hw', is_flag=True, default=False, help='Flag to control whether we are controlling timing hardware')
 @click.option('--timing-hw-connections-file', default="${TIMING_SHARE}/config/etc/connections.xml", help='Real timing hardware only: path to hardware connections file')
 @click.option('--region-id', multiple=True, default=[0], help="Define the Region IDs for the RUs. If only specified once, will apply to all RUs.")
@@ -86,7 +86,7 @@ import click
 @click.option('--dqm-impl', type=click.Choice(['local','cern','pocket'], case_sensitive=False), default='local', help="DQM destination (Kafka used for cern and pocket)")
 @click.option('--pocket-url', default='127.0.0.1', help="URL for connecting to Pocket services")
 @click.option('--enable-software-tpg', is_flag=True, default=False, help="Enable software TPG")
-@click.option('--enable-tpset-writing', is_flag=True, default=False, help="Enable the writing of TPSets to disk (only works with --enable-software-tpg")
+@click.option('--enable-tpset-writing', is_flag=True, default=False, help="Enable the writing of TPs to disk (only works with --enable-software-tpg")
 @click.option('--use-fake-data-producers', is_flag=True, default=False, help="Use fake data producers that respond with empty fragments immediately instead of (fake) cards and DLHs")
 @click.option('--dqm-cmap', type=click.Choice(['HD', 'VD']), default='HD', help="Which channel map to use for DQM")
 @click.option('--dqm-rawdisplay-params', nargs=3, default=[60, 10, 50], help="Parameters that control the data sent for the raw display plot")
@@ -128,8 +128,8 @@ def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowd
     console.log("Loading timing hardware config generator")
     from .thi_gen import THIApp
     if enable_tpset_writing:
-        console.log("Loading TPSetWriter config generator")
-        from .tpsetwriter_gen import TPSetWriterApp
+        console.log("Loading TPWriter config generator")
+        from .tpwriter_gen import TPWriterApp
 
     console.log(f"Generating configs for hosts trigger={host_trigger} dataflow={host_df} readout={host_ru} hsi={host_hsi} dqm={host_ru}")
 
@@ -154,7 +154,7 @@ def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowd
         raise Exception("DQM can't be used with fake data producers")
 
     if enable_tpset_writing and not enable_software_tpg:
-        raise Exception("TPSet writing can only be used when software TPG is enabled")
+        raise Exception("TP writing can only be used when software TPG is enabled")
 
     if token_count > 0:
         trigemu_token_count = token_count
@@ -377,10 +377,9 @@ def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowd
             if debug: console.log(f"{dqm_name} app: {the_system.apps[dqm_name]}")
 
     if enable_tpset_writing:
-        tpw_name=f'tpsetwriter'
-        the_system.apps[tpw_name] = TPSetWriterApp(
+        tpw_name=f'tpwriter'
+        the_system.apps[tpw_name] = TPWriterApp(
             RU_CONFIG = ru_configs, 
-            TPSET_WRITING_ENABLED=enable_tpset_writing, 
             HOST=host_tpw, 
             DEBUG=debug)
         if debug: console.log(f"{tpw_name} app: {the_system.apps[tpw_name]}")
@@ -425,7 +424,7 @@ def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowd
                                       topics=["TPSets"],
                                       receivers=([f"trigger.tpsets_into_buffer_ru{ruidx}_link{link}",
                                                   f"trigger.tpsets_into_chain_apa{apa_idx}"] +
-                                                 ([f"tpsetwriter.tpsets_into_writer_ru{ruidx}"] if enable_tpset_writing else [])))
+                                                 (["tpwriter.tpsets_into_writer"] if enable_tpset_writing else [])))
                     })
 
     for i,df_app_name in enumerate(df_app_names):
@@ -464,7 +463,7 @@ def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowd
     # # console.log("After adding network, trigger mgraph:", the_system.apps['trigger'].modulegraph)
     add_network("hsi", the_system, verbose=debug)
     if enable_tpset_writing:
-        add_network("tpsetwriter", the_system, verbose=debug)
+        add_network("tpwriter", the_system, verbose=debug)
     for ru_app_name in ru_app_names:
         add_network(ru_app_name, the_system, verbose=debug)
 

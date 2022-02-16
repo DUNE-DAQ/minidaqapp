@@ -22,10 +22,9 @@ from appfwk.conf_utils import Direction
 # Time to wait on pop()
 QUEUE_POP_WAIT_MS = 100
 
-class TPSetWriterApp(App):
+class TPWriterApp(App):
     def __init__(self,
                  RU_CONFIG=[],
-                 TPSET_WRITING_ENABLED=False,
                  HOST="localhost",
                  DEBUG=False):
         
@@ -33,19 +32,15 @@ class TPSetWriterApp(App):
 
         modules = []
         
-        if TPSET_WRITING_ENABLED:
-            for ruidx in range(len(RU_CONFIG)):
-                    modules += [DAQModule(name = f'tpswriter_ru{ruidx}',
-                                          plugin = "TPSetWriter",
-                                          connections = {}, #'tpset_source': Connection("tpsets_from_netq")},
-                                          conf = tpsw.ConfParams(max_file_size_bytes=1000000000))]
+        modules += [DAQModule(name = 'tpswriter',
+                              plugin = "TPSetWriter",
+                              connections = {}, #'tpset_source': Connection("tpsets_from_netq")},
+                              conf = tpsw.ConfParams(max_file_size_bytes=1000000000))]
 
         mgraph=ModuleGraph(modules)
 
-        if TPSET_WRITING_ENABLED:
-            for ruidx in range(len(RU_CONFIG)):
-                    mgraph.add_endpoint(f"tpsets_into_writer_ru{ruidx}", f"tpswriter_ru{ruidx}.tpset_source", Direction.IN)
+        mgraph.add_endpoint("tpsets_into_writer", "tpswriter.tpset_source", Direction.IN)
 
         super().__init__(modulegraph=mgraph, host=HOST)
         if DEBUG:
-            self.export("tpsetwriter_app.dot")
+            self.export("tpwriter_app.dot")
