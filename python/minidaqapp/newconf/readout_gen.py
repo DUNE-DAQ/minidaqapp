@@ -145,7 +145,7 @@ class ReadoutApp(App):
             if USE_FAKE_DATA_PRODUCERS:
                 modules += [DAQModule(name = f"fakedataprod_{idx}",
                                    plugin='FakeDataProd',
-                                   connections={'input': Connection(f'data_request_{idx}')})]
+                                   connections={})]
             else:
                 connections = {}
                 # connections['raw_input']      = Connection(f"{FRONTEND_TYPE}_link_{idx}", Direction.IN)
@@ -305,10 +305,24 @@ class ReadoutApp(App):
                 mgraph.add_endpoint(f"tpsets_ru{RUIDX}_link{idx}", f"datahandler_{idx}.tpset_out",    Direction.OUT)
                 mgraph.add_endpoint(f"timesync_{idx+RU_CONFIG[RUIDX]['channel_count']}", f"tp_datahandler_{idx}.timesync",    Direction.OUT)
 
-            # Add fragment producers for raw data
-            mgraph.add_fragment_producer(region = RU_CONFIG[RUIDX]["region_id"], element = idx, system = SYSTEM_TYPE,
-                                         requests_in   = f"datahandler_{idx}.data_requests_0",
-                                         fragments_out = f"datahandler_{idx}.fragment_queue")
+            if USE_FAKE_DATA_PRODUCERS:
+                # TODO: At time of writing (2022-02-16),
+                # FakeDataProducer doesn't follow the same pattern as
+                # DataLinkHandler and the fragment producers in
+                # trigger. Specifically, it pushes its fragments
+                # directly to the network, while the other fragment
+                # producers push to a queue. So the following won't
+                # actually work, because there's no
+                # fakedataprod.fragment_queue. This should be fixed in
+                # FakeDataProducer
+                mgraph.add_fragment_producer(region = RU_CONFIG[RUIDX]["region_id"], element = idx, system = SYSTEM_TYPE,
+                                             requests_in   = f"fakedataprod_{idx}.data_request_input_queue",
+                                             fragments_out = f"fakedataprod_{idx}.fragment_queue")
+            else:
+                # Add fragment producers for raw data
+                mgraph.add_fragment_producer(region = RU_CONFIG[RUIDX]["region_id"], element = idx, system = SYSTEM_TYPE,
+                                             requests_in   = f"datahandler_{idx}.data_requests_0",
+                                             fragments_out = f"datahandler_{idx}.fragment_queue")
 
             # Add fragment producers for TPC TPs. Make sure the element index doesn't overlap with the ones for raw data
             if SOFTWARE_TPG_ENABLED:
