@@ -13,7 +13,6 @@ moo.otypes.load_types('appfwk/app.jsonnet')
 moo.otypes.load_types('dfmodules/triggerrecordbuilder.jsonnet')
 moo.otypes.load_types('dfmodules/datawriter.jsonnet')
 moo.otypes.load_types('dfmodules/hdf5datastore.jsonnet')
-moo.otypes.load_types('dfmodules/tpsetwriter.jsonnet')
 moo.otypes.load_types('dfmodules/fragmentreceiver.jsonnet')
 moo.otypes.load_types('dfmodules/triggerdecisionreceiver.jsonnet')
 moo.otypes.load_types('nwqueueadapters/queuetonetwork.jsonnet')
@@ -31,7 +30,6 @@ import dunedaq.appfwk.app as app # AddressedCmd,
 import dunedaq.dfmodules.triggerrecordbuilder as trb
 import dunedaq.dfmodules.datawriter as dw
 import dunedaq.dfmodules.hdf5datastore as hdf5ds
-import dunedaq.dfmodules.tpsetwriter as tpsw
 import dunedaq.dfmodules.fragmentreceiver as frcv
 import dunedaq.dfmodules.triggerdecisionreceiver as tdrcv
 import dunedaq.nwqueueadapters.networktoqueue as ntoq
@@ -50,13 +48,8 @@ QUEUE_POP_WAIT_MS = 100
 
 class DataFlowApp(App):
     def __init__(self,
-                 RU_CONFIG=[],
                  HOSTIDX=0,
-                 RUN_NUMBER=333,
                  OUTPUT_PATH=".",
-                 SYSTEM_TYPE="TPC",
-                 SOFTWARE_TPG_ENABLED=False,
-                 TPSET_WRITING_ENABLED=False,
                  PARTITION="UNKNOWN",
                  OPERATIONAL_ENVIRONMENT="swtest",
                  TPC_REGION_NAME_PREFIX="APA",
@@ -110,17 +103,10 @@ class DataFlowApp(App):
                                                               region_name_prefix="TP_APA",
                                                               element_name_prefix="Link")])))))]
 
-        if TPSET_WRITING_ENABLED and HOSTIDX == 0:
-            modules += [DAQModule(name = 'tpswriter',
-                                  plugin = "TPSetWriter",
-                                  connections = {}, #'tpset_source': Connection("tpsets_from_netq")},
-                                  conf = tpsw.ConfParams(max_file_size_bytes=1000000000))]
-
+        
         mgraph=ModuleGraph(modules)
 
         mgraph.add_endpoint("trigger_decisions", "trb.trigger_decision_input_queue", Direction.IN)
-        if TPSET_WRITING_ENABLED and HOSTIDX == 0:
-            mgraph.add_endpoint(f"tpsets_into_writer", f"tpswriter.tpset_source", Direction.IN)
 
         super().__init__(modulegraph=mgraph, host=HOST)
         if DEBUG:
