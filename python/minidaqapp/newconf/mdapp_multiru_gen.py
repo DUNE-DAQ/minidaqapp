@@ -47,6 +47,7 @@ import click
 @click.option('-f', '--use-felix', is_flag=True, help="Use real felix cards instead of fake ones")
 @click.option('--use-ssp', is_flag=True, help="Use real SSPs instead of fake sources")
 @click.option('--host-df', multiple=True, default=['localhost'], help="This option is repeatable, with each repetition adding another dataflow app.")
+@click.option('--host-dfo', default='localhost', help="Sets the host for the DFO app")
 @click.option('--host-ru', multiple=True, default=['localhost'], help="This option is repeatable, with each repetition adding an additional ru process.")
 @click.option('--host-trigger', default='localhost', help='Host to run the trigger app on')
 @click.option('--host-hsi', default='localhost', help='Host to run the HSI app on')
@@ -109,7 +110,7 @@ import click
 @click.argument('json_dir', type=click.Path())
 
 def cli(global_partition_name, host_global, port_global, partition_name, number_of_data_producers, emulator_mode, data_rate_slowdown_factor, run_number, trigger_rate_hz, trigger_window_before_ticks, trigger_window_after_ticks,
-        token_count, data_file, output_path, disable_trace, use_felix, use_ssp, host_df, host_ru, host_trigger, host_hsi, host_tprtc, region_id, latency_buffer_size,
+        token_count, data_file, output_path, disable_trace, use_felix, use_ssp, host_df, host_dfo, host_ru, host_trigger, host_hsi, host_tprtc, region_id, latency_buffer_size,
         hsi_hw_connections_file, hsi_device_name, hsi_readout_period, control_hsi_hw, hsi_endpoint_address, hsi_endpoint_partition, hsi_re_mask, hsi_fe_mask, hsi_inv_mask, hsi_source,
         use_hsi_hw, hsi_device_id, mean_hsi_signal_multiplicity, hsi_signal_emulation_mode, enabled_hsi_signals,
         ttcm_s1, ttcm_s2, trigger_activity_plugin, trigger_activity_config, trigger_candidate_plugin, trigger_candidate_config,
@@ -131,6 +132,8 @@ def cli(global_partition_name, host_global, port_global, partition_name, number_
     from .readout_gen import ReadoutApp
     console.log("Loading trigger config generator")
     from .trigger_gen import TriggerApp
+    console.log("Loading DFO config generator")
+    from .dfo_gen import DFOApp
     console.log("Loading hsi config generator")
     from .hsi_gen import HSIApp
     console.log("Loading fake hsi config generator")
@@ -138,7 +141,7 @@ def cli(global_partition_name, host_global, port_global, partition_name, number_
     console.log("Loading timing partition controller config generator")
     from .tprtc_gen import TPRTCApp
 
-    console.log(f"Generating configs for hosts trigger={host_trigger} dataflow={host_df} readout={host_ru} hsi={host_hsi} dqm={host_ru}")
+    console.log(f"Generating configs for hosts trigger={host_trigger} DFO={host_dfo} dataflow={host_df} readout={host_ru} hsi={host_hsi} dqm={host_ru}")
 
     the_system = System(partition_name, first_port=port_global)
    
@@ -304,17 +307,22 @@ def cli(global_partition_name, host_global, port_global, partition_name, number_
     the_system.apps['trigger'] = TriggerApp(
         SOFTWARE_TPG_ENABLED = enable_software_tpg,
         RU_CONFIG = ru_configs,
-        DF_COUNT = len(host_df),
         ACTIVITY_PLUGIN = trigger_activity_plugin,
         ACTIVITY_CONFIG = eval(trigger_activity_config),
         CANDIDATE_PLUGIN = trigger_candidate_plugin,
         CANDIDATE_CONFIG = eval(trigger_candidate_config),
-        TOKEN_COUNT = trigemu_token_count,
         SYSTEM_TYPE = system_type,
         TTCM_S1=ttcm_s1,
         TTCM_S2=ttcm_s2,
         TRIGGER_WINDOW_BEFORE_TICKS = trigger_window_before_ticks,
         TRIGGER_WINDOW_AFTER_TICKS = trigger_window_after_ticks,
+        PARTITION=partition_name,
+        HOST=host_trigger,
+        DEBUG=debug)
+
+    the_system.apps['dfo'] = DFOApp(
+        DF_COUNT = len(host_df),
+        TOKEN_COUNT = trigemu_token_count,
         PARTITION=partition_name,
         HOST=host_trigger,
         DEBUG=debug)
@@ -445,7 +453,7 @@ def cli(global_partition_name, host_global, port_global, partition_name, number_
 
 
     for i,df_app_name in enumerate(df_app_names):
-        the_system.app_connections[f"trigger.trigger_decisions{i}"] = AppConnection(nwmgr_connection=f"{partition_name}.trigdec_{i}",
+        the_system.app_connections[f"dfo.trigger_decisions{i}"] = AppConnection(nwmgr_connection=f"{partition_name}.trigdec_{i}",
                                                                                     msg_type="dunedaq::dfmessages::TriggerDecision",
                                                                                     msg_module_name="TriggerDecisionNQ",
                                                                                     topics=[],
@@ -456,11 +464,20 @@ def cli(global_partition_name, host_global, port_global, partition_name, number_
                                                                 use_nwqa=False,
                                                                 receivers=["trigger.hsievents"])
 
+    the_system.app_connections["trigger.td_to_dfo"] = AppConnection(nwmgr_connection=f"{partition_name}.td_mlt_to_dfo",
+                                                                topics=[],
+                                                                use_nwqa=False,
+                                                                receivers=["dfo.td_to_dfo"])
 
+    the_system.app_connections["dfo.df_busy_signal"] = AppConnection(nwmgr_connection=f"{partition_name}.df_busy_signal",
+                                                                  topics=[],
+                                                                  use_nwqa=False,
+                                                                  receivers=["trigger.df_busy_signal"])
+ 
     # TODO: How to do this more automatically?
     the_system.network_endpoints.append(nwmgr.Connection(name=f"{the_system.partition_name}.triginh",
                                                          topics=[],
-                                                         address=f"tcp://{{host_trigger}}:{the_system.next_unassigned_port()}"))
+                                                         address=f"tcp://{{host_dfo}}:{the_system.next_unassigned_port()}"))
                                                                             
     
     #     console.log(f"MDAapp config generated in {json_dir}")
@@ -477,6 +494,8 @@ def cli(global_partition_name, host_global, port_global, partition_name, number_
     if debug:
         console.log(f"After set_mlt_links, mlt_links is {mlt_links}")
     add_network("trigger", the_system, verbose=debug)
+    add_network("dfo", the_system, verbose=debug)
+
     # # console.log("After adding network, trigger mgraph:", the_system.apps['trigger'].modulegraph)
     add_network("hsi", the_system, verbose=debug)
     if control_timing_partition:
