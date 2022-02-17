@@ -116,7 +116,7 @@ class HSIApp(App):
         if CONTROL_HSI_HARDWARE:
             mgraph.add_endpoint("timing_cmds", "hsic.hardware_commands_out", Direction.OUT)
         
-        mgraph.add_endpoint("hsievents", "hsir.hsievent_sink",     Direction.OUT)
+        mgraph.add_endpoint("hsievents", None,     Direction.OUT)
         super().__init__(modulegraph=mgraph, host=HOST, name="HSIApp")
         if DEBUG:
             self.export("hsi_app.dot")
