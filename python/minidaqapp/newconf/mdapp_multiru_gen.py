@@ -324,7 +324,8 @@ def cli(global_partition_name, host_global, port_global, partition_name, number_
         DF_COUNT = len(host_df),
         TOKEN_COUNT = trigemu_token_count,
         PARTITION=partition_name,
-        HOST=host_trigger)
+        HOST=host_trigger,
+        DEBUG=debug)
 
     # console.log("trigger cmd data:", cmd_data_trigger)
 
@@ -466,9 +467,9 @@ def cli(global_partition_name, host_global, port_global, partition_name, number_
     the_system.app_connections["trigger.td_to_dfo"] = AppConnection(nwmgr_connection=f"{partition_name}.td_mlt_to_dfo",
                                                                 topics=[],
                                                                 use_nwqa=False,
-                                                                receivers=["dfo.td_mlt_to_dfo"])
+                                                                receivers=["dfo.td_to_dfo"])
 
-    the_system.app_connections["dfo.busy_signal"] = AppConnection(nwmgr_connection=f"{partition_name}.df_busy_signal",
+    the_system.app_connections["dfo.df_busy_signal"] = AppConnection(nwmgr_connection=f"{partition_name}.df_busy_signal",
                                                                   topics=[],
                                                                   use_nwqa=False,
                                                                   receivers=["trigger.df_busy_signal"])

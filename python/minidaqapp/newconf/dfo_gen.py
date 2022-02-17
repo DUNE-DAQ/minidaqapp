@@ -43,7 +43,8 @@ class DFOApp(App):
                  TOKEN_COUNT: int = 10,
                  PARTITION="UNKNOWN",
                  DF_COUNT: int = 1,
-                 HOST="localhost"
+                 HOST="localhost",
+                 DEBUG=False
                  ):
         """
         { item_description }
@@ -63,8 +64,7 @@ class DFOApp(App):
         
         mgraph = ModuleGraph(modules)
         mgraph.add_endpoint("td_to_dfo", None, Direction.IN)
-
-        mgraph.add_endpoint("busy_signal", None, Direction.OUT)
+        mgraph.add_endpoint("df_busy_signal", None, Direction.OUT)
         for i in range(DF_COUNT):
             # We have an outgoing endpoint for trigger decisions, but the
             # TDs come directly from the DFO to a nwmgr connection, so the
@@ -73,4 +73,4 @@ class DFOApp(App):
             # mgraph.add_endpoint("tokens", "mlt.token_source", Direction.IN)
 
         super().__init__(modulegraph=mgraph, host=HOST, name='DFOApp')
-        self.export("dfo_app.dot")
+        if DEBUG: self.export("dfo_app.dot")

@@ -163,7 +163,8 @@ class TriggerApp(App):
 
         mgraph = ModuleGraph(modules)
         mgraph.add_endpoint("hsievents", None, Direction.IN)
-        mgraph.add_endpoint("td_to_dfo",  "mlt.input", Direction.OUT)
+        mgraph.add_endpoint("td_to_dfo", None, Direction.OUT)
+        mgraph.add_endpoint("df_busy_signal", None, Direction.IN)
         if SOFTWARE_TPG_ENABLED:
             for ruidx, ru_config in enumerate(RU_CONFIG):
                 # 1 zipper input per region_id
