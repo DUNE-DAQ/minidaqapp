@@ -33,7 +33,7 @@ class TPWriterApp(App):
         modules = []
         
         modules += [DAQModule(name = 'tpswriter',
-                              plugin = "TPSetWriter",
+                              plugin = "TPStreamWriter",
                               connections = {}, #'tpset_source': Connection("tpsets_from_netq")},
                               conf = tpsw.ConfParams(max_file_size_bytes=1000000000))]
 
