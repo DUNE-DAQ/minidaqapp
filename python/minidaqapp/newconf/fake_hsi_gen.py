@@ -43,7 +43,6 @@ import math
 #===============================================================================
 class FakeHSIApp(App):
     def __init__(self,
-                 # NW_SPECS: list,
                  RUN_NUMBER=333,
                  CLOCK_SPEED_HZ: int=50000000,
                  DATA_RATE_SLOWDOWN_FACTOR: int=1,
@@ -57,10 +56,6 @@ class FakeHSIApp(App):
                  DEBUG=False):
         
         trigger_interval_ticks = 0
-        required_eps = {PARTITION + '.hsievent'}
-        # if not required_eps.issubset([nw.name for nw in NW_SPECS]):
-        #     raise RuntimeError(f"ERROR: not all the required endpoints ({', '.join(required_eps)}) found in list of endpoints {' '.join([nw.name for nw in NW_SPECS])}")
-
         if TRIGGER_RATE_HZ > 0:
             trigger_interval_ticks = math.floor((1 / TRIGGER_RATE_HZ) * CLOCK_SPEED_HZ / DATA_RATE_SLOWDOWN_FACTOR)
 
