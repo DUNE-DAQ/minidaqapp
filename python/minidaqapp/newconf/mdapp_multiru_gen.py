@@ -463,6 +463,8 @@ def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowd
                                                                 topics=[],
                                                                 use_nwqa=False,
                                                                 receivers=["trigger.hsievents"])
+
+
     # TODO: How to do this more automatically?
     the_system.network_endpoints.append(nwmgr.Connection(name=f"{the_system.partition_name}.triginh",
                                                          topics=[],
@@ -529,7 +531,7 @@ def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowd
 
     system_command_datas['boot'] = boot
 
-    write_json_files(app_command_datas, system_command_datas, json_dir)
+    write_json_files(app_command_datas, system_command_datas, json_dir, verbose=debug)
 
     console.log(f"MDAapp config generated in {json_dir}")
 

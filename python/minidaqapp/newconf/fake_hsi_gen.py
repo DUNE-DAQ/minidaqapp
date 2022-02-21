@@ -74,13 +74,20 @@ class FakeHSIApp(App):
                                                   mean_signal_multiplicity=MEAN_SIGNAL_MULTIPLICITY,
                                                   signal_emulation_mode=SIGNAL_EMULATION_MODE,
                                                   enabled_signals=ENABLED_SIGNALS,
-                                                  hsievent_connection_name=PARTITION+".hsievents"),
+                                                  hsievent_connection_name=PARTITION+".hsievents",
+                                                  timesync_topic="Timesync"),
                              extra_commands = {"start": startpars,
                                                "resume": resumepars})]
     
         mgraph = ModuleGraph(modules)
-        mgraph.add_endpoint("time_sync", "fhsig.time_sync_source", Direction.IN)
-        mgraph.add_endpoint("hsievents", "fhsig.hsievent_sink",    Direction.OUT)
+        # P. Rodrigues 2022-02-15 We don't make endpoints for the
+        # timesync connection because they are handled by some
+        # special-case magic in NetworkManager, which holds a map
+        # of topics to connections, and looks up all the
+        # connections for a given topic.
+        #
+        # mgraph.add_endpoint("time_sync", None, Direction.IN)
+        mgraph.add_endpoint("hsievents", None, Direction.OUT)
         super().__init__(modulegraph=mgraph, host=HOST, name="FakeHSIApp")
         if DEBUG:
             self.export("fake_hsi_app.dot")

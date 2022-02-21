@@ -37,6 +37,7 @@ class DQMApp(App):
                  RU_CONFIG=[],
                  RU_NAME='',
                  EMULATOR_MODE=False,
+                 DATA_RATE_SLOWDOWN_FACTOR=1,
                  RUN_NUMBER=333,
                  DATA_FILE="./frames.bin",
                  CLOCK_SPEED_HZ=50000000,
@@ -55,8 +56,6 @@ class DQMApp(App):
                  DEBUG=False):
 
         cmd_data = {}
-
-        required_eps = {f'{PARTITION}.timesync_{RUIDX}'}
 
         MIN_LINK = RU_CONFIG[RUIDX]["start_channel"]
         MAX_LINK = MIN_LINK + RU_CONFIG[RUIDX]["channel_count"]
@@ -114,7 +113,7 @@ class DQMApp(App):
         modules += [DAQModule(name='dqmprocessor',
                               plugin='DQMProcessor',
                               connections=connections,
-                              conf= dqmprocessor.Conf(
+                              conf=dqmprocessor.Conf(
                                   region=RU_CONFIG[RUIDX]["region_id"],
                                   channel_map=DQM_CMAP, # 'HD' for horizontal drift or 'VD' for vertical drift
                                   mode=MODE,
@@ -128,6 +127,7 @@ class DQMApp(App):
                                   timesync_connection_name = f"{PARTITION}.timesync_{RUIDX}",
                                   df2dqm_connection_name=f"{PARTITION}.tr_df2dqm_{RUIDX}" if RUIDX < NUM_DF_APPS else '',
                                   dqm2df_connection_name=f"{PARTITION}.trmon_dqm2df_{RUIDX}" if RUIDX < NUM_DF_APPS else '',
+                                  readout_window_offset=10**7 / DATA_RATE_SLOWDOWN_FACTOR, # 10^7 works fine for WIBs with no slowdown
                                    )
                               )
                               ]
