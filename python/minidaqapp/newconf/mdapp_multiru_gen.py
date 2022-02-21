@@ -208,7 +208,7 @@ def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowd
     regionidx = 0
 
     ru_app_names=[f"ruflx{idx}" if use_felix else f"ruemu{idx}" for idx in range(len(host_ru))]
-    dqm_app_names = [f"dqm{idx}" for idx in range(len(host_ru))]
+    dqm_app_names = [f"dqm{idx}_ru" for idx in range(len(host_ru))]
     
     for hostidx,ru_host in enumerate(ru_app_names):
         if enable_dqm:
@@ -357,12 +357,12 @@ def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowd
                 RU_CONFIG = ru_configs,
                 RU_NAME=ru_name,
                 EMULATOR_MODE = emulator_mode,
+                DATA_RATE_SLOWDOWN_FACTOR = data_rate_slowdown_factor,
                 RUN_NUMBER = run_number,
                 DATA_FILE = data_file,
                 CLOCK_SPEED_HZ = CLOCK_SPEED_HZ,
                 RUIDX = i,
                 SYSTEM_TYPE = system_type,
-                DQM_ENABLED=enable_dqm,
                 DQM_KAFKA_ADDRESS=dqm_kafka_address,
                 DQM_CMAP=dqm_cmap,
                 DQM_RAWDISPLAY_PARAMS=dqm_rawdisplay_params,
@@ -376,6 +376,7 @@ def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowd
             if debug: console.log(f"{dqm_name} app: {the_system.apps[dqm_name]}")
 
     df_app_names = []
+    dqm_df_app_names = [f"dqm{idx}_df" for idx in range(len(host_df))]
     for i,host in enumerate(host_df):
         app_name = f'dataflow{i}'
         df_app_names.append(app_name)
@@ -394,6 +395,30 @@ def cli(partition_name, number_of_data_producers, emulator_mode, data_rate_slowd
             HOST=host,
             DEBUG=debug
         )
+        if enable_dqm:
+            dqm_name = dqm_df_app_names[i]
+            the_system.apps[dqm_name] = DQMApp(
+                RU_CONFIG = ru_configs,
+                RU_NAME=ru_name,
+                EMULATOR_MODE = emulator_mode,
+                DATA_RATE_SLOWDOWN_FACTOR = data_rate_slowdown_factor,
+                RUN_NUMBER = run_number,
+                DATA_FILE = data_file,
+                CLOCK_SPEED_HZ = CLOCK_SPEED_HZ,
+                RUIDX = i,
+                SYSTEM_TYPE = system_type,
+                DQM_KAFKA_ADDRESS=dqm_kafka_address,
+                DQM_CMAP=dqm_cmap,
+                DQM_RAWDISPLAY_PARAMS=dqm_rawdisplay_params,
+                DQM_MEANRMS_PARAMS=dqm_meanrms_params,
+                DQM_FOURIER_PARAMS=dqm_fourier_params,
+                DQM_FOURIERSUM_PARAMS=dqm_fouriersum_params,
+                PARTITION=partition_name,
+                HOST=host,
+                MODE='df',
+                DEBUG=debug)
+            if debug: console.log(f"{dqm_name} app: {the_system.apps[dqm_name]}")
+
 
     for name,app in the_system.apps.items():
         if app.name=="__app":
