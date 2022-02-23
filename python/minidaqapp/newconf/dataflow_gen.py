@@ -48,89 +48,89 @@ from appfwk.conf_utils import Direction, Connection, data_request_endpoint_name
 # Time to wait on pop()
 QUEUE_POP_WAIT_MS = 100
 
-class DataFlowApp(App):
-    def __init__(self,
-                 RU_CONFIG=[],
-                 HOSTIDX=0,
-                 RUN_NUMBER=333,
-                 OUTPUT_PATH=".",
-                 SYSTEM_TYPE="TPC",
-                 SOFTWARE_TPG_ENABLED=False,
-                 TPSET_WRITING_ENABLED=False,
-                 PARTITION="UNKNOWN",
-                 OPERATIONAL_ENVIRONMENT="swtest",
-                 TPC_REGION_NAME_PREFIX="APA",
-                 HOST="localhost",
-                 MAX_FILE_SIZE=4*1024*1024*1024,
-                 DEBUG=False):
-        
-        """Generate the json configuration for the readout and DF process"""
+def get_dataflow_app(RU_CONFIG=[],
+                     HOSTIDX=0,
+                     RUN_NUMBER=333,
+                     OUTPUT_PATH=".",
+                     SYSTEM_TYPE="TPC",
+                     SOFTWARE_TPG_ENABLED=False,
+                     TPSET_WRITING_ENABLED=False,
+                     PARTITION="UNKNOWN",
+                     OPERATIONAL_ENVIRONMENT="swtest",
+                     TPC_REGION_NAME_PREFIX="APA",
+                     HOST="localhost",
+                     MAX_FILE_SIZE=4*1024*1024*1024,
+                     DEBUG=False):
 
-        modules = []
-        total_link_count = 0
-        for ru in range(len(RU_CONFIG)):
-            total_link_count += RU_CONFIG[ru]["channel_count"]
-        
-        modules += [DAQModule(name = 'trb',
-                              plugin = 'TriggerRecordBuilder',
-                              connections = {'trigger_record_output_queue': Connection('datawriter.trigger_record_input_queue')},
-                              conf = trb.ConfParams(general_queue_timeout=QUEUE_POP_WAIT_MS,
-                                                    reply_connection_name = "",
-                                                    map=trb.mapgeoidconnections([]))), # We patch this up in connect_fragment_producers
-                    DAQModule(name = 'datawriter',
-                           plugin = 'DataWriter',
-                           connections = {},
-                           conf = dw.ConfParams(decision_connection=f"{PARTITION}.trigdec_{HOSTIDX}",
-                               token_connection=PARTITION+".triginh",
-                               data_store_parameters=hdf5ds.ConfParams(
-                                   name="data_store",
-                                   version = 3,
-                                   operational_environment = OPERATIONAL_ENVIRONMENT,
-                                   directory_path = OUTPUT_PATH,
-                                   max_file_size_bytes = MAX_FILE_SIZE,
-                                   disable_unique_filename_suffix = False,
-                                   filename_parameters = hdf5ds.FileNameParams(
-                                       overall_prefix = OPERATIONAL_ENVIRONMENT,
-                                       digits_for_run_number = 6,
-                                       file_index_prefix = "",
-                                       digits_for_file_index = 4),
-                                   file_layout_parameters = hdf5ds.FileLayoutParams(
-                                       trigger_record_name_prefix= "TriggerRecord",
-                                       digits_for_trigger_number = 5,
-                                       path_param_list = hdf5ds.PathParamList(
-                                           [hdf5ds.PathParams(detector_group_type="TPC",
-                                                              detector_group_name="TPC",
-                                                              region_name_prefix=TPC_REGION_NAME_PREFIX,
-                                                              element_name_prefix="Link"),
-                                            hdf5ds.PathParams(detector_group_type="PDS",
-                                                              detector_group_name="PDS"),
-                                            hdf5ds.PathParams(detector_group_type="NDLArTPC",
-                                                              detector_group_name="NDLArTPC"),
-                                            hdf5ds.PathParams(detector_group_type="Trigger",
-                                                              detector_group_name="Trigger"),
-                                            hdf5ds.PathParams(detector_group_type="TPC_TP",
-                                                              detector_group_name="TPC",
-                                                              region_name_prefix="TP_APA",
-                                                              element_name_prefix="Link")])))))]
-            
-        if TPSET_WRITING_ENABLED:
-            for idx in range(len(RU_CONFIG)):
-                modules += [DAQModule(name = f'tpset_subscriber_{idx}',
-                                   plugin = "NetworkToQueue",
-                                   connections = {'output':Connection(f"tpswriter.tpsets_from_netq")},
-                                   conf = nor.Conf(name=f'{PARTITION}.tpsets_{idx}',
-                                                   subscriptions=["TPSets"]))]
+    """Generate the json configuration for the readout and DF process"""
 
-            modules += [DAQModule(name = 'tpswriter',
-                               plugin = "TPSetWriter",
-                               connections = {'tpset_source': Connection("tpsets_from_netq")},
-                               conf = tpsw.ConfParams(max_file_size_bytes=1000000000))]
+    modules = []
+    total_link_count = 0
+    for ru in range(len(RU_CONFIG)):
+        total_link_count += RU_CONFIG[ru]["channel_count"]
 
-        mgraph=ModuleGraph(modules)
+    modules += [DAQModule(name = 'trb',
+                          plugin = 'TriggerRecordBuilder',
+                          connections = {'trigger_record_output_queue': Connection('datawriter.trigger_record_input_queue')},
+                          conf = trb.ConfParams(general_queue_timeout=QUEUE_POP_WAIT_MS,
+                                                reply_connection_name = "",
+                                                map=trb.mapgeoidconnections([]))), # We patch this up in connect_fragment_producers
+                DAQModule(name = 'datawriter',
+                       plugin = 'DataWriter',
+                       connections = {},
+                       conf = dw.ConfParams(decision_connection=f"{PARTITION}.trigdec_{HOSTIDX}",
+                           token_connection=PARTITION+".triginh",
+                           data_store_parameters=hdf5ds.ConfParams(
+                               name="data_store",
+                               version = 3,
+                               operational_environment = OPERATIONAL_ENVIRONMENT,
+                               directory_path = OUTPUT_PATH,
+                               max_file_size_bytes = MAX_FILE_SIZE,
+                               disable_unique_filename_suffix = False,
+                               filename_parameters = hdf5ds.FileNameParams(
+                                   overall_prefix = OPERATIONAL_ENVIRONMENT,
+                                   digits_for_run_number = 6,
+                                   file_index_prefix = "",
+                                   digits_for_file_index = 4),
+                               file_layout_parameters = hdf5ds.FileLayoutParams(
+                                   trigger_record_name_prefix= "TriggerRecord",
+                                   digits_for_trigger_number = 5,
+                                   path_param_list = hdf5ds.PathParamList(
+                                       [hdf5ds.PathParams(detector_group_type="TPC",
+                                                          detector_group_name="TPC",
+                                                          region_name_prefix=TPC_REGION_NAME_PREFIX,
+                                                          element_name_prefix="Link"),
+                                        hdf5ds.PathParams(detector_group_type="PDS",
+                                                          detector_group_name="PDS"),
+                                        hdf5ds.PathParams(detector_group_type="NDLArTPC",
+                                                          detector_group_name="NDLArTPC"),
+                                        hdf5ds.PathParams(detector_group_type="Trigger",
+                                                          detector_group_name="Trigger"),
+                                        hdf5ds.PathParams(detector_group_type="TPC_TP",
+                                                          detector_group_name="TPC",
+                                                          region_name_prefix="TP_APA",
+                                                          element_name_prefix="Link")])))))]
 
-        mgraph.add_endpoint("trigger_decisions", "trb.trigger_decision_input_queue", Direction.IN)
-        
-        super().__init__(modulegraph=mgraph, host=HOST)
-        if DEBUG:
-            self.export("dataflow_app.dot")
+    if TPSET_WRITING_ENABLED:
+        for idx in range(len(RU_CONFIG)):
+            modules += [DAQModule(name = f'tpset_subscriber_{idx}',
+                               plugin = "NetworkToQueue",
+                               connections = {'output':Connection(f"tpswriter.tpsets_from_netq")},
+                               conf = nor.Conf(name=f'{PARTITION}.tpsets_{idx}',
+                                               subscriptions=["TPSets"]))]
 
+        modules += [DAQModule(name = 'tpswriter',
+                           plugin = "TPSetWriter",
+                           connections = {'tpset_source': Connection("tpsets_from_netq")},
+                           conf = tpsw.ConfParams(max_file_size_bytes=1000000000))]
+
+    mgraph=ModuleGraph(modules)
+
+    mgraph.add_endpoint("trigger_decisions", "trb.trigger_decision_input_queue", Direction.IN)
+
+    df_app = App(modulegraph=mgraph, host=HOST)
+
+    if DEBUG:
+        df_app.export("dataflow_app.dot")
+
+    return df_app

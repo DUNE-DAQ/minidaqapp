@@ -48,36 +48,36 @@ from appfwk.daqmodule import DAQModule
 from appfwk.conf_utils import Direction, Connection
 
 #===============================================================================
-class THIApp(App):
-    def __init__(self,
-                 GATHER_INTERVAL=1e6,
-                 GATHER_INTERVAL_DEBUG=10e6,
-                 MASTER_DEVICE_NAME="",
-                 HSI_DEVICE_NAME="",
-                 CONNECTIONS_FILE="${TIMING_SHARE}/config/etc/connections.xml",
-                 UHAL_LOG_LEVEL="notice",
-                 HOST="localhost",
-                 DEBUG=False):
-        """
-        { item_description }
-        """
-        modules = {}
-        modules = [ 
-                    DAQModule( name="thi",
-                                    plugin="TimingHardwareManagerPDI",
-                                    conf= thi.ConfParams(connections_file=CONNECTIONS_FILE,
-                                                           gather_interval=GATHER_INTERVAL,
-                                                           gather_interval_debug=GATHER_INTERVAL_DEBUG,
-                                                           monitored_device_name_master=MASTER_DEVICE_NAME,
-                                                           monitored_device_names_fanout=[],
-                                                           monitored_device_name_endpoint="",
-                                                           monitored_device_name_hsi=HSI_DEVICE_NAME,
-                                                           uhal_log_level=UHAL_LOG_LEVEL)),
-                    ]                
-            
+def get_thi_app(GATHER_INTERVAL=1e6,
+                GATHER_INTERVAL_DEBUG=10e6,
+                MASTER_DEVICE_NAME="",
+                HSI_DEVICE_NAME="",
+                CONNECTIONS_FILE="${TIMING_SHARE}/config/etc/connections.xml",
+                UHAL_LOG_LEVEL="notice",
+                HOST="localhost",
+                DEBUG=False):
+    
+    modules = {}
+    modules = [ 
+                DAQModule( name="thi",
+                                plugin="TimingHardwareManagerPDI",
+                                conf= thi.ConfParams(connections_file=CONNECTIONS_FILE,
+                                                       gather_interval=GATHER_INTERVAL,
+                                                       gather_interval_debug=GATHER_INTERVAL_DEBUG,
+                                                       monitored_device_name_master=MASTER_DEVICE_NAME,
+                                                       monitored_device_names_fanout=[],
+                                                       monitored_device_name_endpoint="",
+                                                       monitored_device_name_hsi=HSI_DEVICE_NAME,
+                                                       uhal_log_level=UHAL_LOG_LEVEL)),
+                ]                
+        
 
-        mgraph = ModuleGraph(modules)
-        mgraph.add_endpoint("timing_cmds", "thi.timing_cmds_queue", Direction.IN)
-        super().__init__(modulegraph=mgraph, host=HOST, name="THIApp")
-        if DEBUG:
-            self.export("thi_app.dot")
+    mgraph = ModuleGraph(modules)
+    mgraph.add_endpoint("timing_cmds", "thi.timing_cmds_queue", Direction.IN)
+    
+    thi_app = App(modulegraph=mgraph, host=HOST, name="THIApp")
+    
+    if DEBUG:
+        thi_app.export("thi_app.dot")
+
+    return thi_app

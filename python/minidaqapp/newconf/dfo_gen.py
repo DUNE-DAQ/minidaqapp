@@ -36,41 +36,37 @@ def make_moo_record(conf_dict,name,path='temptypes'):
     moo.otypes.make_type(schema='record', fields=fields, name=name, path=path)
 
 #===============================================================================
-class DFOApp(App):
-    def __init__(self,
-                 # NW_SPECS: list,
-
-                 TOKEN_COUNT: int = 10,
-                 PARTITION="UNKNOWN",
-                 DF_COUNT: int = 1,
-                 HOST="localhost",
-                 DEBUG=False
-                 ):
-        """
-        { item_description }
-        """
-        
-        modules = []
+def get_dfo_app(TOKEN_COUNT: int = 10,
+                PARTITION="UNKNOWN",
+                DF_COUNT: int = 1,
+                HOST="localhost",
+                DEBUG=False):
     
-        df_app_configs = [dfo.app_config(decision_connection=f"{PARTITION}.trigdec_{dfidx}", 
-                                         thresholds=dfo.busy_thresholds(free=max(1, int(TOKEN_COUNT/2)),
-                                                                                 busy=TOKEN_COUNT)) for dfidx in range(DF_COUNT)]
-        modules += [DAQModule(name = "dfo",
-                              plugin = "DataFlowOrchestrator",
-                              conf = dfo.ConfParams(token_connection = PARTITION+".triginh",
-                                                    busy_connection = PARTITION+".df_busy_signal",
-                                                    td_connection = PARTITION+".td_mlt_to_dfo",
-                                                    dataflow_applications=df_app_configs))]
-        
-        mgraph = ModuleGraph(modules)
-        mgraph.add_endpoint("td_to_dfo", None, Direction.IN)
-        mgraph.add_endpoint("df_busy_signal", None, Direction.OUT)
-        for i in range(DF_COUNT):
-            # We have an outgoing endpoint for trigger decisions, but the
-            # TDs come directly from the DFO to a nwmgr connection, so the
-            # queue we connect to is None
-            mgraph.add_endpoint(f"trigger_decisions{i}", None, Direction.OUT)
-            # mgraph.add_endpoint("tokens", "mlt.token_source", Direction.IN)
+    modules = []
+    
+    df_app_configs = [dfo.app_config(decision_connection=f"{PARTITION}.trigdec_{dfidx}", 
+                                     thresholds=dfo.busy_thresholds(free=max(1, int(TOKEN_COUNT/2)),
+                                                                             busy=TOKEN_COUNT)) for dfidx in range(DF_COUNT)]
+    modules += [DAQModule(name = "dfo",
+                          plugin = "DataFlowOrchestrator",
+                          conf = dfo.ConfParams(token_connection = PARTITION+".triginh",
+                                                busy_connection = PARTITION+".df_busy_signal",
+                                                td_connection = PARTITION+".td_mlt_to_dfo",
+                                                dataflow_applications=df_app_configs))]
+    
+    mgraph = ModuleGraph(modules)
+    mgraph.add_endpoint("td_to_dfo", None, Direction.IN)
+    mgraph.add_endpoint("df_busy_signal", None, Direction.OUT)
+    for i in range(DF_COUNT):
+        # We have an outgoing endpoint for trigger decisions, but the
+        # TDs come directly from the DFO to a nwmgr connection, so the
+        # queue we connect to is None
+        mgraph.add_endpoint(f"trigger_decisions{i}", None, Direction.OUT)
+        # mgraph.add_endpoint("tokens", "mlt.token_source", Direction.IN)
 
-        super().__init__(modulegraph=mgraph, host=HOST, name='DFOApp')
-        if DEBUG: self.export("dfo_app.dot")
+    dfo_app = App(modulegraph=mgraph, host=HOST, name='DFOApp')
+    
+    if DEBUG:
+        dfo_app.export("dfo_app.dot")
+    
+    return dfo_app
