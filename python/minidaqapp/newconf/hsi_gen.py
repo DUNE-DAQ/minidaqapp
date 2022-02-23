@@ -53,70 +53,69 @@ from appfwk.daqmodule import DAQModule
 from appfwk.conf_utils import Direction, Connection
 
 #===============================================================================
-class HSIApp(App):
-    def __init__(self,
-                 RUN_NUMBER = 333,
-                 CLOCK_SPEED_HZ: int = 50000000,
-                 TRIGGER_RATE_HZ: int = 1,
-                 CONTROL_HSI_HARDWARE = False,
-                 READOUT_PERIOD_US: int = 1e3,
-                 HSI_ENDPOINT_ADDRESS = 1,
-                 HSI_ENDPOINT_PARTITION = 0,
-                 HSI_RE_MASK = 0x20000,
-                 HSI_FE_MASK = 0,
-                 HSI_INV_MASK = 0,
-                 HSI_SOURCE = 1,
-                 CONNECTIONS_FILE="${TIMING_SHARE}/config/etc/connections.xml",
-                 HSI_DEVICE_NAME="BOREAS_TLU",
-                 UHAL_LOG_LEVEL="notice",
-                 PARTITION="UNKNOWN",
-                 GLOBAL_PARTITION="UNKNOWN",
-                 HOST="localhost",
-                 DEBUG=False):
-        """
-        { item_description }
-        """            
-        modules = {}
+def get_hsi_app(RUN_NUMBER = 333,
+                CLOCK_SPEED_HZ: int = 50000000,
+                TRIGGER_RATE_HZ: int = 1,
+                CONTROL_HSI_HARDWARE = False,
+                READOUT_PERIOD_US: int = 1e3,
+                HSI_ENDPOINT_ADDRESS = 1,
+                HSI_ENDPOINT_PARTITION = 0,
+                HSI_RE_MASK = 0x20000,
+                HSI_FE_MASK = 0,
+                HSI_INV_MASK = 0,
+                HSI_SOURCE = 1,
+                CONNECTIONS_FILE="${TIMING_SHARE}/config/etc/connections.xml",
+                HSI_DEVICE_NAME="BOREAS_TLU",
+                UHAL_LOG_LEVEL="notice",
+                PARTITION="UNKNOWN",
+                GLOBAL_PARTITION="UNKNOWN",
+                HOST="localhost",
+                DEBUG=False):
+    modules = {}
 
-        ## TODO all the connections...
-        modules = [DAQModule(name = "hsir",
-                            plugin = "HSIReadout",
-                            conf = hsi.ConfParams(connections_file=CONNECTIONS_FILE,
-                                                readout_period=READOUT_PERIOD_US,
-                                                hsi_device_name=HSI_DEVICE_NAME,
-                                                uhal_log_level=UHAL_LOG_LEVEL,
-                                                hsievent_connection_name = f"{PARTITION}.hsievents"))]
-        
-        trigger_interval_ticks=0
-        if TRIGGER_RATE_HZ > 0:
-            trigger_interval_ticks=math.floor((1/TRIGGER_RATE_HZ) * CLOCK_SPEED_HZ)
-        elif CONTROL_HSI_HARDWARE:
-            console.log('WARNING! Emulated trigger rate of 0 will not disable signal emulation in real HSI hardware! To disable emulated HSI triggers, use  option: "--hsi-source 0" or mask all signal bits', style="bold red")
-        
-        startpars = rccmd.StartParams(run=RUN_NUMBER, trigger_interval_ticks = trigger_interval_ticks)
-        resumepars = rccmd.ResumeParams(trigger_interval_ticks = trigger_interval_ticks)
+    ## TODO all the connections...
+    modules = [DAQModule(name = "hsir",
+                        plugin = "HSIReadout",
+                        conf = hsi.ConfParams(connections_file=CONNECTIONS_FILE,
+                                            readout_period=READOUT_PERIOD_US,
+                                            hsi_device_name=HSI_DEVICE_NAME,
+                                            uhal_log_level=UHAL_LOG_LEVEL,
+                                            hsievent_connection_name = f"{PARTITION}.hsievents"))]
+    
+    trigger_interval_ticks=0
+    if TRIGGER_RATE_HZ > 0:
+        trigger_interval_ticks=math.floor((1/TRIGGER_RATE_HZ) * CLOCK_SPEED_HZ)
+    elif CONTROL_HSI_HARDWARE:
+        console.log('WARNING! Emulated trigger rate of 0 will not disable signal emulation in real HSI hardware! To disable emulated HSI triggers, use  option: "--hsi-source 0" or mask all signal bits', style="bold red")
+    
+    startpars = rccmd.StartParams(run=RUN_NUMBER, trigger_interval_ticks = trigger_interval_ticks)
+    resumepars = rccmd.ResumeParams(trigger_interval_ticks = trigger_interval_ticks)
 
-        if CONTROL_HSI_HARDWARE:
-            modules.extend( [
-                            DAQModule(name="hsic",
-                                    plugin = "HSIController",
-                                    conf = hsic.ConfParams( device=HSI_DEVICE_NAME,
-                                                            clock_frequency=CLOCK_SPEED_HZ,
-                                                            trigger_interval_ticks=trigger_interval_ticks,
-                                                            address=HSI_ENDPOINT_ADDRESS,
-                                                            partition=HSI_ENDPOINT_PARTITION,
-                                                            rising_edge_mask=HSI_RE_MASK,
-                                                            falling_edge_mask=HSI_FE_MASK,
-                                                            invert_edge_mask=HSI_INV_MASK,
-                                                            data_source=HSI_SOURCE)),
-                            ] )
-        
-        mgraph = ModuleGraph(modules)
-        
-        if CONTROL_HSI_HARDWARE:
-            mgraph.add_endpoint("timing_cmds", "hsic.hardware_commands_out", Direction.OUT)
-        
-        mgraph.add_endpoint("hsievents", None,     Direction.OUT)
-        super().__init__(modulegraph=mgraph, host=HOST, name="HSIApp")
-        if DEBUG:
-            self.export("hsi_app.dot")
+    if CONTROL_HSI_HARDWARE:
+        modules.extend( [
+                        DAQModule(name="hsic",
+                                plugin = "HSIController",
+                                conf = hsic.ConfParams( device=HSI_DEVICE_NAME,
+                                                        clock_frequency=CLOCK_SPEED_HZ,
+                                                        trigger_interval_ticks=trigger_interval_ticks,
+                                                        address=HSI_ENDPOINT_ADDRESS,
+                                                        partition=HSI_ENDPOINT_PARTITION,
+                                                        rising_edge_mask=HSI_RE_MASK,
+                                                        falling_edge_mask=HSI_FE_MASK,
+                                                        invert_edge_mask=HSI_INV_MASK,
+                                                        data_source=HSI_SOURCE)),
+                        ] )
+    
+    mgraph = ModuleGraph(modules)
+    
+    if CONTROL_HSI_HARDWARE:
+        mgraph.add_endpoint("timing_cmds", "hsic.hardware_commands_out", Direction.OUT)
+    
+    mgraph.add_endpoint("hsievents", None,     Direction.OUT)
+    
+    hsi_app = App(modulegraph=mgraph, host=HOST, name="HSIApp")
+    
+    if DEBUG:
+        hsi_app.export("hsi_app.dot")
+
+    return hsi_app

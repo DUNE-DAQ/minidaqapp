@@ -124,22 +124,22 @@ def cli(global_partition_name, host_global, port_global, partition_name, number_
         raise RuntimeError(f"Directory {json_dir} already exists")
 
     console.log("Loading dataflow config generator")
-    from .dataflow_gen import DataFlowApp
+    from .dataflow_gen import get_dataflow_app
     if enable_dqm:
         console.log("Loading dqm config generator")
-        from .dqm_gen import DQMApp
+        from .dqm_gen import get_dqm_app
     console.log("Loading readout config generator")
-    from .readout_gen import ReadoutApp
+    from .readout_gen import get_readout_app
     console.log("Loading trigger config generator")
-    from .trigger_gen import TriggerApp
+    from .trigger_gen import get_trigger_app
     console.log("Loading DFO config generator")
-    from .dfo_gen import DFOApp
+    from .dfo_gen import get_dfo_app
     console.log("Loading hsi config generator")
-    from .hsi_gen import HSIApp
+    from .hsi_gen import get_hsi_app
     console.log("Loading fake hsi config generator")
-    from .fake_hsi_gen import FakeHSIApp
+    from .fake_hsi_gen import get_fake_hsi_app
     console.log("Loading timing partition controller config generator")
-    from .tprtc_gen import TPRTCApp
+    from .tprtc_gen import get_tprtc_app
 
     console.log(f"Generating configs for hosts trigger={host_trigger} DFO={host_dfo} dataflow={host_df} readout={host_ru} hsi={host_hsi} dqm={host_ru}")
 
@@ -245,7 +245,7 @@ def cli(global_partition_name, host_global, port_global, partition_name, number_
         if len(region_id) != 1: regionidx = regionidx + 1
 
     if use_hsi_hw:
-        the_system.apps["hsi"] = HSIApp(
+        the_system.apps["hsi"] = get_hsi_app(
             RUN_NUMBER = run_number,
             CLOCK_SPEED_HZ = CLOCK_SPEED_HZ,
             TRIGGER_RATE_HZ = trigger_rate_hz,
@@ -264,7 +264,7 @@ def cli(global_partition_name, host_global, port_global, partition_name, number_
             HOST=host_hsi,
             DEBUG=debug)
     else:
-        the_system.apps["hsi"] = FakeHSIApp(
+        the_system.apps["hsi"] = get_fake_hsi_app(
             RUN_NUMBER = run_number,
             CLOCK_SPEED_HZ = CLOCK_SPEED_HZ,
             DATA_RATE_SLOWDOWN_FACTOR = data_rate_slowdown_factor,
@@ -288,7 +288,7 @@ def cli(global_partition_name, host_global, port_global, partition_name, number_
     if debug: console.log("hsi cmd data:", the_system.apps["hsi"])
 
     if control_timing_partition:
-        the_system.apps["tprtc"] = TPRTCApp(
+        the_system.apps["tprtc"] = get_tprtc_app(
             MASTER_DEVICE_NAME=timing_partition_master_device_name,
             TIMING_PARTITION=timing_partition_id,
             TRIGGER_MASK=timing_partition_trigger_mask,
@@ -304,7 +304,7 @@ def cli(global_partition_name, host_global, port_global, partition_name, number_
                                                                             topics=[],
                                                                             receivers=[])
 
-    the_system.apps['trigger'] = TriggerApp(
+    the_system.apps['trigger'] = get_trigger_app(
         SOFTWARE_TPG_ENABLED = enable_software_tpg,
         RU_CONFIG = ru_configs,
         ACTIVITY_PLUGIN = trigger_activity_plugin,
@@ -320,7 +320,7 @@ def cli(global_partition_name, host_global, port_global, partition_name, number_
         HOST=host_trigger,
         DEBUG=debug)
 
-    the_system.apps['dfo'] = DFOApp(
+    the_system.apps['dfo'] = get_dfo_app(
         DF_COUNT = len(host_df),
         TOKEN_COUNT = trigemu_token_count,
         PARTITION=partition_name,
@@ -359,29 +359,32 @@ def cli(global_partition_name, host_global, port_global, partition_name, number_
     mgraphs_readout = []
     for i,host in enumerate(host_ru):
         ru_name = ru_app_names[i]
-        the_system.apps[ru_name] = ReadoutApp(PARTITION=partition_name,
-                                              RU_CONFIG=ru_configs,
-                                              EMULATOR_MODE = emulator_mode,
-                                              DATA_RATE_SLOWDOWN_FACTOR = data_rate_slowdown_factor,
-                                              DATA_FILE = data_file,
-                                              FLX_INPUT = use_felix,
-                                              SSP_INPUT = use_ssp,
-                                              CLOCK_SPEED_HZ = CLOCK_SPEED_HZ,
-                                              RUIDX = i,
-                                              RAW_RECORDING_ENABLED = enable_raw_recording,
-                                              RAW_RECORDING_OUTPUT_DIR = raw_recording_output_dir,
-                                              FRONTEND_TYPE = frontend_type,
-                                              SYSTEM_TYPE = system_type,
-                                              SOFTWARE_TPG_ENABLED = enable_software_tpg,
-                                              USE_FAKE_DATA_PRODUCERS = use_fake_data_producers,
-                                              HOST=host,
-                                              LATENCY_BUFFER_SIZE=latency_buffer_size,
-                                              DEBUG=debug)
-        if debug: console.log(f"{ru_name} app: {the_system.apps[ru_name]}")
+        the_system.apps[ru_name] = get_readout_app(
+            PARTITION=partition_name,
+            RU_CONFIG=ru_configs,
+            EMULATOR_MODE = emulator_mode,
+            DATA_RATE_SLOWDOWN_FACTOR = data_rate_slowdown_factor,
+            DATA_FILE = data_file,
+            FLX_INPUT = use_felix,
+            SSP_INPUT = use_ssp,
+            CLOCK_SPEED_HZ = CLOCK_SPEED_HZ,
+            RUIDX = i,
+            RAW_RECORDING_ENABLED = enable_raw_recording,
+            RAW_RECORDING_OUTPUT_DIR = raw_recording_output_dir,
+            FRONTEND_TYPE = frontend_type,
+            SYSTEM_TYPE = system_type,
+            SOFTWARE_TPG_ENABLED = enable_software_tpg,
+            USE_FAKE_DATA_PRODUCERS = use_fake_data_producers,
+            HOST=host,
+            LATENCY_BUFFER_SIZE=latency_buffer_size,
+            DEBUG=debug)
+        
+        if debug:
+            console.log(f"{ru_name} app: {the_system.apps[ru_name]}")
 
         if enable_dqm:
             dqm_name = dqm_app_names[i]
-            the_system.apps[dqm_name] = DQMApp(
+            the_system.apps[dqm_name] = get_dqm_app(
                 RU_CONFIG = ru_configs,
                 RU_NAME=ru_name,
                 EMULATOR_MODE = emulator_mode,
@@ -407,7 +410,7 @@ def cli(global_partition_name, host_global, port_global, partition_name, number_
     for i,host in enumerate(host_df):
         app_name = f'dataflow{i}'
         df_app_names.append(app_name)
-        the_system.apps[app_name] = DataFlowApp(
+        the_system.apps[app_name] = get_dataflow_app(
             RU_CONFIG = ru_configs,
             HOSTIDX = i,
             RUN_NUMBER = run_number,
