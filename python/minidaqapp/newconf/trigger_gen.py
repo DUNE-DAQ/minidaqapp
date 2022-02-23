@@ -97,8 +97,8 @@ def get_trigger_app(SOFTWARE_TPG_ENABLED: bool = False,
                 for RU in RU_CONFIG:
                     if RU['region_id'] == region_id:
                         cardinality += RU['channel_count']
-                        modules += [DAQModule(name = f'zip_{region_id}',
-                                              plugin = 'TPZipper',
+                modules += [DAQModule(name = f'zip_{region_id}',
+                                      plugin = 'TPZipper',
                                               connections = {# 'input' are App.network_endpoints, from RU
                                                   'output': Connection(f'tam_{region_id}.input')},
                                               conf = tzip.ConfParams(cardinality=cardinality,
