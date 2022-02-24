@@ -99,7 +99,7 @@ def generate(RUN_NUMBER: int,
     
     for cmd_nw_endpoint in TIMING_CMD_NETWORK_ENDPOINTS:
         nq_mod_name_suffix=cmd_nw_endpoint.split('.')[-1]
-        conf_cmds.extend([(f'ntoq_{nq_mod_name_suffix}', ntoq.Conf(msg_type="dunedaq::timinglibs::timingcmd::TimingHwCmd",
+        conf_cmds.extend([(f'ntoq_{nq_mod_name_suffix}', ntoq.Conf(msg_type="dunedaq::timing::timingrccmd::TimingHwCmd",
                                                msg_module_name="TimingHwCmdNQ",
                                                receiver_config=nor.Conf(name=cmd_nw_endpoint))),])
     cmd_data['conf'] = acmd(conf_cmds)

@@ -98,7 +98,7 @@ def cli(partition_name, disable_trace, host_thi, port_thi, host_tmc, timing_hw_c
         DEBUG=debug)
         
     the_system.app_connections[f"from_outside.timing_cmds"] = AppConnection(nwmgr_connection=partition_name + ".timing_cmds",
-                                                                            msg_type="dunedaq::timinglibs::timingcmd::TimingHwCmd",
+                                                                            msg_type="dunedaq::timing::timingrccmd::TimingHwCmd",
                                                                             msg_module_name="TimingHwCmdNQ",
                                                                             topics=[],
                                                                             receivers=["thi.timing_cmds"])
@@ -106,7 +106,7 @@ def cli(partition_name, disable_trace, host_thi, port_thi, host_tmc, timing_hw_c
 
     # the timing master controller application
     the_system.app_connections[f"tmc.timing_cmds"] = AppConnection(nwmgr_connection=partition_name + ".timing_cmds",
-                                                                            msg_type="dunedaq::timinglibs::timingcmd::TimingHwCmd",
+                                                                            msg_type="dunedaq::timing::timingrccmd::TimingHwCmd",
                                                                             msg_module_name="TimingHwCmdNQ",
                                                                             topics=[],
                                                                             receivers=["thi.timing_cmds"])

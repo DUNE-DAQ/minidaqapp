@@ -123,7 +123,7 @@ def generate(
 
     if CONTROL_HSI_HARDWARE:
         conf_cmds.extend([
-            ("qton_hw_cmds", qton.Conf(msg_type="dunedaq::timinglibs::timingcmd::TimingHwCmd",
+            ("qton_hw_cmds", qton.Conf(msg_type="dunedaq::timing::timingrccmd::TimingHwCmd",
                                            msg_module_name="TimingHwCmdNQ",
                                            sender_config=nos.Conf(name=PARTITION+".hsicmds",
                                                                   stype="msgpack")

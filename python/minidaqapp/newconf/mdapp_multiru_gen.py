@@ -279,7 +279,7 @@ def cli(global_partition_name, host_global, port_global, partition_name, number_
     
     if control_hsi_hw and use_hsi_hw:
         the_system.app_connections[f"hsi.timing_cmds"] = AppConnection(nwmgr_connection=f"{global_partition_name}.timing_cmds",
-                                                                            msg_type="dunedaq::timinglibs::timingcmd::TimingHwCmd",
+                                                                            msg_type="dunedaq::timing::timingrccmd::TimingHwCmd",
                                                                             msg_module_name="TimingHwCmdNQ",
                                                                             topics=[],
                                                                             receivers=[])
@@ -299,7 +299,7 @@ def cli(global_partition_name, host_global, port_global, partition_name, number_
             HOST=host_tprtc,
             DEBUG=debug)
         the_system.app_connections[f"tprtc.timing_cmds"] = AppConnection(nwmgr_connection=f"{global_partition_name}.timing_cmds",
-                                                                            msg_type="dunedaq::timinglibs::timingcmd::TimingHwCmd",
+                                                                            msg_type="dunedaq::timing::timingrccmd::TimingHwCmd",
                                                                             msg_module_name="TimingHwCmdNQ",
                                                                             topics=[],
                                                                             receivers=[])
