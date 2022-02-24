@@ -96,6 +96,7 @@ import click
 @click.option('--dqm-impl', type=click.Choice(['local','cern','pocket'], case_sensitive=False), default='local', help="DQM destination (Kafka used for cern and pocket)")
 @click.option('--pocket-url', default='127.0.0.1', help="URL for connecting to Pocket services")
 @click.option('--enable-software-tpg', is_flag=True, default=False, help="Enable software TPG")
+@click.option('--tpg-channel-map', type=click.Choice(["VDColdboxChannelMap", "ProtoDUNESP1ChannelMap"]), default="ProtoDUNESP1ChannelMap", help="Channel map for software TPG")
 @click.option('--enable-tpset-writing', is_flag=True, default=False, help="Enable the writing of TPSets to disk (only works with --enable-software-tpg")
 @click.option('--use-fake-data-producers', is_flag=True, default=False, help="Use fake data producers that respond with empty fragments immediately instead of (fake) cards and DLHs")
 @click.option('--dqm-cmap', type=click.Choice(['HD', 'VD']), default='HD', help="Which channel map to use for DQM")
@@ -115,7 +116,7 @@ def cli(global_partition_name, host_global, port_global, partition_name, number_
         use_hsi_hw, hsi_device_id, mean_hsi_signal_multiplicity, hsi_signal_emulation_mode, enabled_hsi_signals,
         ttcm_s1, ttcm_s2, trigger_activity_plugin, trigger_activity_config, trigger_candidate_plugin, trigger_candidate_config,
         control_timing_partition, timing_partition_master_device_name, timing_partition_id, timing_partition_trigger_mask, timing_partition_rate_control_enabled, timing_partition_spill_gate_enabled,
-        enable_raw_recording, raw_recording_output_dir, frontend_type, opmon_impl, enable_dqm, ers_impl, dqm_impl, pocket_url, enable_software_tpg, enable_tpset_writing, use_fake_data_producers, dqm_cmap,
+        enable_raw_recording, raw_recording_output_dir, frontend_type, opmon_impl, enable_dqm, ers_impl, dqm_impl, pocket_url, enable_software_tpg, tpg_channel_map, enable_tpset_writing, use_fake_data_producers, dqm_cmap,
         dqm_rawdisplay_params, dqm_meanrms_params, dqm_fourier_params, dqm_fouriersum_params,
         op_env, tpc_region_name_prefix, max_file_size, debug, json_dir):
 
@@ -374,6 +375,7 @@ def cli(global_partition_name, host_global, port_global, partition_name, number_
             FRONTEND_TYPE = frontend_type,
             SYSTEM_TYPE = system_type,
             SOFTWARE_TPG_ENABLED = enable_software_tpg,
+            TPG_CHANNEL_MAP = tpg_channel_map,
             USE_FAKE_DATA_PRODUCERS = use_fake_data_producers,
             HOST=host,
             LATENCY_BUFFER_SIZE=latency_buffer_size,
