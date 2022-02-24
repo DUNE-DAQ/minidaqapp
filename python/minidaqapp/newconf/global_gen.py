@@ -110,13 +110,13 @@ def cli(partition_name, disable_trace, host_thi, port_thi, host_tmc, timing_hw_c
                                                                             msg_module_name="TimingHwCmdNQ",
                                                                             topics=[],
                                                                             receivers=["thi.timing_cmds"])
-    the_system.apps["tmc"] = get_tmc_app(
-        MASTER_DEVICE_NAME=master_device_name,
-        HOST=host_tmc,
-        DEBUG=debug)
-    add_network("tmc", the_system, verbose=debug)
+    if master_device_name:
+        the_system.apps["tmc"] = get_tmc_app(
+            MASTER_DEVICE_NAME=master_device_name,
+            HOST=host_tmc,
+            DEBUG=debug)
+        add_network("tmc", the_system, verbose=debug)
 
-    
     if debug:
         the_system.export("global_system.dot")
 
