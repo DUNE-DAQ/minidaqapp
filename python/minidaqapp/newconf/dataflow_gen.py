@@ -48,9 +48,7 @@ from appfwk.conf_utils import Direction, Connection, data_request_endpoint_name
 # Time to wait on pop()
 QUEUE_POP_WAIT_MS = 100
 
-class DataFlowApp(App):
-    def __init__(self,
-                 RU_CONFIG=[],
+def get_dataflow_app(RU_CONFIG=[],
                  HOSTIDX=0,
                  RUN_NUMBER=333,
                  OUTPUT_PATH=".",
@@ -131,7 +129,9 @@ class DataFlowApp(App):
 
         mgraph.add_endpoint("trigger_decisions", "trb.trigger_decision_input_queue", Direction.IN)
         
-        super().__init__(modulegraph=mgraph, host=HOST)
-        if DEBUG:
-            self.export("dataflow_app.dot")
+    df_app = App(modulegraph=mgraph, host=HOST)
 
+        if DEBUG:
+        df_app.export("dataflow_app.dot")
+
+    return df_app

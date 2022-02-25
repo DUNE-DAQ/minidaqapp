@@ -56,7 +56,7 @@ def generate(
         RU_CONFIG=[],
         EMULATOR_MODE=False,
         DATA_RATE_SLOWDOWN_FACTOR=1,
-        RUN_NUMBER=333, 
+        RUN_NUMBER=333,
         DATA_FILE="./frames.bin",
         FLX_INPUT=False,
         SSP_INPUT=True,
@@ -108,7 +108,8 @@ def generate(
 
     if FRONTEND_TYPE == 'wib':
         queue_bare_specs += [
-            app.QueueSpec(inst="errored_frames_q", kind="FollyMPMCQueue", capacity=10000)
+            app.QueueSpec(inst="errored_frames_q", kind="FollyMPMCQueue", capacity=10000),
+            app.QueueSpec(inst="errored_chunks_q", kind='FollyMPMCQueue', capacity=100)
         ]
 
     # Only needed to reproduce the same order as when using jsonnet
@@ -178,11 +179,15 @@ def generate(
             mod_specs.append(mspec("flxcard_0", "FelixCardReader", [
                             app.QueueInfo(name=f"output_{idx}", inst=f"{FRONTEND_TYPE}_link_{idx}", dir="output")
                                 for idx in range(MIN_LINK, MIN_LINK + min(5, RU_CONFIG[RUIDX]["channel_count"]))
+                            ] + [
+                            app.QueueInfo(name="errored_chunks", inst="errored_chunks_q", dir="output")
                             ]))
             if RU_CONFIG[RUIDX]["channel_count"] > 5 :
                 mod_specs.append(mspec("flxcard_1", "FelixCardReader", [
                                 app.QueueInfo(name=f"output_{idx}", inst=f"{FRONTEND_TYPE}_link_{idx}", dir="output")
                                     for idx in range(MIN_LINK + 5, MAX_LINK)
+                                ] + [
+                                app.QueueInfo(name="errored_chunks", inst="errored_chunks_q", dir="output")
                                 ]))
         elif SSP_INPUT:
             mod_specs.append(mspec("ssp_0", "SSPCardReader", [

@@ -32,9 +32,7 @@ QUEUE_POP_WAIT_MS = 100
 # local clock speed Hz
 # CLOCK_SPEED_HZ = 50000000;
 
-class DQMApp(App):
-    def __init__(self,
-                 RU_CONFIG=[],
+def get_dqm_app(RU_CONFIG=[],
                  RU_NAME='',
                  EMULATOR_MODE=False,
                  DATA_RATE_SLOWDOWN_FACTOR=1,
@@ -134,6 +132,9 @@ class DQMApp(App):
 
         mgraph = ModuleGraph(modules)
 
-        super().__init__(mgraph, host=HOST)
+    dqm_app = App(mgraph, host=HOST)
+
         if DEBUG:
-            self.export("dqm_app.dot")
+        dqm_app.export("dqm_app.dot")
+
+    return dqm_app

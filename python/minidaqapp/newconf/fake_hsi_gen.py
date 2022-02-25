@@ -41,55 +41,50 @@ from appfwk.conf_utils import Direction
 import math
 
 #===============================================================================
-class FakeHSIApp(App):
-    def __init__(self,
-                 # NW_SPECS: list,
-                 RUN_NUMBER=333,
-                 CLOCK_SPEED_HZ: int=50000000,
-                 DATA_RATE_SLOWDOWN_FACTOR: int=1,
-                 TRIGGER_RATE_HZ: int=1,
-                 HSI_DEVICE_ID: int=0,
-                 MEAN_SIGNAL_MULTIPLICITY: int=0,
-                 SIGNAL_EMULATION_MODE: int=0,
-                 ENABLED_SIGNALS: int=0b00000001,
-                 PARTITION="UNKNOWN",
-                 HOST="localhost",
-                 DEBUG=False):
+def get_fake_hsi_app(RUN_NUMBER=333,
+                     CLOCK_SPEED_HZ: int=50000000,
+                     DATA_RATE_SLOWDOWN_FACTOR: int=1,
+                     TRIGGER_RATE_HZ: int=1,
+                     HSI_DEVICE_ID: int=0,
+                     MEAN_SIGNAL_MULTIPLICITY: int=0,
+                     SIGNAL_EMULATION_MODE: int=0,
+                     ENABLED_SIGNALS: int=0b00000001,
+                     PARTITION="UNKNOWN",
+                     HOST="localhost",
+                     DEBUG=False):
         
-        trigger_interval_ticks = 0
-        required_eps = {PARTITION + '.hsievent'}
-        # if not required_eps.issubset([nw.name for nw in NW_SPECS]):
-        #     raise RuntimeError(f"ERROR: not all the required endpoints ({', '.join(required_eps)}) found in list of endpoints {' '.join([nw.name for nw in NW_SPECS])}")
+    trigger_interval_ticks = 0
+    if TRIGGER_RATE_HZ > 0:
+        trigger_interval_ticks = math.floor((1 / TRIGGER_RATE_HZ) * CLOCK_SPEED_HZ / DATA_RATE_SLOWDOWN_FACTOR)
 
-        if TRIGGER_RATE_HZ > 0:
-            trigger_interval_ticks = math.floor((1 / TRIGGER_RATE_HZ) * CLOCK_SPEED_HZ / DATA_RATE_SLOWDOWN_FACTOR)
+    startpars = rccmd.StartParams(run=RUN_NUMBER, trigger_interval_ticks = trigger_interval_ticks)
+    resumepars = rccmd.ResumeParams(trigger_interval_ticks = trigger_interval_ticks)
 
-        startpars = rccmd.StartParams(run=RUN_NUMBER, trigger_interval_ticks = trigger_interval_ticks)
-        resumepars = rccmd.ResumeParams(trigger_interval_ticks = trigger_interval_ticks)
-
-        modules = [DAQModule(name   = 'fhsig',
-                             plugin = "FakeHSIEventGenerator",
-                             conf   =  fhsig.Conf(clock_frequency=CLOCK_SPEED_HZ/DATA_RATE_SLOWDOWN_FACTOR,
-                                                  trigger_interval_ticks=trigger_interval_ticks,
-                                                  mean_signal_multiplicity=MEAN_SIGNAL_MULTIPLICITY,
-                                                  signal_emulation_mode=SIGNAL_EMULATION_MODE,
-                                                  enabled_signals=ENABLED_SIGNALS,
-                                                  hsievent_connection_name=PARTITION+".hsievents",
-                                                  timesync_topic="Timesync"),
-                             extra_commands = {"start": startpars,
-                                               "resume": resumepars})]
+    modules = [DAQModule(name   = 'fhsig',
+                         plugin = "FakeHSIEventGenerator",
+                         conf   =  fhsig.Conf(clock_frequency=CLOCK_SPEED_HZ/DATA_RATE_SLOWDOWN_FACTOR,
+                                              trigger_interval_ticks=trigger_interval_ticks,
+                                              mean_signal_multiplicity=MEAN_SIGNAL_MULTIPLICITY,
+                                              signal_emulation_mode=SIGNAL_EMULATION_MODE,
+                                              enabled_signals=ENABLED_SIGNALS,
+                                              hsievent_connection_name=PARTITION+".hsievents",
+                                              timesync_topic="Timesync"),
+                         extra_commands = {"start": startpars,
+                                           "resume": resumepars})]
     
-        mgraph = ModuleGraph(modules)
-        # P. Rodrigues 2022-02-15 We don't make endpoints for the
-        # timesync connection because they are handled by some
-        # special-case magic in NetworkManager, which holds a map
-        # of topics to connections, and looks up all the
-        # connections for a given topic.
-        #
-        # mgraph.add_endpoint("time_sync", None, Direction.IN)
-        mgraph.add_endpoint("hsievents", None, Direction.OUT)
-        super().__init__(modulegraph=mgraph, host=HOST, name="FakeHSIApp")
-        if DEBUG:
-            self.export("fake_hsi_app.dot")
-        
+    mgraph = ModuleGraph(modules)
+    # P. Rodrigues 2022-02-15 We don't make endpoints for the
+    # timesync connection because they are handled by some
+    # special-case magic in NetworkManager, which holds a map
+    # of topics to connections, and looks up all the
+    # connections for a given topic.
+    #
+    # mgraph.add_endpoint("time_sync", None, Direction.IN)
+    mgraph.add_endpoint("hsievents", None, Direction.OUT)
+    fake_hsi_app = App(modulegraph=mgraph, host=HOST, name="FakeHSIApp")
+    
+    if DEBUG:
+        fake_hsi_app.export("fake_hsi_app.dot")
+
+    return fake_hsi_app
 
