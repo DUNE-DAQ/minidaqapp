@@ -433,7 +433,7 @@ def cli(global_partition_name, host_global, port_global, partition_name, number_
         )
         if enable_dqm:
             dqm_name = dqm_df_app_names[i]
-            the_system.apps[dqm_name] = DQMApp(
+            the_system.apps[dqm_name] = get_dqm_app(
                 RU_CONFIG = ru_configs,
                 RU_NAME=ru_name,
                 EMULATOR_MODE = emulator_mode,

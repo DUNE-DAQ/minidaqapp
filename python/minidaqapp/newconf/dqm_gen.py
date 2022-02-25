@@ -132,9 +132,9 @@ def get_dqm_app(RU_CONFIG=[],
 
         mgraph = ModuleGraph(modules)
 
-    dqm_app = App(mgraph, host=HOST)
+        dqm_app = App(mgraph, host=HOST)
 
         if DEBUG:
-        dqm_app.export("dqm_app.dot")
+            dqm_app.export("dqm_app.dot")
 
-    return dqm_app
+        return dqm_app
