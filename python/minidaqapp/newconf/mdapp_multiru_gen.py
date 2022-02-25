@@ -174,6 +174,15 @@ def cli(global_partition_name, host_global, port_global, partition_name, number_
     if (len(region_id) != len(host_ru)) and (len(region_id) != 1):
         raise Exception("--region-id should be specified either once only or once for each --host-ru!")
 
+    if use_hsi_hw and not hsi_device_name:
+        raise Exception("If --use-hsi-hw flag is set to true, --hsi-device-name must be specified!")
+
+    if control_timing_partition and not timing_partition_master_device_name:
+        raise Exception("If --control-timing-partition flag is set to true, --timing-partition-master-device-name must be specified!")
+
+    if control_hsi_hw and not use_hsi_hw:
+        raise Exception("HSI hardware control can only be enabled if HSI hardware is used!")
+
     if frontend_type == 'wib' or frontend_type == 'wib2':
         system_type = 'TPC'
     elif frontend_type == 'pacman':
