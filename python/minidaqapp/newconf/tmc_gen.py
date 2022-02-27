@@ -51,31 +51,30 @@ from appfwk.daqmodule import DAQModule
 from appfwk.conf_utils import Direction, Connection
 
 #===============================================================================
-class TMCApp(App):
-    def __init__(self,
-                 MASTER_DEVICE_NAME="",
-                 MASTER_CLOCK_FILE="",
-                 MASTER_CLOCK_MODE=-1,
-                 HOST="localhost",
-                 DEBUG=False):
-        """
-        { item_description }
-        """            
-        modules = {}
+def get_tmc_app(MASTER_DEVICE_NAME="",
+                MASTER_CLOCK_FILE="",
+                MASTER_CLOCK_MODE=-1,
+                HOST="localhost",
+                DEBUG=False):
+    
+    modules = {}
 
-        ## TODO all the connections...
-        modules = [DAQModule(name = "tmc",
-                            plugin = "TimingMasterController",
-                            conf = tmc.ConfParams(
-                                                device=MASTER_DEVICE_NAME,
-                                                clock_config=MASTER_CLOCK_FILE,
-                                                fanout_mode=MASTER_CLOCK_MODE,
-                                                ))]
+    ## TODO all the connections...
+    modules = [DAQModule(name = "tmc",
+                        plugin = "TimingMasterController",
+                        conf = tmc.ConfParams(
+                                            device=MASTER_DEVICE_NAME,
+                                            clock_config=MASTER_CLOCK_FILE,
+                                            fanout_mode=MASTER_CLOCK_MODE,
+                                            ))]
 
-        mgraph = ModuleGraph(modules)
-        
-        mgraph.add_endpoint("timing_cmds", "tmc.hardware_commands_out", Direction.OUT)
-        
-        super().__init__(modulegraph=mgraph, host=HOST, name="TMCApp")
-        if DEBUG:
-            self.export("tmc_app.dot")
+    mgraph = ModuleGraph(modules)
+    
+    mgraph.add_endpoint("timing_cmds", "tmc.hardware_commands_out", Direction.OUT)
+    
+    tmc_app = App(modulegraph=mgraph, host=HOST, name="TMCApp")
+    
+    if DEBUG:
+        tmc_app.export("tmc_app.dot")
+
+    return tmc_app

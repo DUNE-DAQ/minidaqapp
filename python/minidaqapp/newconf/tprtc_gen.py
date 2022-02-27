@@ -51,36 +51,35 @@ from appfwk.daqmodule import DAQModule
 from appfwk.conf_utils import Direction, Connection
 
 #===============================================================================
-class TPRTCApp(App):
-    def __init__(self,
-                 MASTER_DEVICE_NAME="",
-                 TIMING_PARTITION=0,
-                 TRIGGER_MASK=0xff,
-                 RATE_CONTROL_ENABLED=True,
-                 SPILL_GATE_ENABLED=False,
-                 PARTITION="UNKNOWN",
-                 GLOBAL_PARTITION="UNKNOWN",
-                 HOST="localhost",
-                 DEBUG=False):
-        """
-        { item_description }
-        """            
-        modules = {}
+def get_tprtc_app(MASTER_DEVICE_NAME="",
+                  TIMING_PARTITION=0,
+                  TRIGGER_MASK=0xff,
+                  RATE_CONTROL_ENABLED=True,
+                  SPILL_GATE_ENABLED=False,
+                  PARTITION="UNKNOWN",
+                  GLOBAL_PARTITION="UNKNOWN",
+                  HOST="localhost",
+                  DEBUG=False):
+    
+    modules = {}
 
-        modules = [DAQModule(name = "tprtc",
-                            plugin = "TimingPartitionController",
-                            conf = tprtc.PartitionConfParams(
-                                                device=MASTER_DEVICE_NAME,
-                                                partition_id=TIMING_PARTITION,
-                                                trigger_mask=TRIGGER_MASK,
-                                                spill_gate_enabled=SPILL_GATE_ENABLED,
-                                                rate_control_enabled=RATE_CONTROL_ENABLED,
-                                                ))]
+    modules = [DAQModule(name = "tprtc",
+                         plugin = "TimingPartitionController",
+                         conf = tprtc.PartitionConfParams(
+                                             device=MASTER_DEVICE_NAME,
+                                             partition_id=TIMING_PARTITION,
+                                             trigger_mask=TRIGGER_MASK,
+                                             spill_gate_enabled=SPILL_GATE_ENABLED,
+                                             rate_control_enabled=RATE_CONTROL_ENABLED,
+                                             ))]
 
-        mgraph = ModuleGraph(modules)
-        
-        mgraph.add_endpoint("timing_cmds", "tprtc.hardware_commands_out", Direction.OUT)
-        
-        super().__init__(modulegraph=mgraph, host=HOST, name="TPRTCApp")
-        if DEBUG:
-            self.export("tprtc_app.dot")
+    mgraph = ModuleGraph(modules)
+     
+    mgraph.add_endpoint("timing_cmds", "tprtc.hardware_commands_out", Direction.OUT)
+     
+    tprtc_app = App(modulegraph=mgraph, host=HOST, name="TPRTCApp")
+     
+    if DEBUG:
+        tprtc_app.export("tprtc_app.dot")
+
+    return tprtc_app

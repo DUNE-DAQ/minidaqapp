@@ -97,6 +97,7 @@ import click
 @click.option('--dqm-impl', type=click.Choice(['local','cern','pocket'], case_sensitive=False), default='local', help="DQM destination (Kafka used for cern and pocket)")
 @click.option('--pocket-url', default='127.0.0.1', help="URL for connecting to Pocket services")
 @click.option('--enable-software-tpg', is_flag=True, default=False, help="Enable software TPG")
+@click.option('--tpg-channel-map', type=click.Choice(["VDColdboxChannelMap", "ProtoDUNESP1ChannelMap"]), default="ProtoDUNESP1ChannelMap", help="Channel map for software TPG")
 @click.option('--enable-tpset-writing', is_flag=True, default=False, help="Enable the writing of TPs to disk (only works with --enable-software-tpg")
 @click.option('--use-fake-data-producers', is_flag=True, default=False, help="Use fake data producers that respond with empty fragments immediately instead of (fake) cards and DLHs")
 @click.option('--dqm-cmap', type=click.Choice(['HD', 'VD']), default='HD', help="Which channel map to use for DQM")
@@ -116,7 +117,7 @@ def cli(global_partition_name, host_global, port_global, partition_name, number_
         use_hsi_hw, hsi_device_id, mean_hsi_signal_multiplicity, hsi_signal_emulation_mode, enabled_hsi_signals,
         ttcm_s1, ttcm_s2, trigger_activity_plugin, trigger_activity_config, trigger_candidate_plugin, trigger_candidate_config,
         control_timing_partition, timing_partition_master_device_name, timing_partition_id, timing_partition_trigger_mask, timing_partition_rate_control_enabled, timing_partition_spill_gate_enabled,
-        enable_raw_recording, raw_recording_output_dir, frontend_type, opmon_impl, enable_dqm, ers_impl, dqm_impl, pocket_url, enable_software_tpg, enable_tpset_writing, use_fake_data_producers, dqm_cmap,
+        enable_raw_recording, raw_recording_output_dir, frontend_type, opmon_impl, enable_dqm, ers_impl, dqm_impl, pocket_url, enable_software_tpg, tpg_channel_map, enable_tpset_writing, use_fake_data_producers, dqm_cmap,
         dqm_rawdisplay_params, dqm_meanrms_params, dqm_fourier_params, dqm_fouriersum_params,
         op_env, tpc_region_name_prefix, max_file_size, debug, json_dir):
 
@@ -125,25 +126,25 @@ def cli(global_partition_name, host_global, port_global, partition_name, number_
         raise RuntimeError(f"Directory {json_dir} already exists")
 
     console.log("Loading dataflow config generator")
-    from .dataflow_gen import DataFlowApp
+    from .dataflow_gen import get_dataflow_app
     if enable_dqm:
         console.log("Loading dqm config generator")
-        from .dqm_gen import DQMApp
+        from .dqm_gen import get_dqm_app
     console.log("Loading readout config generator")
-    from .readout_gen import ReadoutApp
+    from .readout_gen import get_readout_app
     console.log("Loading trigger config generator")
-    from .trigger_gen import TriggerApp
+    from .trigger_gen import get_trigger_app
     console.log("Loading DFO config generator")
-    from .dfo_gen import DFOApp
+    from .dfo_gen import get_dfo_app
     console.log("Loading hsi config generator")
-    from .hsi_gen import HSIApp
+    from .hsi_gen import get_hsi_app
     console.log("Loading fake hsi config generator")
-    from .fake_hsi_gen import FakeHSIApp
+    from .fake_hsi_gen import get_fake_hsi_app
     console.log("Loading timing partition controller config generator")
-    from .tprtc_gen import TPRTCApp
+    from .tprtc_gen import get_tprtc_app
     if enable_tpset_writing:
         console.log("Loading TPWriter config generator")
-        from .tpwriter_gen import TPWriterApp
+        from .tpwriter_gen import get_tpwriter_app
 
     console.log(f"Generating configs for hosts trigger={host_trigger} DFO={host_dfo} dataflow={host_df} readout={host_ru} hsi={host_hsi} dqm={host_ru}")
 
@@ -249,7 +250,7 @@ def cli(global_partition_name, host_global, port_global, partition_name, number_
         if len(region_id) != 1: regionidx = regionidx + 1
 
     if use_hsi_hw:
-        the_system.apps["hsi"] = HSIApp(
+        the_system.apps["hsi"] = get_hsi_app(
             RUN_NUMBER = run_number,
             CLOCK_SPEED_HZ = CLOCK_SPEED_HZ,
             TRIGGER_RATE_HZ = trigger_rate_hz,
@@ -268,7 +269,7 @@ def cli(global_partition_name, host_global, port_global, partition_name, number_
             HOST=host_hsi,
             DEBUG=debug)
     else:
-        the_system.apps["hsi"] = FakeHSIApp(
+        the_system.apps["hsi"] = get_fake_hsi_app(
             RUN_NUMBER = run_number,
             CLOCK_SPEED_HZ = CLOCK_SPEED_HZ,
             DATA_RATE_SLOWDOWN_FACTOR = data_rate_slowdown_factor,
@@ -292,7 +293,7 @@ def cli(global_partition_name, host_global, port_global, partition_name, number_
     if debug: console.log("hsi cmd data:", the_system.apps["hsi"])
 
     if control_timing_partition:
-        the_system.apps["tprtc"] = TPRTCApp(
+        the_system.apps["tprtc"] = get_tprtc_app(
             MASTER_DEVICE_NAME=timing_partition_master_device_name,
             TIMING_PARTITION=timing_partition_id,
             TRIGGER_MASK=timing_partition_trigger_mask,
@@ -308,7 +309,7 @@ def cli(global_partition_name, host_global, port_global, partition_name, number_
                                                                             topics=[],
                                                                             receivers=[])
 
-    the_system.apps['trigger'] = TriggerApp(
+    the_system.apps['trigger'] = get_trigger_app(
         SOFTWARE_TPG_ENABLED = enable_software_tpg,
         RU_CONFIG = ru_configs,
         ACTIVITY_PLUGIN = trigger_activity_plugin,
@@ -324,7 +325,7 @@ def cli(global_partition_name, host_global, port_global, partition_name, number_
         HOST=host_trigger,
         DEBUG=debug)
 
-    the_system.apps['dfo'] = DFOApp(
+    the_system.apps['dfo'] = get_dfo_app(
         DF_COUNT = len(host_df),
         TOKEN_COUNT = trigemu_token_count,
         PARTITION=partition_name,
@@ -363,29 +364,33 @@ def cli(global_partition_name, host_global, port_global, partition_name, number_
     mgraphs_readout = []
     for i,host in enumerate(host_ru):
         ru_name = ru_app_names[i]
-        the_system.apps[ru_name] = ReadoutApp(PARTITION=partition_name,
-                                              RU_CONFIG=ru_configs,
-                                              EMULATOR_MODE = emulator_mode,
-                                              DATA_RATE_SLOWDOWN_FACTOR = data_rate_slowdown_factor,
-                                              DATA_FILE = data_file,
-                                              FLX_INPUT = use_felix,
-                                              SSP_INPUT = use_ssp,
-                                              CLOCK_SPEED_HZ = CLOCK_SPEED_HZ,
-                                              RUIDX = i,
-                                              RAW_RECORDING_ENABLED = enable_raw_recording,
-                                              RAW_RECORDING_OUTPUT_DIR = raw_recording_output_dir,
-                                              FRONTEND_TYPE = frontend_type,
-                                              SYSTEM_TYPE = system_type,
-                                              SOFTWARE_TPG_ENABLED = enable_software_tpg,
-                                              USE_FAKE_DATA_PRODUCERS = use_fake_data_producers,
-                                              HOST=host,
-                                              LATENCY_BUFFER_SIZE=latency_buffer_size,
-                                              DEBUG=debug)
-        if debug: console.log(f"{ru_name} app: {the_system.apps[ru_name]}")
+        the_system.apps[ru_name] = get_readout_app(
+            PARTITION=partition_name,
+            RU_CONFIG=ru_configs,
+            EMULATOR_MODE = emulator_mode,
+            DATA_RATE_SLOWDOWN_FACTOR = data_rate_slowdown_factor,
+            DATA_FILE = data_file,
+            FLX_INPUT = use_felix,
+            SSP_INPUT = use_ssp,
+            CLOCK_SPEED_HZ = CLOCK_SPEED_HZ,
+            RUIDX = i,
+            RAW_RECORDING_ENABLED = enable_raw_recording,
+            RAW_RECORDING_OUTPUT_DIR = raw_recording_output_dir,
+            FRONTEND_TYPE = frontend_type,
+            SYSTEM_TYPE = system_type,
+            SOFTWARE_TPG_ENABLED = enable_software_tpg,
+            TPG_CHANNEL_MAP = tpg_channel_map,
+            USE_FAKE_DATA_PRODUCERS = use_fake_data_producers,
+            HOST=host,
+            LATENCY_BUFFER_SIZE=latency_buffer_size,
+            DEBUG=debug)
+        
+        if debug:
+            console.log(f"{ru_name} app: {the_system.apps[ru_name]}")
 
         if enable_dqm:
             dqm_name = dqm_app_names[i]
-            the_system.apps[dqm_name] = DQMApp(
+            the_system.apps[dqm_name] = get_dqm_app(
                 RU_CONFIG = ru_configs,
                 RU_NAME=ru_name,
                 EMULATOR_MODE = emulator_mode,
@@ -419,7 +424,7 @@ def cli(global_partition_name, host_global, port_global, partition_name, number_
     for i,host in enumerate(host_df):
         app_name = f'dataflow{i}'
         df_app_names.append(app_name)
-        the_system.apps[app_name] = DataFlowApp(
+        the_system.apps[app_name] = get_dataflow_app(
             HOSTIDX = i,
             OUTPUT_PATH = output_path,
             PARTITION=partition_name,

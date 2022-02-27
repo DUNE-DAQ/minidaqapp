@@ -49,10 +49,10 @@ def cli(partition_name, disable_trace, host_thi, port_thi, host_tmc, timing_hw_c
         raise RuntimeError(f"Directory {json_dir} already exists")
 
     console.log("Loading timing hardware config generator")
-    from .thi_gen import THIApp
+    from .thi_gen import get_thi_app
 
     console.log("Loading timing master controller generator")
-    from .tmc_gen import TMCApp
+    from .tmc_gen import get_tmc_app
 
     console.log(f"Generating configs for global thi host {host_thi}")
 
@@ -90,7 +90,7 @@ def cli(partition_name, disable_trace, host_thi, port_thi, host_tmc, timing_hw_c
     the_system.network_endpoints.append(nwmgr.Connection(name=partition_name + ".timing_cmds",  topics=[], address=f"tcp://{{host_thi}}:{port_thi}"))
     
     # the timing hardware interface application
-    the_system.apps["thi"] = THIApp(
+    the_system.apps["thi"] = get_thi_app(
         CONNECTIONS_FILE=timing_hw_connections_file,
         MASTER_DEVICE_NAME=master_device_name,
         HSI_DEVICE_NAME=hsi_device_name,
@@ -110,7 +110,7 @@ def cli(partition_name, disable_trace, host_thi, port_thi, host_tmc, timing_hw_c
                                                                             msg_module_name="TimingHwCmdNQ",
                                                                             topics=[],
                                                                             receivers=["thi.timing_cmds"])
-    the_system.apps["tmc"] = TMCApp(
+    the_system.apps["tmc"] = get_tmc_app(
         MASTER_DEVICE_NAME=master_device_name,
         HOST=host_tmc,
         DEBUG=debug)
