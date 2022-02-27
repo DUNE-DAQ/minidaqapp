@@ -22,25 +22,26 @@ from appfwk.conf_utils import Direction
 # Time to wait on pop()
 QUEUE_POP_WAIT_MS = 100
 
-class TPWriterApp(App):
-    def __init__(self,
-                 RU_CONFIG=[],
-                 HOST="localhost",
-                 DEBUG=False):
-        
-        """Generate the json configuration for the readout and DF process"""
+def get_tpwriter_app(RU_CONFIG=[],
+                     HOST="localhost",
+                     DEBUG=False):
 
-        modules = []
-        
-        modules += [DAQModule(name = 'tpswriter',
-                              plugin = "TPStreamWriter",
-                              connections = {}, #'tpset_source': Connection("tpsets_from_netq")},
-                              conf = tpsw.ConfParams(max_file_size_bytes=1000000000))]
+    """Generate the json configuration for the readout and DF process"""
 
-        mgraph=ModuleGraph(modules)
+    modules = []
 
-        mgraph.add_endpoint("tpsets_into_writer", "tpswriter.tpset_source", Direction.IN)
+    modules += [DAQModule(name = 'tpswriter',
+                          plugin = "TPStreamWriter",
+                          connections = {}, #'tpset_source': Connection("tpsets_from_netq")},
+                          conf = tpsw.ConfParams(max_file_size_bytes=1000000000))]
 
-        super().__init__(modulegraph=mgraph, host=HOST)
-        if DEBUG:
-            self.export("tpwriter_app.dot")
+    mgraph=ModuleGraph(modules)
+
+    mgraph.add_endpoint("tpsets_into_writer", "tpswriter.tpset_source", Direction.IN)
+
+    tpw_app = App(modulegraph=mgraph, host=HOST)
+
+    if DEBUG:
+        tpw_app.export("tpwriter_app.dot")
+
+    return tpw_app
